@@ -80,5 +80,12 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ hint: "POST with Authorization: Bearer <INIT_DB_TOKEN>" });
+  const env = {
+    NETLIFY_DATABASE_URL: !!process.env.NETLIFY_DATABASE_URL,
+    NETLIFY_DATABASE_URL_UNPOOLED: !!process.env.NETLIFY_DATABASE_URL_UNPOOLED,
+    DATABASE_URL: !!process.env.DATABASE_URL,
+    INIT_DB_TOKEN: !!process.env.INIT_DB_TOKEN,
+    CLERK_SECRET_KEY: !!process.env.CLERK_SECRET_KEY,
+  };
+  return NextResponse.json({ hint: "POST with Authorization: Bearer <INIT_DB_TOKEN>", env });
 }
