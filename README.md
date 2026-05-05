@@ -1,4 +1,4 @@
-# 🎵 Song Rater
+# 🎵 Tuned Up
 
 Rate songs 1–100, follow other users, and see their ratings in your feed.
 

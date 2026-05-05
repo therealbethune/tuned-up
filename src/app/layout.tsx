@@ -4,7 +4,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Song Rater",
+  title: "Tuned Up",
   description: "Rate songs 1–100 and follow your friends",
 };
 
@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body className="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
           <header className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur sticky top-0 z-10">
             <nav className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">
-              <Link href="/" className="font-bold text-lg tracking-tight">🎵 SongRater</Link>
+              <Link href="/" className="font-bold text-lg tracking-tight">🎵 Tuned Up</Link>
               <div className="flex items-center gap-4 text-sm">
                 <Show when="signed-in">
                   <Link href="/feed" className="hover:text-white text-neutral-300">Feed</Link>
