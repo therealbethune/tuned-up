@@ -1,38 +1,49 @@
 import Image from "next/image";
 import Link from "next/link";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, count } from "drizzle-orm";
 import { db, ratings, songs, follows, users } from "@/db";
 import { FollowButton } from "./FollowButton";
 
 type User = typeof users.$inferSelect;
 
 export default async function UserProfile({ target, viewerId }: { target: User; viewerId: string | null }) {
-  const rows = await db
-    .select({
-      score: ratings.score,
-      review: ratings.review,
-      createdAt: ratings.createdAt,
-      songId: songs.id,
-      title: songs.title,
-      artist: songs.artist,
-      album: songs.album,
-      thumbnail: songs.thumbnail,
-    })
-    .from(ratings)
-    .innerJoin(songs, eq(ratings.songId, songs.id))
-    .where(eq(ratings.userId, target.id))
-    .orderBy(desc(ratings.createdAt))
-    .limit(100);
-
-  let isFollowing = false;
-  if (viewerId && viewerId !== target.id) {
-    const [f] = await db
-      .select()
+  const [rows, [followerStat], [followingStat], followingViewer] = await Promise.all([
+    db
+      .select({
+        score: ratings.score,
+        review: ratings.review,
+        createdAt: ratings.createdAt,
+        songId: songs.id,
+        title: songs.title,
+        artist: songs.artist,
+        album: songs.album,
+        thumbnail: songs.thumbnail,
+      })
+      .from(ratings)
+      .innerJoin(songs, eq(ratings.songId, songs.id))
+      .where(eq(ratings.userId, target.id))
+      .orderBy(desc(ratings.createdAt))
+      .limit(100),
+    db
+      .select({ n: count() })
       .from(follows)
-      .where(and(eq(follows.followerId, viewerId), eq(follows.followeeId, target.id)))
-      .limit(1);
-    isFollowing = !!f;
-  }
+      .where(eq(follows.followeeId, target.id)),
+    db
+      .select({ n: count() })
+      .from(follows)
+      .where(eq(follows.followerId, target.id)),
+    viewerId && viewerId !== target.id
+      ? db
+          .select()
+          .from(follows)
+          .where(and(eq(follows.followerId, viewerId), eq(follows.followeeId, target.id)))
+          .limit(1)
+      : Promise.resolve([]),
+  ]);
+
+  const followersCount = followerStat?.n ?? 0;
+  const followingCount = followingStat?.n ?? 0;
+  const isFollowing = followingViewer.length > 0;
 
   const avg = rows.length
     ? Math.round(rows.reduce((a, r) => a + r.score, 0) / rows.length)
@@ -53,6 +64,23 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         {viewerId && viewerId !== target.id && (
           <FollowButton username={target.username} initiallyFollowing={isFollowing} />
         )}
+      </div>
+
+      <div className="flex gap-6 text-sm">
+        <Link
+          href={`/u/${target.username}/followers`}
+          className="hover:text-white text-neutral-300 transition-colors"
+        >
+          <span className="font-bold text-white tabular-nums">{followersCount}</span>{" "}
+          <span className="text-neutral-400">{followersCount === 1 ? "follower" : "followers"}</span>
+        </Link>
+        <Link
+          href={`/u/${target.username}/following`}
+          className="hover:text-white text-neutral-300 transition-colors"
+        >
+          <span className="font-bold text-white tabular-nums">{followingCount}</span>{" "}
+          <span className="text-neutral-400">following</span>
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-4 text-sm">
