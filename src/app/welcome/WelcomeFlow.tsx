@@ -107,6 +107,21 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
 
       {step === 1 && (
         <div className="space-y-4">
+          <div className="rounded-lg border border-emerald-700/40 bg-emerald-500/5 p-4 flex items-center justify-between gap-4">
+            <div>
+              <div className="font-medium">Got Spotify?</div>
+              <p className="text-sm text-neutral-400">
+                Import your top tracks and rate them in seconds.
+              </p>
+            </div>
+            <a
+              href="/import/spotify"
+              className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-4 py-1.5 text-sm whitespace-nowrap"
+            >
+              Import
+            </a>
+          </div>
+
           <div className="relative">
             <svg
               className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500"

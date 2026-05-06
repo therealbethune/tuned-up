@@ -14,8 +14,19 @@ export function ytUrlForSongId(songId: string): string | null {
   return null;
 }
 
+// Direct Spotify track / album URL for ids we created from a Spotify import.
+export function spotifyDirectUrlForSongId(songId: string): string | null {
+  if (songId.startsWith("spotify:")) {
+    return `https://open.spotify.com/track/${songId.slice("spotify:".length)}`;
+  }
+  if (songId.startsWith("spotify-album:")) {
+    return `https://open.spotify.com/album/${songId.slice("spotify-album:".length)}`;
+  }
+  return null;
+}
+
 export function isAlbumId(songId: string): boolean {
-  return songId.startsWith("yt-album:");
+  return songId.startsWith("yt-album:") || songId.startsWith("spotify-album:");
 }
 
 export function itemKindForId(songId: string): "song" | "album" {

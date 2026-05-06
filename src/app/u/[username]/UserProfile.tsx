@@ -10,6 +10,7 @@ import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { isAlbumId } from "@/lib/songs";
+import { computeTasteAgreement } from "@/lib/taste";
 
 type User = typeof users.$inferSelect;
 
@@ -35,6 +36,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
 
   const followersCount = followerStat?.n ?? 0;
   const followingCount = followingStat?.n ?? 0;
+  const taste = viewerId && !isOwner ? await computeTasteAgreement(viewerId, target.id) : null;
   const followRow = followingViewer[0];
   const followState: "none" | "pending" | "accepted" = !followRow
     ? "none"
@@ -127,6 +129,18 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
               ? "Your follow request is waiting to be approved."
               : "Follow to see their ratings — they'll need to approve your request."}
           </p>
+        </div>
+      )}
+
+      {taste && (
+        <div className="rounded-lg border border-emerald-700/40 bg-emerald-500/5 p-4 flex items-center gap-4">
+          <div className="text-3xl font-bold tabular-nums text-emerald-400">{taste.agreement}%</div>
+          <div className="flex-1">
+            <div className="font-medium">Taste agreement</div>
+            <div className="text-sm text-neutral-400">
+              Across {taste.shared} {taste.shared === 1 ? "song" : "songs"} you&apos;ve both rated.
+            </div>
+          </div>
         </div>
       )}
 

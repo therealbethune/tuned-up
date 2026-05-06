@@ -1,4 +1,4 @@
-import { ytUrlForSongId, streamingSearchLinks } from "@/lib/songs";
+import { ytUrlForSongId, spotifyDirectUrlForSongId, streamingSearchLinks } from "@/lib/songs";
 
 // Branded one-color icons. Keeps things small and avoids logo licensing concerns.
 function YtMusicIcon() {
@@ -47,7 +47,9 @@ export function StreamingLinks({
   className?: string;
 }) {
   const yt = ytUrlForSongId(songId);
-  const { spotify, appleMusic } = streamingSearchLinks({ title, artist });
+  const spotifyDirect = spotifyDirectUrlForSongId(songId);
+  const { spotify: spotifySearch, appleMusic } = streamingSearchLinks({ title, artist });
+  const spotify = spotifyDirect ?? spotifySearch;
 
   const linkClass =
     "inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors";
