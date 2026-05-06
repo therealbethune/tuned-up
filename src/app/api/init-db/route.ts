@@ -80,6 +80,9 @@ const STATEMENTS = [
   `ALTER TABLE "likes" ADD CONSTRAINT "likes_liker_id_users_id_fk" FOREIGN KEY ("liker_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   `ALTER TABLE "likes" ADD CONSTRAINT "likes_rating_fk" FOREIGN KEY ("rating_user_id","song_id") REFERENCES "public"."ratings"("user_id","song_id") ON DELETE cascade ON UPDATE no action`,
   `CREATE INDEX IF NOT EXISTS "likes_target_idx" ON "likes" USING btree ("rating_user_id","song_id")`,
+  // Backfill: any user who's already rated something is grandfathered in.
+  // Idempotent — only updates rows where onboarded_at is still null.
+  `UPDATE "users" SET "onboarded_at" = "created_at" WHERE "onboarded_at" IS NULL AND EXISTS (SELECT 1 FROM "ratings" WHERE "ratings"."user_id" = "users"."id")`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).
