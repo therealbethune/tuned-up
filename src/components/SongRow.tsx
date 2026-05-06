@@ -1,14 +1,7 @@
 import Image from "next/image";
 import { RateButton } from "./RateButton";
 import type { SongResult } from "@/lib/ytmusic";
-
-function ytUrl(songId: string): string | null {
-  if (songId.startsWith("yt:")) {
-    const videoId = songId.slice(3);
-    return `https://music.youtube.com/watch?v=${videoId}`;
-  }
-  return null;
-}
+import { ytUrlForSongId } from "@/lib/songs";
 
 function durationLabel(seconds: number | null | undefined): string | null {
   if (seconds == null) return null;
@@ -28,7 +21,7 @@ export function SongRow({
   right?: React.ReactNode;
   highlight?: boolean;
 }) {
-  const url = ytUrl(song.id);
+  const url = ytUrlForSongId(song.id);
   const dur = durationLabel(song.durationSeconds);
 
   return (

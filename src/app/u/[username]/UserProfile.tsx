@@ -3,6 +3,7 @@ import Link from "next/link";
 import { and, desc, eq, count } from "drizzle-orm";
 import { db, ratings, songs, follows, users } from "@/db";
 import { FollowButton } from "./FollowButton";
+import { ytUrlForSongId } from "@/lib/songs";
 
 type User = typeof users.$inferSelect;
 
@@ -99,20 +100,51 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         <p className="text-neutral-500 text-sm">No ratings yet. <Link href="/search" className="underline">Rate something.</Link></p>
       ) : (
         <ul className="space-y-2">
-          {rows.map((r) => (
-            <li key={r.songId} className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
-              {r.thumbnail ? (
-                <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" unoptimized />
-              ) : (
-                <div className="h-12 w-12 rounded bg-neutral-800" />
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{r.title}</div>
-                <div className="text-sm text-neutral-400 truncate">{r.artist}{r.album ? ` · ${r.album}` : ""}</div>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{r.score}</div>
-            </li>
-          ))}
+          {rows.map((r) => {
+            const url = ytUrlForSongId(r.songId);
+            return (
+              <li key={r.songId} className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
+                {url ? (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="relative shrink-0 group"
+                    title="Open in YouTube Music"
+                  >
+                    {r.thumbnail ? (
+                      <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" unoptimized />
+                    ) : (
+                      <div className="h-12 w-12 rounded bg-neutral-800" />
+                    )}
+                    <div className="absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+                      <svg
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden
+                      >
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </a>
+                ) : r.thumbnail ? (
+                  <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover shrink-0" unoptimized />
+                ) : (
+                  <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  {url ? (
+                    <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate block hover:underline">
+                      {r.title}
+                    </a>
+                  ) : (
+                    <div className="font-medium truncate">{r.title}</div>
+                  )}
+                  <div className="text-sm text-neutral-400 truncate">{r.artist}{r.album ? ` · ${r.album}` : ""}</div>
+                </div>
+                <div className="text-2xl font-bold tabular-nums">{r.score}</div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
