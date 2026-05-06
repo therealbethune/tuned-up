@@ -1,16 +1,16 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { SongRow } from "@/components/SongRow";
-import type { SongResult } from "@/lib/ytmusic";
+import type { SongResult, ItemKind } from "@/lib/ytmusic";
 
 export default function SearchPage() {
   const [q, setQ] = useState("");
+  const [kind, setKind] = useState<ItemKind>("song");
   const [results, setResults] = useState<SongResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reqId = useRef(0);
 
-  // Debounced search-as-you-type
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) {
@@ -23,9 +23,8 @@ export default function SearchPage() {
     const id = ++reqId.current;
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}&kind=${kind}`);
         const data = await res.json();
-        // ignore stale responses
         if (id !== reqId.current) return;
         if (!res.ok) throw new Error(data.error || "search failed");
         setResults(data.results ?? []);
@@ -39,7 +38,7 @@ export default function SearchPage() {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, kind]);
 
   const top = results[0];
   const rest = results.slice(1);
@@ -47,8 +46,29 @@ export default function SearchPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Find a song</h1>
-        <p className="text-neutral-400 text-sm">Search YouTube Music. Click the album art to open the track.</p>
+        <h1 className="text-2xl font-bold">Find {kind === "album" ? "an album" : "a song"}</h1>
+        <p className="text-neutral-400 text-sm">
+          Search YouTube Music. Click the artwork to open the {kind === "album" ? "album" : "track"}.
+        </p>
+      </div>
+
+      <div className="inline-flex rounded-full border border-neutral-800 p-1 text-sm">
+        <button
+          onClick={() => setKind("song")}
+          className={`px-4 py-1 rounded-full transition-colors ${
+            kind === "song" ? "bg-white text-black" : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          Songs
+        </button>
+        <button
+          onClick={() => setKind("album")}
+          className={`px-4 py-1 rounded-full transition-colors ${
+            kind === "album" ? "bg-white text-black" : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          Albums
+        </button>
       </div>
 
       <div className="relative">
@@ -64,7 +84,7 @@ export default function SearchPage() {
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Song, artist, album…"
+          placeholder={kind === "album" ? "Album, artist…" : "Song, artist, album…"}
           className="w-full rounded-full bg-neutral-900 border border-neutral-800 pl-11 pr-12 py-2.5 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
         />
         {loading && (

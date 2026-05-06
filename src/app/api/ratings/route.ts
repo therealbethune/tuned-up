@@ -23,10 +23,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "score must be 1-100" }, { status: 400 });
   }
 
+  // Detect kind from id prefix (or accept it from the client).
+  const kind: "song" | "album" =
+    song.kind === "album" || song.id.startsWith("yt-album:") ? "album" : "song";
+
   await db
     .insert(songs)
     .values({
       id: song.id,
+      kind,
       title: song.title,
       artist: song.artist,
       album: song.album ?? null,
@@ -35,7 +40,13 @@ export async function POST(req: Request) {
     })
     .onConflictDoUpdate({
       target: songs.id,
-      set: { title: song.title, artist: song.artist, album: song.album ?? null, thumbnail: song.thumbnail ?? null },
+      set: {
+        kind,
+        title: song.title,
+        artist: song.artist,
+        album: song.album ?? null,
+        thumbnail: song.thumbnail ?? null,
+      },
     });
 
   // Detect whether this is a NEW rating (vs an update of an existing one) by

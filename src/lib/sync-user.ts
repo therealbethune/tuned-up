@@ -20,8 +20,9 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
     `user_${u.id.slice(-6)}`;
   const displayName = [u.firstName, u.lastName].filter(Boolean).join(" ") || username;
 
-  // Insert sets onboardedAt to null implicitly; update preserves it (we don't
-  // touch it here so onboarding completion isn't overwritten).
+  // Insert preserves onboardedAt and isPrivate; we only touch the avatar on
+  // updates so a user-edited username/displayName from /settings isn't
+  // overwritten on every page load.
   await db
     .insert(users)
     .values({
@@ -33,8 +34,6 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
     .onConflictDoUpdate({
       target: users.id,
       set: {
-        username,
-        displayName,
         imageUrl: u.imageUrl ?? null,
       },
     });

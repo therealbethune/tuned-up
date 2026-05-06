@@ -4,6 +4,7 @@
 const YT_MUSIC_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30";
 const ENDPOINT = `https://music.youtube.com/youtubei/v1/search?key=${YT_MUSIC_KEY}&prettyPrint=false`;
 const SONGS_PARAMS = "EgWKAQIIAWoOEAMQBBAJEA4QChAFEBA%3D";
+const ALBUMS_PARAMS = "EgWKAQIYAWoOEAMQBBAJEA4QChAFEBA%3D";
 
 const CTX = {
   client: {
@@ -14,8 +15,11 @@ const CTX = {
   },
 };
 
+export type ItemKind = "song" | "album";
+
 export type SongResult = {
-  id: string;
+  id: string; // yt:<videoId> for songs, yt-album:<browseId> for albums
+  kind: ItemKind;
   title: string;
   artist: string;
   album: string | null;
@@ -39,7 +43,7 @@ function parseDuration(s: string | null | undefined): number | null {
   return total;
 }
 
-export async function searchSongs(query: string): Promise<SongResult[]> {
+async function rawSearch(query: string, params: string): Promise<unknown> {
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: {
@@ -47,60 +51,115 @@ export async function searchSongs(query: string): Promise<SongResult[]> {
       "user-agent": "Mozilla/5.0",
       origin: "https://music.youtube.com",
     },
-    body: JSON.stringify({ context: CTX, query, params: SONGS_PARAMS }),
+    body: JSON.stringify({ context: CTX, query, params }),
   });
   if (!res.ok) throw new Error(`yt music search failed: ${res.status}`);
-  const data = await res.json();
+  return res.json();
+}
 
-  const sections =
-    data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content
+function shelfContents(data: unknown): unknown[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sections: any[] =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (data as any)?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content
       ?.sectionListRenderer?.contents ?? [];
-
-  const results: SongResult[] = [];
+  const out: unknown[] = [];
   for (const section of sections) {
-    const shelf = section?.musicShelfRenderer;
-    if (!shelf) continue;
-    const items = shelf.contents ?? [];
-    for (const it of items) {
-      const r = it?.musicResponsiveListItemRenderer;
-      if (!r) continue;
+    const items = section?.musicShelfRenderer?.contents ?? [];
+    for (const it of items) out.push(it);
+  }
+  return out;
+}
 
-      const flex = r.flexColumns ?? [];
-      const title = joinRuns(flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs);
-      const subRuns: Run[] =
-        flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs ?? [];
+export async function searchSongs(query: string): Promise<SongResult[]> {
+  const data = await rawSearch(query, SONGS_PARAMS);
+  const results: SongResult[] = [];
+  for (const it of shelfContents(data)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = (it as any)?.musicResponsiveListItemRenderer;
+    if (!r) continue;
+    const flex = r.flexColumns ?? [];
+    const title = joinRuns(flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs);
+    const subRuns: Run[] = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs ?? [];
 
-      const separated: Run[][] = [[]];
-      for (const run of subRuns) {
-        if (run.text === " • ") separated.push([]);
-        else separated[separated.length - 1].push(run);
-      }
-      // Songs filter shape: [Artists] • [Album] • [Duration]
-      const artistRuns = separated[0] ?? [];
-      const artist = artistRuns.map((x) => x.text ?? "").join("");
-      const album = separated.length >= 3 ? separated[separated.length - 2].map((x) => x.text ?? "").join("") : null;
-      const durationStr = separated.length >= 2 ? separated[separated.length - 1].map((x) => x.text ?? "").join("") : null;
-      const durationSeconds = parseDuration(durationStr);
-
-      const videoId =
-        r.playlistItemData?.videoId ??
-        r.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer
-          ?.playNavigationEndpoint?.watchEndpoint?.videoId ??
-        null;
-      if (!videoId || !title) continue;
-
-      const thumbs = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails ?? [];
-      const thumbnail = thumbs.length ? thumbs[thumbs.length - 1].url : null;
-
-      results.push({
-        id: `yt:${videoId}`,
-        title,
-        artist,
-        album: album || null,
-        thumbnail,
-        durationSeconds,
-      });
+    const separated: Run[][] = [[]];
+    for (const run of subRuns) {
+      if (run.text === " • ") separated.push([]);
+      else separated[separated.length - 1].push(run);
     }
+    const artist = (separated[0] ?? []).map((x) => x.text ?? "").join("");
+    const album = separated.length >= 3 ? separated[separated.length - 2].map((x) => x.text ?? "").join("") : null;
+    const durationStr = separated.length >= 2 ? separated[separated.length - 1].map((x) => x.text ?? "").join("") : null;
+    const durationSeconds = parseDuration(durationStr);
+
+    const videoId =
+      r.playlistItemData?.videoId ??
+      r.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer
+        ?.playNavigationEndpoint?.watchEndpoint?.videoId ??
+      null;
+    if (!videoId || !title) continue;
+
+    const thumbs = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails ?? [];
+    const thumbnail = thumbs.length ? thumbs[thumbs.length - 1].url : null;
+
+    results.push({
+      id: `yt:${videoId}`,
+      kind: "song",
+      title,
+      artist,
+      album: album || null,
+      thumbnail,
+      durationSeconds,
+    });
   }
   return results.slice(0, 15);
+}
+
+export async function searchAlbums(query: string): Promise<SongResult[]> {
+  const data = await rawSearch(query, ALBUMS_PARAMS);
+  const results: SongResult[] = [];
+  for (const it of shelfContents(data)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = (it as any)?.musicResponsiveListItemRenderer;
+    if (!r) continue;
+    const flex = r.flexColumns ?? [];
+    const title = joinRuns(flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs);
+    const subRuns: Run[] = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs ?? [];
+
+    // Albums shape: [Album] • [Artists] • [Year]
+    const separated: Run[][] = [[]];
+    for (const run of subRuns) {
+      if (run.text === " • ") separated.push([]);
+      else separated[separated.length - 1].push(run);
+    }
+    // separated[0] is "Album"/"EP"/"Single" type label; artists is [1]; year is [2]
+    const artist = (separated[1] ?? []).map((x) => x.text ?? "").join("");
+
+    // browseId for albums comes from the navigationEndpoint of the overall row.
+    const browseId: string | null =
+      r.navigationEndpoint?.browseEndpoint?.browseId ??
+      r.menu?.menuRenderer?.items?.find((i: { menuNavigationItemRenderer?: { navigationEndpoint?: { browseEndpoint?: { browseId?: string } } } }) =>
+        i?.menuNavigationItemRenderer?.navigationEndpoint?.browseEndpoint?.browseId,
+      )?.menuNavigationItemRenderer?.navigationEndpoint?.browseEndpoint?.browseId ??
+      null;
+    if (!browseId || !title) continue;
+
+    const thumbs = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails ?? [];
+    const thumbnail = thumbs.length ? thumbs[thumbs.length - 1].url : null;
+
+    results.push({
+      id: `yt-album:${browseId}`,
+      kind: "album",
+      title,
+      artist,
+      album: null,
+      thumbnail,
+      durationSeconds: null,
+    });
+  }
+  return results.slice(0, 15);
+}
+
+export async function search(query: string, kind: ItemKind = "song"): Promise<SongResult[]> {
+  return kind === "album" ? searchAlbums(query) : searchSongs(query);
 }

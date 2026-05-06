@@ -20,13 +20,9 @@ export default async function MePage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Link
-          href="/me/stats"
-          className="text-sm text-neutral-400 hover:text-white inline-flex items-center gap-1"
-        >
-          📊 View stats →
-        </Link>
+      <div className="flex justify-end gap-4 text-sm">
+        <Link href="/me/stats" className="text-neutral-400 hover:text-white">📊 Stats</Link>
+        <Link href="/settings" className="text-neutral-400 hover:text-white">⚙️ Settings</Link>
       </div>
       <UserProfile target={me} viewerId={userId} />
     </div>

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db, activities, users, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
+import { FollowRequestActions } from "./FollowRequestActions";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,7 @@ export default async function ActivityPage() {
                     </Link>{" "}
                     <span className="text-neutral-400">
                       {a.type === "follow" && "started following you"}
+                      {a.type === "follow_request" && "requested to follow you"}
                       {a.type === "comment" && (
                         <>
                           commented on your rating
@@ -113,13 +115,16 @@ export default async function ActivityPage() {
                           )}
                         </>
                       )}
-                      {!["follow", "comment", "like", "rating_match"].includes(a.type) && a.type}
+                      {!["follow", "follow_request", "comment", "like", "rating_match"].includes(a.type) && a.type}
                     </span>
                   </div>
                   <div className="text-xs text-neutral-500">
                     {new Date(a.createdAt).toLocaleDateString()}
                   </div>
                 </div>
+                {a.type === "follow_request" && (
+                  <FollowRequestActions followerUsername={a.actorUsername} />
+                )}
               </li>
             );
           })}

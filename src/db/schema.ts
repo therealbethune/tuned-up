@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, primaryKey, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, boolean, primaryKey, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -7,10 +7,14 @@ export const users = pgTable("users", {
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   onboardedAt: timestamp("onboarded_at"),
+  isPrivate: boolean("is_private").notNull().default(false),
 }, (t) => [uniqueIndex("users_username_idx").on(t.username)]);
 
+// 'song' | 'album'. The table name is historical — these are really
+// "rateable items"; album rows just have kind='album' and reuse the column.
 export const songs = pgTable("songs", {
   id: text("id").primaryKey(),
+  kind: text("kind").notNull().default("song"),
   title: text("title").notNull(),
   artist: text("artist").notNull(),
   album: text("album"),
@@ -32,9 +36,12 @@ export const ratings = pgTable("ratings", {
   index("ratings_song_idx").on(t.songId),
 ]);
 
+// status: 'accepted' for normal follows, 'pending' when the target is
+// a private profile and hasn't yet accepted the request.
 export const follows = pgTable("follows", {
   followerId: text("follower_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   followeeId: text("followee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("accepted"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   primaryKey({ columns: [t.followerId, t.followeeId] }),

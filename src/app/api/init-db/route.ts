@@ -83,6 +83,10 @@ const STATEMENTS = [
   // Backfill: any user who's already rated something is grandfathered in.
   // Idempotent — only updates rows where onboarded_at is still null.
   `UPDATE "users" SET "onboarded_at" = "created_at" WHERE "onboarded_at" IS NULL AND EXISTS (SELECT 1 FROM "ratings" WHERE "ratings"."user_id" = "users"."id")`,
+  // Newer columns added in later batches — all idempotent.
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_private" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "kind" text NOT NULL DEFAULT 'song'`,
+  `ALTER TABLE "follows" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'accepted'`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

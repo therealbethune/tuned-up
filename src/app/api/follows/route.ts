@@ -7,6 +7,8 @@ import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
 
+// Body: { username, action?: 'follow' | 'unfollow' | 'accept' | 'reject' }
+// 'accept' / 'reject' are run by the *target* of a pending follow request.
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -17,38 +19,89 @@ export async function POST(req: Request) {
 
   const [target] = await db.select().from(users).where(eq(users.username, username)).limit(1);
   if (!target) return NextResponse.json({ error: "user not found" }, { status: 404 });
-  if (target.id === userId) return NextResponse.json({ error: "cannot follow yourself" }, { status: 400 });
 
-  if (action === "unfollow") {
-    await db.delete(follows).where(and(eq(follows.followerId, userId), eq(follows.followeeId, target.id)));
-  } else {
-    const inserted = await db
-      .insert(follows)
-      .values({ followerId: userId, followeeId: target.id })
-      .onConflictDoNothing()
-      .returning({ followerId: follows.followerId });
-
-    // Only generate an activity for a *new* follow (not duplicate calls).
-    if (inserted.length > 0) {
-      // Clear any prior follow-activity from this actor to avoid stale entries
-      // when the user unfollowed and re-followed.
+  // accept/reject: viewer is the followee, the actor (in URL) is the requester
+  if (action === "accept" || action === "reject") {
+    // For accept/reject the viewer is the *target* of the request; `username`
+    // identifies the *follower*.
+    if (target.id === userId) {
+      return NextResponse.json({ error: "use a follower's username, not your own" }, { status: 400 });
+    }
+    if (action === "accept") {
+      await db
+        .update(follows)
+        .set({ status: "accepted" })
+        .where(and(eq(follows.followerId, target.id), eq(follows.followeeId, userId), eq(follows.status, "pending")));
+      // Convert the request activity into a regular follow notification.
       await db
         .delete(activities)
         .where(
           and(
-            eq(activities.userId, target.id),
-            eq(activities.actorId, userId),
-            eq(activities.type, "follow"),
+            eq(activities.userId, userId),
+            eq(activities.actorId, target.id),
+            eq(activities.type, "follow_request"),
           ),
         );
       await db.insert(activities).values({
         id: randomUUID(),
-        userId: target.id,
-        actorId: userId,
+        userId: userId,
+        actorId: target.id,
         type: "follow",
       });
+    } else {
+      await db
+        .delete(follows)
+        .where(and(eq(follows.followerId, target.id), eq(follows.followeeId, userId), eq(follows.status, "pending")));
+      await db
+        .delete(activities)
+        .where(
+          and(
+            eq(activities.userId, userId),
+            eq(activities.actorId, target.id),
+            eq(activities.type, "follow_request"),
+          ),
+        );
     }
+    return NextResponse.json({ ok: true });
   }
 
-  return NextResponse.json({ ok: true });
+  if (target.id === userId) {
+    return NextResponse.json({ error: "cannot follow yourself" }, { status: 400 });
+  }
+
+  if (action === "unfollow") {
+    await db
+      .delete(follows)
+      .where(and(eq(follows.followerId, userId), eq(follows.followeeId, target.id)));
+    return NextResponse.json({ ok: true });
+  }
+
+  // Follow (or follow-request, depending on whether target is private).
+  const status = target.isPrivate ? "pending" : "accepted";
+  const inserted = await db
+    .insert(follows)
+    .values({ followerId: userId, followeeId: target.id, status })
+    .onConflictDoNothing()
+    .returning({ followerId: follows.followerId });
+
+  if (inserted.length > 0) {
+    // Dedup any prior matching activity.
+    await db
+      .delete(activities)
+      .where(
+        and(
+          eq(activities.userId, target.id),
+          eq(activities.actorId, userId),
+          status === "pending" ? eq(activities.type, "follow_request") : eq(activities.type, "follow"),
+        ),
+      );
+    await db.insert(activities).values({
+      id: randomUUID(),
+      userId: target.id,
+      actorId: userId,
+      type: status === "pending" ? "follow_request" : "follow",
+    });
+  }
+
+  return NextResponse.json({ ok: true, status });
 }

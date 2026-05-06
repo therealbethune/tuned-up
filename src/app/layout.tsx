@@ -9,6 +9,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Tuned Up",
   description: "Rate songs 1–100 and follow your friends",
+  applicationName: "Tuned Up",
+  appleWebApp: {
+    capable: true,
+    title: "Tuned Up",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport = {
+  themeColor: "#0a0a0a",
 };
 
 async function unreadActivityCount(userId: string): Promise<number> {

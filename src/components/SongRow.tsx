@@ -72,13 +72,20 @@ export function SongRow({
       )}
 
       <div className="flex-1 min-w-0">
-        {url ? (
-          <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate block hover:underline">
-            {song.title}
-          </a>
-        ) : (
-          <div className="font-medium truncate">{song.title}</div>
-        )}
+        <div className="flex items-center gap-2 min-w-0">
+          {url ? (
+            <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate hover:underline">
+              {song.title}
+            </a>
+          ) : (
+            <div className="font-medium truncate">{song.title}</div>
+          )}
+          {song.kind === "album" && (
+            <span className="shrink-0 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+              Album
+            </span>
+          )}
+        </div>
         <div className="text-sm text-neutral-400 truncate">
           {song.artist}
           {song.album ? ` · ${song.album}` : ""}

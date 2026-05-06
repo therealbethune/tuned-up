@@ -9,6 +9,8 @@ import { ytUrlForSongId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
 import { CommentSection } from "@/components/CommentSection";
 import { LikeButton } from "@/components/LikeButton";
+import { ShareButton } from "@/components/ShareButton";
+import { isAlbumId } from "@/lib/songs";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,7 @@ export default async function FeedPage() {
   const followedRows = await db
     .select({ id: follows.followeeId })
     .from(follows)
-    .where(eq(follows.followerId, userId));
+    .where(and(eq(follows.followerId, userId), eq(follows.status, "accepted")));
   const followedIds = followedRows.map((r) => r.id);
   followedIds.push(userId); // include self
 
@@ -136,6 +138,7 @@ export default async function FeedPage() {
             const iLiked = myLikes.has(cKey);
             const songLike = {
               id: it.songId,
+              kind: (isAlbumId(it.songId) ? "album" : "song") as "song" | "album",
               title: it.title,
               artist: it.artist,
               album: it.album,
@@ -186,13 +189,20 @@ export default async function FeedPage() {
                     <div className="h-14 w-14 rounded bg-neutral-800 shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    {url ? (
-                      <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate block hover:underline">
-                        {it.title}
-                      </a>
-                    ) : (
-                      <div className="font-medium truncate">{it.title}</div>
-                    )}
+                    <div className="flex items-center gap-2 min-w-0">
+                      {url ? (
+                        <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate hover:underline">
+                          {it.title}
+                        </a>
+                      ) : (
+                        <div className="font-medium truncate">{it.title}</div>
+                      )}
+                      {isAlbumId(it.songId) && (
+                        <span className="shrink-0 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                          Album
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-neutral-400 truncate">{it.artist}{it.album ? ` · ${it.album}` : ""}</div>
                   </div>
                   <div className="text-right">
@@ -218,6 +228,7 @@ export default async function FeedPage() {
                     initialLiked={iLiked}
                     initialCount={lCount}
                   />
+                  <ShareButton username={it.username} songId={it.songId} />
                 </div>
 
                 <CommentSection

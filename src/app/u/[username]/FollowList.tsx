@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, follows, users } from "@/db";
 
 export type FollowDirection = "followers" | "following";
@@ -31,7 +31,7 @@ export default async function FollowList({
           })
           .from(follows)
           .innerJoin(users, eq(users.id, follows.followerId))
-          .where(eq(follows.followeeId, target.id))
+          .where(and(eq(follows.followeeId, target.id), eq(follows.status, "accepted")))
           .orderBy(desc(follows.createdAt))
           .limit(200)
       : await db
@@ -44,7 +44,7 @@ export default async function FollowList({
           })
           .from(follows)
           .innerJoin(users, eq(users.id, follows.followeeId))
-          .where(eq(follows.followerId, target.id))
+          .where(and(eq(follows.followerId, target.id), eq(follows.status, "accepted")))
           .orderBy(desc(follows.createdAt))
           .limit(200);
 
