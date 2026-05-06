@@ -8,6 +8,7 @@ import { OwnRatingForm } from "@/components/OwnRatingForm";
 import { CommentSection } from "@/components/CommentSection";
 import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
+import { StreamingLinks } from "@/components/StreamingLinks";
 import { isAlbumId } from "@/lib/songs";
 
 type User = typeof users.$inferSelect;
@@ -223,14 +224,17 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                 )}
                 {viewerId && (
                   <>
-                    <div className="mt-3 flex items-center gap-4">
-                      <LikeButton
-                        ratingUserId={target.id}
-                        songId={r.songId}
-                        initialLiked={myLikes.has(r.songId)}
-                        initialCount={likeCounts.get(r.songId) ?? 0}
-                      />
-                      <ShareButton username={target.username} songId={r.songId} />
+                    <div className="mt-3 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <LikeButton
+                          ratingUserId={target.id}
+                          songId={r.songId}
+                          initialLiked={myLikes.has(r.songId)}
+                          initialCount={likeCounts.get(r.songId) ?? 0}
+                        />
+                        <ShareButton username={target.username} songId={r.songId} />
+                      </div>
+                      <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} />
                     </div>
                     <CommentSection
                       ratingUserId={target.id}

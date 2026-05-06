@@ -3,6 +3,7 @@ import Link from "next/link";
 import { desc, sql, gte } from "drizzle-orm";
 import { db, ratings, songs } from "@/db";
 import { ytUrlForSongId } from "@/lib/songs";
+import { StreamingLinks } from "@/components/StreamingLinks";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,7 @@ function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
               <div className="text-sm text-neutral-400 truncate">
                 {r.artist}{r.album ? ` · ${r.album}` : ""}
               </div>
+              <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} className="mt-1" />
             </div>
             <div className="text-right shrink-0">
               <div className="text-xl font-bold tabular-nums">{r.avgScore}</div>

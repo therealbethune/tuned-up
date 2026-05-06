@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { ClerkProvider, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { db, activities } from "@/db";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,8 +20,24 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
+
+// Runs before paint to prevent a flash of dark/light. Reads localStorage
+// 'theme' override; if absent, follows the system preference.
+const themeBootstrapScript = `
+try {
+  var t = localStorage.getItem('theme');
+  var d = document.documentElement;
+  if (t === 'light') d.classList.remove('dark');
+  else if (t === 'dark') d.classList.add('dark');
+  else if (window.matchMedia('(prefers-color-scheme: dark)').matches) d.classList.add('dark');
+  else d.classList.remove('dark');
+} catch (e) {}
+`;
 
 async function unreadActivityCount(userId: string): Promise<number> {
   try {
@@ -29,7 +47,6 @@ async function unreadActivityCount(userId: string): Promise<number> {
       .where(and(eq(activities.userId, userId), isNull(activities.readAt)));
     return Number(row?.n ?? 0);
   } catch {
-    // The table may not exist yet (e.g. before init-db is hit after a migration).
     return 0;
   }
 }
@@ -51,6 +68,7 @@ async function SignedInNav({ userId }: { userId: string }) {
         )}
       </Link>
       <Link href="/me" className="hover:text-white text-neutral-300">Me</Link>
+      <ThemeToggle />
       <UserButton />
     </>
   );
@@ -59,6 +77,7 @@ async function SignedInNav({ userId }: { userId: string }) {
 function SignedOutNav() {
   return (
     <>
+      <ThemeToggle />
       <SignInButton>
         <button className="text-neutral-300 hover:text-white">Sign in</button>
       </SignInButton>
@@ -73,7 +92,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { userId } = await auth();
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" className="dark" suppressHydrationWarning>
+        <head>
+          <Script id="theme-bootstrap" strategy="beforeInteractive">
+            {themeBootstrapScript}
+          </Script>
+        </head>
         <body className="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
           <header className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur sticky top-0 z-10">
             <nav className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">

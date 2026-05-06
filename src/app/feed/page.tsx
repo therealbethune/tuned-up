@@ -10,6 +10,7 @@ import { RateButton } from "@/components/RateButton";
 import { CommentSection } from "@/components/CommentSection";
 import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
+import { StreamingLinks } from "@/components/StreamingLinks";
 import { isAlbumId } from "@/lib/songs";
 
 export const dynamic = "force-dynamic";
@@ -221,14 +222,17 @@ export default async function FeedPage() {
                   </div>
                 )}
 
-                <div className="mt-3 flex items-center gap-4">
-                  <LikeButton
-                    ratingUserId={it.ratingUserId}
-                    songId={it.songId}
-                    initialLiked={iLiked}
-                    initialCount={lCount}
-                  />
-                  <ShareButton username={it.username} songId={it.songId} />
+                <div className="mt-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <LikeButton
+                      ratingUserId={it.ratingUserId}
+                      songId={it.songId}
+                      initialLiked={iLiked}
+                      initialCount={lCount}
+                    />
+                    <ShareButton username={it.username} songId={it.songId} />
+                  </div>
+                  <StreamingLinks songId={it.songId} title={it.title} artist={it.artist} />
                 </div>
 
                 <CommentSection

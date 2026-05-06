@@ -21,3 +21,17 @@ export function isAlbumId(songId: string): boolean {
 export function itemKindForId(songId: string): "song" | "album" {
   return isAlbumId(songId) ? "album" : "song";
 }
+
+// Generate Spotify / Apple Music outbound search URLs. We don't have those
+// services' APIs, so we just deep-link to their search pages — clicking lands
+// the user on the matching track or album with one tap.
+export function streamingSearchLinks(params: { title: string; artist: string }): {
+  spotify: string;
+  appleMusic: string;
+} {
+  const q = `${params.title} ${params.artist}`.trim();
+  return {
+    spotify: `https://open.spotify.com/search/${encodeURIComponent(q)}`,
+    appleMusic: `https://music.apple.com/us/search?term=${encodeURIComponent(q)}`,
+  };
+}

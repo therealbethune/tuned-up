@@ -2,6 +2,7 @@ import Image from "next/image";
 import { RateButton } from "./RateButton";
 import type { SongResult } from "@/lib/ytmusic";
 import { ytUrlForSongId } from "@/lib/songs";
+import { StreamingLinks } from "./StreamingLinks";
 
 function durationLabel(seconds: number | null | undefined): string | null {
   if (seconds == null) return null;
@@ -91,6 +92,7 @@ export function SongRow({
           {song.album ? ` · ${song.album}` : ""}
           {dur ? ` · ${dur}` : ""}
         </div>
+        <StreamingLinks songId={song.id} title={song.title} artist={song.artist} className="mt-1" />
       </div>
 
       {right ?? <RateButton song={song} initialScore={score ?? null} />}

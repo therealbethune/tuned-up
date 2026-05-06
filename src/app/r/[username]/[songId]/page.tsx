@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { and, eq } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
 import { ytUrlForSongId } from "@/lib/songs";
+import { StreamingLinks } from "@/components/StreamingLinks";
 
 export const dynamic = "force-dynamic";
 
@@ -156,6 +157,7 @@ export default async function SharedRatingPage({
             </div>
           </div>
         </div>
+        <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} />
         {r.review && <p className="text-neutral-200 whitespace-pre-wrap">{r.review}</p>}
       </div>
 
