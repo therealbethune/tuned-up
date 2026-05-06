@@ -3,18 +3,20 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { and, desc, eq, inArray, notInArray, sql, count } from "drizzle-orm";
-import { db, ratings, songs, users, follows, comments } from "@/db";
+import { db, ratings, songs, users, follows, comments, likes } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
 import { CommentSection } from "@/components/CommentSection";
+import { LikeButton } from "@/components/LikeButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
-  await syncCurrentUser();
+  const me = await syncCurrentUser();
+  if (me && !me.onboardedAt) redirect("/welcome");
 
   const followedRows = await db
     .select({ id: follows.followeeId })
@@ -60,25 +62,58 @@ export default async function FeedPage() {
 
   // Comment counts per (ratingUserId, songId) grouped by both.
   let commentCounts: Map<string, number> = new Map();
+  let likeCounts: Map<string, number> = new Map();
+  let myLikes: Set<string> = new Set();
   if (items.length) {
     const ratingUserIds = Array.from(new Set(items.map((i) => i.ratingUserId)));
-    const counts = await db
-      .select({
-        ratingUserId: comments.ratingUserId,
-        songId: comments.songId,
-        n: count(),
-      })
-      .from(comments)
-      .where(
-        and(
-          inArray(comments.ratingUserId, ratingUserIds),
-          inArray(comments.songId, songIds),
+
+    const [cCounts, lCounts, myLikeRows] = await Promise.all([
+      db
+        .select({
+          ratingUserId: comments.ratingUserId,
+          songId: comments.songId,
+          n: count(),
+        })
+        .from(comments)
+        .where(
+          and(
+            inArray(comments.ratingUserId, ratingUserIds),
+            inArray(comments.songId, songIds),
+          ),
+        )
+        .groupBy(comments.ratingUserId, comments.songId),
+      db
+        .select({
+          ratingUserId: likes.ratingUserId,
+          songId: likes.songId,
+          n: count(),
+        })
+        .from(likes)
+        .where(
+          and(
+            inArray(likes.ratingUserId, ratingUserIds),
+            inArray(likes.songId, songIds),
+          ),
+        )
+        .groupBy(likes.ratingUserId, likes.songId),
+      db
+        .select({ ratingUserId: likes.ratingUserId, songId: likes.songId })
+        .from(likes)
+        .where(
+          and(
+            eq(likes.likerId, userId),
+            inArray(likes.ratingUserId, ratingUserIds),
+            inArray(likes.songId, songIds),
+          ),
         ),
-      )
-      .groupBy(comments.ratingUserId, comments.songId);
+    ]);
     commentCounts = new Map(
-      counts.map((c) => [`${c.ratingUserId}::${c.songId}`, Number(c.n)]),
+      cCounts.map((c) => [`${c.ratingUserId}::${c.songId}`, Number(c.n)]),
     );
+    likeCounts = new Map(
+      lCounts.map((l) => [`${l.ratingUserId}::${l.songId}`, Number(l.n)]),
+    );
+    myLikes = new Set(myLikeRows.map((l) => `${l.ratingUserId}::${l.songId}`));
   }
 
   return (
@@ -97,6 +132,8 @@ export default async function FeedPage() {
             const myScore = myRatingsMap.get(it.songId) ?? null;
             const cKey = `${it.ratingUserId}::${it.songId}`;
             const cCount = commentCounts.get(cKey) ?? 0;
+            const lCount = likeCounts.get(cKey) ?? 0;
+            const iLiked = myLikes.has(cKey);
             const songLike = {
               id: it.songId,
               title: it.title,
@@ -173,6 +210,15 @@ export default async function FeedPage() {
                     <RateButton song={songLike} initialScore={myScore} />
                   </div>
                 )}
+
+                <div className="mt-3 flex items-center gap-4">
+                  <LikeButton
+                    ratingUserId={it.ratingUserId}
+                    songId={it.songId}
+                    initialLiked={iLiked}
+                    initialCount={lCount}
+                  />
+                </div>
 
                 <CommentSection
                   ratingUserId={it.ratingUserId}

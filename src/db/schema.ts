@@ -6,6 +6,7 @@ export const users = pgTable("users", {
   displayName: text("display_name"),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  onboardedAt: timestamp("onboarded_at"),
 }, (t) => [uniqueIndex("users_username_idx").on(t.username)]);
 
 export const songs = pgTable("songs", {
@@ -42,6 +43,18 @@ export const follows = pgTable("follows", {
 
 // Activity / notifications. type='follow' means actorId followed userId.
 // Future types: 'rating_match' (actorId rated a song userId also rated), etc.
+// A like on someone's rating. Composite key prevents duplicates;
+// toggling is delete-then-insert.
+export const likes = pgTable("likes", {
+  ratingUserId: text("rating_user_id").notNull(),
+  songId: text("song_id").notNull(),
+  likerId: text("liker_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.ratingUserId, t.songId, t.likerId] }),
+  index("likes_target_idx").on(t.ratingUserId, t.songId),
+]);
+
 // A comment on someone's rating of a song. Targets the (userId, songId)
 // composite primary key of `ratings`.
 export const comments = pgTable("comments", {

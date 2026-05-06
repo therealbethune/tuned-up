@@ -1,11 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { and, desc, eq, count, inArray } from "drizzle-orm";
-import { db, ratings, songs, follows, users, comments } from "@/db";
+import { db, ratings, songs, follows, users, comments, likes } from "@/db";
 import { FollowButton } from "./FollowButton";
 import { ytUrlForSongId } from "@/lib/songs";
 import { OwnRatingForm } from "@/components/OwnRatingForm";
 import { CommentSection } from "@/components/CommentSection";
+import { LikeButton } from "@/components/LikeButton";
 
 type User = typeof users.$inferSelect;
 
@@ -53,16 +54,39 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     : null;
   const isOwner = viewerId === target.id;
 
-  // Comment counts for this user's ratings.
+  // Comment + like counts for this user's ratings.
   const songIds = rows.map((r) => r.songId);
   let commentCounts: Map<string, number> = new Map();
+  let likeCounts: Map<string, number> = new Map();
+  let myLikes: Set<string> = new Set();
   if (songIds.length) {
-    const counts = await db
-      .select({ songId: comments.songId, n: count() })
-      .from(comments)
-      .where(and(eq(comments.ratingUserId, target.id), inArray(comments.songId, songIds)))
-      .groupBy(comments.songId);
-    commentCounts = new Map(counts.map((c) => [c.songId, Number(c.n)]));
+    const [cCounts, lCounts, myLikeRows] = await Promise.all([
+      db
+        .select({ songId: comments.songId, n: count() })
+        .from(comments)
+        .where(and(eq(comments.ratingUserId, target.id), inArray(comments.songId, songIds)))
+        .groupBy(comments.songId),
+      db
+        .select({ songId: likes.songId, n: count() })
+        .from(likes)
+        .where(and(eq(likes.ratingUserId, target.id), inArray(likes.songId, songIds)))
+        .groupBy(likes.songId),
+      viewerId
+        ? db
+            .select({ songId: likes.songId })
+            .from(likes)
+            .where(
+              and(
+                eq(likes.likerId, viewerId),
+                eq(likes.ratingUserId, target.id),
+                inArray(likes.songId, songIds),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
+    commentCounts = new Map(cCounts.map((c) => [c.songId, Number(c.n)]));
+    likeCounts = new Map(lCounts.map((l) => [l.songId, Number(l.n)]));
+    myLikes = new Set(myLikeRows.map((l) => l.songId));
   }
 
   return (
@@ -166,12 +190,22 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                   </div>
                 )}
                 {viewerId && (
-                  <CommentSection
-                    ratingUserId={target.id}
-                    songId={r.songId}
-                    viewerId={viewerId}
-                    initialCount={commentCounts.get(r.songId) ?? 0}
-                  />
+                  <>
+                    <div className="mt-3 flex items-center gap-4">
+                      <LikeButton
+                        ratingUserId={target.id}
+                        songId={r.songId}
+                        initialLiked={myLikes.has(r.songId)}
+                        initialCount={likeCounts.get(r.songId) ?? 0}
+                      />
+                    </div>
+                    <CommentSection
+                      ratingUserId={target.id}
+                      songId={r.songId}
+                      viewerId={viewerId}
+                      initialCount={commentCounts.get(r.songId) ?? 0}
+                    />
+                  </>
                 )}
               </li>
             );

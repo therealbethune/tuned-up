@@ -29,6 +29,9 @@ export function RateButton({
     if (res.ok) {
       setOpen(false);
       router.refresh();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("song-rated", { detail: { songId: song.id } }));
+      }
     } else {
       const j = await res.json().catch(() => ({}));
       alert(j.error || "Failed to save rating");

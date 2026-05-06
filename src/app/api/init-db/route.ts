@@ -69,6 +69,17 @@ const STATEMENTS = [
   `ALTER TABLE "comments" ADD CONSTRAINT "comments_commenter_id_users_id_fk" FOREIGN KEY ("commenter_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   `ALTER TABLE "comments" ADD CONSTRAINT "comments_rating_fk" FOREIGN KEY ("rating_user_id","song_id") REFERENCES "public"."ratings"("user_id","song_id") ON DELETE cascade ON UPDATE no action`,
   `CREATE INDEX IF NOT EXISTS "comments_target_idx" ON "comments" USING btree ("rating_user_id","song_id","created_at")`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "onboarded_at" timestamp`,
+  `CREATE TABLE IF NOT EXISTS "likes" (
+    "rating_user_id" text NOT NULL,
+    "song_id" text NOT NULL,
+    "liker_id" text NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    CONSTRAINT "likes_pk" PRIMARY KEY("rating_user_id","song_id","liker_id")
+  )`,
+  `ALTER TABLE "likes" ADD CONSTRAINT "likes_liker_id_users_id_fk" FOREIGN KEY ("liker_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `ALTER TABLE "likes" ADD CONSTRAINT "likes_rating_fk" FOREIGN KEY ("rating_user_id","song_id") REFERENCES "public"."ratings"("user_id","song_id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE INDEX IF NOT EXISTS "likes_target_idx" ON "likes" USING btree ("rating_user_id","song_id")`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

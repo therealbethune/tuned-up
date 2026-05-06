@@ -10,7 +10,7 @@ export default function Home() {
       </p>
       <div className="flex gap-3">
         <Show when="signed-out">
-          <SignUpButton>
+          <SignUpButton forceRedirectUrl="/welcome">
             <button className="rounded-full bg-white text-black px-5 py-2 font-medium">Get started</button>
           </SignUpButton>
         </Show>

@@ -91,7 +91,29 @@ export default async function ActivityPage() {
                           ) : null}
                         </>
                       )}
-                      {a.type !== "follow" && a.type !== "comment" && a.type}
+                      {a.type === "like" && (
+                        <>
+                          liked your rating
+                          {a.songTitle ? (
+                            <>
+                              {" "}of <span className="text-neutral-200">{a.songTitle}</span>
+                            </>
+                          ) : null}
+                        </>
+                      )}
+                      {a.type === "rating_match" && (
+                        <>
+                          also rated
+                          {a.songTitle ? (
+                            <>
+                              {" "}<span className="text-neutral-200">{a.songTitle}</span>
+                            </>
+                          ) : (
+                            " a song you rated"
+                          )}
+                        </>
+                      )}
+                      {!["follow", "comment", "like", "rating_match"].includes(a.type) && a.type}
                     </span>
                   </div>
                   <div className="text-xs text-neutral-500">

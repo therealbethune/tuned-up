@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
-import { db, songs, ratings } from "@/db";
+import { and, eq, ne } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { db, songs, ratings, activities } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 
 export const runtime = "nodejs";
@@ -37,6 +38,15 @@ export async function POST(req: Request) {
       set: { title: song.title, artist: song.artist, album: song.album ?? null, thumbnail: song.thumbnail ?? null },
     });
 
+  // Detect whether this is a NEW rating (vs an update of an existing one) by
+  // checking for a prior row before the upsert.
+  const [prior] = await db
+    .select({ songId: ratings.songId })
+    .from(ratings)
+    .where(and(eq(ratings.userId, userId), eq(ratings.songId, song.id)))
+    .limit(1);
+  const isNewRating = !prior;
+
   const now = new Date();
   await db
     .insert(ratings)
@@ -45,6 +55,31 @@ export async function POST(req: Request) {
       target: [ratings.userId, ratings.songId],
       set: { score: Math.round(s), review: review ?? null, updatedAt: now },
     });
+
+  // Notify everyone else who's already rated the same song that someone new
+  // has now rated it too. Only fires the FIRST time this user rates the song.
+  if (isNewRating) {
+    const others = await db
+      .select({ userId: ratings.userId })
+      .from(ratings)
+      .where(and(eq(ratings.songId, song.id), ne(ratings.userId, userId)));
+
+    if (others.length > 0) {
+      const toInsert = others.map((o) => ({
+        id: randomUUID(),
+        userId: o.userId,
+        actorId: userId,
+        type: "rating_match",
+        songId: song.id,
+      }));
+      // Best-effort; don't fail the rating if activity insert fails.
+      try {
+        await db.insert(activities).values(toInsert);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

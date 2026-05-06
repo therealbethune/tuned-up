@@ -52,7 +52,7 @@ function SignedOutNav() {
       <SignInButton>
         <button className="text-neutral-300 hover:text-white">Sign in</button>
       </SignInButton>
-      <SignUpButton>
+      <SignUpButton forceRedirectUrl="/welcome">
         <button className="rounded-full bg-white text-black px-3 py-1 font-medium">Sign up</button>
       </SignUpButton>
     </>
