@@ -20,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Show when="signed-in">
                   <Link href="/feed" className="hover:text-white text-neutral-300">Feed</Link>
                   <Link href="/search" className="hover:text-white text-neutral-300">Search</Link>
+                  <Link href="/people" className="hover:text-white text-neutral-300">People</Link>
                   <Link href="/me" className="hover:text-white text-neutral-300">Me</Link>
                   <UserButton />
                 </Show>

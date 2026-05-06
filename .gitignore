@@ -42,3 +42,6 @@ next-env.d.ts
 
 # netlify
 .netlify/
+
+# clerk configuration (can include secrets)
+/.clerk/
