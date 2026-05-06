@@ -46,6 +46,29 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS "ratings_user_idx" ON "ratings" USING btree ("user_id","created_at")`,
   `CREATE INDEX IF NOT EXISTS "ratings_song_idx" ON "ratings" USING btree ("song_id")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "users_username_idx" ON "users" USING btree ("username")`,
+  `CREATE TABLE IF NOT EXISTS "activities" (
+    "id" text PRIMARY KEY NOT NULL,
+    "user_id" text NOT NULL,
+    "actor_id" text NOT NULL,
+    "type" text NOT NULL,
+    "song_id" text,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "read_at" timestamp
+  )`,
+  `ALTER TABLE "activities" ADD CONSTRAINT "activities_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `ALTER TABLE "activities" ADD CONSTRAINT "activities_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE INDEX IF NOT EXISTS "activities_user_idx" ON "activities" USING btree ("user_id","created_at")`,
+  `CREATE TABLE IF NOT EXISTS "comments" (
+    "id" text PRIMARY KEY NOT NULL,
+    "rating_user_id" text NOT NULL,
+    "song_id" text NOT NULL,
+    "commenter_id" text NOT NULL,
+    "body" text NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `ALTER TABLE "comments" ADD CONSTRAINT "comments_commenter_id_users_id_fk" FOREIGN KEY ("commenter_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `ALTER TABLE "comments" ADD CONSTRAINT "comments_rating_fk" FOREIGN KEY ("rating_user_id","song_id") REFERENCES "public"."ratings"("user_id","song_id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE INDEX IF NOT EXISTS "comments_target_idx" ON "comments" USING btree ("rating_user_id","song_id","created_at")`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

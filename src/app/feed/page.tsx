@@ -2,10 +2,12 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { desc, eq, inArray } from "drizzle-orm";
-import { db, ratings, songs, users, follows } from "@/db";
+import { and, desc, eq, inArray, notInArray, sql, count } from "drizzle-orm";
+import { db, ratings, songs, users, follows, comments } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId } from "@/lib/songs";
+import { RateButton } from "@/components/RateButton";
+import { CommentSection } from "@/components/CommentSection";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +21,12 @@ export default async function FeedPage() {
     .from(follows)
     .where(eq(follows.followerId, userId));
   const followedIds = followedRows.map((r) => r.id);
-  // Include self.
-  followedIds.push(userId);
+  followedIds.push(userId); // include self
 
   const items = followedIds.length
     ? await db
         .select({
+          ratingUserId: ratings.userId,
           score: ratings.score,
           review: ratings.review,
           createdAt: ratings.createdAt,
@@ -45,6 +47,40 @@ export default async function FeedPage() {
         .limit(50)
     : [];
 
+  // Viewer's own ratings on the songs visible in the feed (so we can show
+  // an accurate "Rated X" label on the inline RateButton).
+  const songIds = Array.from(new Set(items.map((i) => i.songId)));
+  const myRatingsRows = songIds.length
+    ? await db
+        .select({ songId: ratings.songId, score: ratings.score })
+        .from(ratings)
+        .where(and(eq(ratings.userId, userId), inArray(ratings.songId, songIds)))
+    : [];
+  const myRatingsMap = new Map(myRatingsRows.map((r) => [r.songId, r.score]));
+
+  // Comment counts per (ratingUserId, songId) grouped by both.
+  let commentCounts: Map<string, number> = new Map();
+  if (items.length) {
+    const ratingUserIds = Array.from(new Set(items.map((i) => i.ratingUserId)));
+    const counts = await db
+      .select({
+        ratingUserId: comments.ratingUserId,
+        songId: comments.songId,
+        n: count(),
+      })
+      .from(comments)
+      .where(
+        and(
+          inArray(comments.ratingUserId, ratingUserIds),
+          inArray(comments.songId, songIds),
+        ),
+      )
+      .groupBy(comments.ratingUserId, comments.songId);
+    commentCounts = new Map(
+      counts.map((c) => [`${c.ratingUserId}::${c.songId}`, Number(c.n)]),
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between">
@@ -53,16 +89,22 @@ export default async function FeedPage() {
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-6 text-center text-neutral-400">
-          <p>No ratings yet.</p>
-          <p className="text-sm mt-2">
-            <Link href="/search" className="underline">Rate a song</Link> or follow someone (visit <code className="text-neutral-300">/u/their-username</code>).
-          </p>
-        </div>
+        <EmptyFeed userId={userId} followedIds={followedIds} />
       ) : (
         <ul className="space-y-3">
           {items.map((it) => {
             const url = ytUrlForSongId(it.songId);
+            const myScore = myRatingsMap.get(it.songId) ?? null;
+            const cKey = `${it.ratingUserId}::${it.songId}`;
+            const cCount = commentCounts.get(cKey) ?? 0;
+            const songLike = {
+              id: it.songId,
+              title: it.title,
+              artist: it.artist,
+              album: it.album,
+              thumbnail: it.thumbnail,
+              durationSeconds: null,
+            };
             return (
               <li key={`${it.username}-${it.songId}-${it.createdAt}`} className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
                 <div className="flex items-center gap-3 mb-3">
@@ -121,11 +163,89 @@ export default async function FeedPage() {
                     <div className="text-xs text-neutral-500">/ 100</div>
                   </div>
                 </div>
-                {it.review && <p className="mt-3 text-sm text-neutral-300">{it.review}</p>}
+                {it.review && <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap">{it.review}</p>}
+
+                {it.ratingUserId !== userId && (
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-xs text-neutral-500">
+                      {myScore != null ? "You also rated this" : "What do you think?"}
+                    </span>
+                    <RateButton song={songLike} initialScore={myScore} />
+                  </div>
+                )}
+
+                <CommentSection
+                  ratingUserId={it.ratingUserId}
+                  songId={it.songId}
+                  viewerId={userId}
+                  initialCount={cCount}
+                />
               </li>
             );
           })}
         </ul>
+      )}
+    </div>
+  );
+}
+
+async function EmptyFeed({ userId, followedIds }: { userId: string; followedIds: string[] }) {
+  const exclude = Array.from(new Set([userId, ...followedIds]));
+  const suggested = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      displayName: users.displayName,
+      imageUrl: users.imageUrl,
+      ratingsCount: count(ratings.userId),
+    })
+    .from(users)
+    .leftJoin(ratings, eq(ratings.userId, users.id))
+    .where(notInArray(users.id, exclude))
+    .groupBy(users.id)
+    .orderBy(desc(sql`count(${ratings.userId})`))
+    .limit(8);
+
+  const withRatings = suggested.filter((u) => u.ratingsCount > 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-6 text-center text-neutral-400 space-y-3">
+        <p>Your feed is empty.</p>
+        <p className="text-sm">
+          Try <Link href="/discover" className="underline text-white">Discover</Link> to see what&apos;s trending,{" "}
+          <Link href="/people" className="underline text-white">find people</Link> to follow,{" "}
+          or <Link href="/search" className="underline text-white">rate a song</Link> to start your own feed.
+        </p>
+      </div>
+
+      {withRatings.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Suggested for you</h2>
+          <ul className="space-y-2">
+            {withRatings.map((u) => (
+              <li key={u.id}>
+                <Link
+                  href={`/u/${u.username}`}
+                  className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900 p-3 transition-colors"
+                >
+                  {u.imageUrl ? (
+                    <Image src={u.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" unoptimized />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-neutral-700" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{u.displayName || u.username}</div>
+                    <div className="text-sm text-neutral-400 truncate">@{u.username}</div>
+                  </div>
+                  <div className="text-sm text-neutral-500 tabular-nums">
+                    {u.ratingsCount} {u.ratingsCount === 1 ? "rating" : "ratings"}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

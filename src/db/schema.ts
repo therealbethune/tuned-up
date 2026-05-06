@@ -39,3 +39,30 @@ export const follows = pgTable("follows", {
   primaryKey({ columns: [t.followerId, t.followeeId] }),
   index("follows_followee_idx").on(t.followeeId),
 ]);
+
+// Activity / notifications. type='follow' means actorId followed userId.
+// Future types: 'rating_match' (actorId rated a song userId also rated), etc.
+// A comment on someone's rating of a song. Targets the (userId, songId)
+// composite primary key of `ratings`.
+export const comments = pgTable("comments", {
+  id: text("id").primaryKey(),
+  ratingUserId: text("rating_user_id").notNull(),
+  songId: text("song_id").notNull(),
+  commenterId: text("commenter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("comments_target_idx").on(t.ratingUserId, t.songId, t.createdAt),
+]);
+
+export const activities = pgTable("activities", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  actorId: text("actor_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  songId: text("song_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  readAt: timestamp("read_at"),
+}, (t) => [
+  index("activities_user_idx").on(t.userId, t.createdAt),
+]);

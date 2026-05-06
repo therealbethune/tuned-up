@@ -1,8 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { db, follows, users } from "@/db";
+import { db, follows, users, activities } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
+import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
 
@@ -21,10 +22,32 @@ export async function POST(req: Request) {
   if (action === "unfollow") {
     await db.delete(follows).where(and(eq(follows.followerId, userId), eq(follows.followeeId, target.id)));
   } else {
-    await db
+    const inserted = await db
       .insert(follows)
       .values({ followerId: userId, followeeId: target.id })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ followerId: follows.followerId });
+
+    // Only generate an activity for a *new* follow (not duplicate calls).
+    if (inserted.length > 0) {
+      // Clear any prior follow-activity from this actor to avoid stale entries
+      // when the user unfollowed and re-followed.
+      await db
+        .delete(activities)
+        .where(
+          and(
+            eq(activities.userId, target.id),
+            eq(activities.actorId, userId),
+            eq(activities.type, "follow"),
+          ),
+        );
+      await db.insert(activities).values({
+        id: randomUUID(),
+        userId: target.id,
+        actorId: userId,
+        type: "follow",
+      });
+    }
   }
 
   return NextResponse.json({ ok: true });

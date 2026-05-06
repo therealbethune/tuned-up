@@ -1,9 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { and, desc, eq, count } from "drizzle-orm";
-import { db, ratings, songs, follows, users } from "@/db";
+import { and, desc, eq, count, inArray } from "drizzle-orm";
+import { db, ratings, songs, follows, users, comments } from "@/db";
 import { FollowButton } from "./FollowButton";
 import { ytUrlForSongId } from "@/lib/songs";
+import { OwnRatingForm } from "@/components/OwnRatingForm";
+import { CommentSection } from "@/components/CommentSection";
 
 type User = typeof users.$inferSelect;
 
@@ -49,6 +51,19 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
   const avg = rows.length
     ? Math.round(rows.reduce((a, r) => a + r.score, 0) / rows.length)
     : null;
+  const isOwner = viewerId === target.id;
+
+  // Comment counts for this user's ratings.
+  const songIds = rows.map((r) => r.songId);
+  let commentCounts: Map<string, number> = new Map();
+  if (songIds.length) {
+    const counts = await db
+      .select({ songId: comments.songId, n: count() })
+      .from(comments)
+      .where(and(eq(comments.ratingUserId, target.id), inArray(comments.songId, songIds)))
+      .groupBy(comments.songId);
+    commentCounts = new Map(counts.map((c) => [c.songId, Number(c.n)]));
+  }
 
   return (
     <div className="space-y-6">
@@ -103,7 +118,8 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           {rows.map((r) => {
             const url = ytUrlForSongId(r.songId);
             return (
-              <li key={r.songId} className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
+              <li key={r.songId} className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
+                <div className="flex items-center gap-3">
                 {url ? (
                   <a
                     href={url}
@@ -142,6 +158,21 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                   <div className="text-sm text-neutral-400 truncate">{r.artist}{r.album ? ` · ${r.album}` : ""}</div>
                 </div>
                 <div className="text-2xl font-bold tabular-nums">{r.score}</div>
+                </div>
+                {r.review && <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap">{r.review}</p>}
+                {isOwner && (
+                  <div className="mt-3">
+                    <OwnRatingForm rating={{ songId: r.songId, title: r.title, score: r.score, review: r.review }} />
+                  </div>
+                )}
+                {viewerId && (
+                  <CommentSection
+                    ratingUserId={target.id}
+                    songId={r.songId}
+                    viewerId={viewerId}
+                    initialCount={commentCounts.get(r.songId) ?? 0}
+                  />
+                )}
               </li>
             );
           })}

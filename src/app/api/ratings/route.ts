@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { db, songs, ratings } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 
@@ -44,6 +45,20 @@ export async function POST(req: Request) {
       target: [ratings.userId, ratings.songId],
       set: { score: Math.round(s), review: review ?? null, updatedAt: now },
     });
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { songId } = (await req.json().catch(() => ({}))) ?? {};
+  if (!songId) return NextResponse.json({ error: "songId required" }, { status: 400 });
+
+  await db
+    .delete(ratings)
+    .where(and(eq(ratings.userId, userId), eq(ratings.songId, songId)));
 
   return NextResponse.json({ ok: true });
 }
