@@ -1,6 +1,11 @@
 // Minimal YouTube Music search via the public InnerTube API.
 // Mirrors what ytmusicapi (Python) does. Swap for Spotify later.
 
+// This is the public InnerTube web client API key shipped to every browser
+// that loads music.youtube.com. It is NOT a secret — it appears in their
+// HTML source. Netlify's secrets scanner flags the AIza-prefixed string
+// pattern by default; we disable smart detection via the
+// SECRETS_SCAN_SMART_DETECTION_ENABLED=false build env var.
 const YT_MUSIC_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30";
 const ENDPOINT = `https://music.youtube.com/youtubei/v1/search?key=${YT_MUSIC_KEY}&prettyPrint=false`;
 const SONGS_PARAMS = "EgWKAQIIAWoOEAMQBBAJEA4QChAFEBA%3D";
