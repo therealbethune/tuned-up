@@ -142,7 +142,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
                           className="w-full flex items-center gap-3 rounded-md p-2 hover:bg-neutral-800 text-left"
                         >
                           {u.imageUrl ? (
-                            <Image src={u.imageUrl} alt="" width={36} height={36} className="rounded-full h-9 w-9" unoptimized />
+                            <Image src={u.imageUrl} alt="" width={36} height={36} className="rounded-full h-9 w-9" />
                           ) : (
                             <div className="h-9 w-9 rounded-full bg-neutral-700" />
                           )}
@@ -163,7 +163,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
               <>
                 <div className="flex items-center gap-3 rounded-md bg-neutral-950 border border-neutral-800 p-2">
                   {picked.imageUrl ? (
-                    <Image src={picked.imageUrl} alt="" width={32} height={32} className="rounded-full h-8 w-8" unoptimized />
+                    <Image src={picked.imageUrl} alt="" width={32} height={32} className="rounded-full h-8 w-8" />
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-neutral-700" />
                   )}

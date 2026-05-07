@@ -4,7 +4,6 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db, activities, users, songs } from "@/db";
-import { syncCurrentUser } from "@/lib/sync-user";
 import { relativeTime } from "@/lib/songs";
 import { FollowRequestActions } from "./FollowRequestActions";
 
@@ -13,7 +12,6 @@ export const dynamic = "force-dynamic";
 export default async function ActivityPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
-  await syncCurrentUser();
 
   const rows = await db
     .select({
@@ -71,7 +69,7 @@ export default async function ActivityPage() {
                 {unread && <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" aria-label="unread" />}
                 <Link href={`/u/${a.actorUsername}`} className="shrink-0">
                   {a.actorImageUrl ? (
-                    <Image src={a.actorImageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" unoptimized />
+                    <Image src={a.actorImageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" />
                   ) : (
                     <div className="h-10 w-10 rounded-full bg-neutral-700" />
                   )}

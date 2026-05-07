@@ -208,7 +208,7 @@ function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
                 title="Open in YouTube Music"
               >
                 {r.thumbnail ? (
-                  <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" unoptimized />
+                  <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" />
                 ) : (
                   <div className="h-12 w-12 rounded bg-neutral-800" />
                 )}
@@ -222,7 +222,7 @@ function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
                 </div>
               </a>
             ) : r.thumbnail ? (
-              <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover shrink-0" unoptimized />
+              <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover shrink-0" />
             ) : (
               <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />
             )}
@@ -286,14 +286,14 @@ function RecommendedRow({ rows }: { rows: RecRow[] }) {
                       width={160}
                       height={160}
                       className="rounded w-full aspect-square object-cover"
-                      unoptimized
+
                     />
                   ) : (
                     <div className="rounded w-full aspect-square bg-neutral-800" />
                   )}
                 </a>
               ) : r.thumbnail ? (
-                <Image src={r.thumbnail} alt="" width={160} height={160} className="rounded w-full aspect-square object-cover" unoptimized />
+                <Image src={r.thumbnail} alt="" width={160} height={160} className="rounded w-full aspect-square object-cover" />
               ) : (
                 <div className="rounded w-full aspect-square bg-neutral-800" />
               )}

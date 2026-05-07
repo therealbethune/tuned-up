@@ -182,7 +182,7 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
                     className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-3"
                   >
                     {u.imageUrl ? (
-                      <Image src={u.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" unoptimized />
+                      <Image src={u.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" />
                     ) : (
                       <div className="h-10 w-10 rounded-full bg-neutral-700" />
                     )}

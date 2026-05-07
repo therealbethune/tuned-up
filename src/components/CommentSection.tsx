@@ -113,7 +113,7 @@ export function CommentSection({
               {(comments ?? []).map((c) => (
                 <li key={c.id} className="flex gap-2 rounded-md border border-neutral-800 bg-neutral-900 p-2">
                   {c.imageUrl ? (
-                    <Image src={c.imageUrl} alt="" width={24} height={24} className="rounded-full h-6 w-6 shrink-0" unoptimized />
+                    <Image src={c.imageUrl} alt="" width={24} height={24} className="rounded-full h-6 w-6 shrink-0" />
                   ) : (
                     <div className="h-6 w-6 rounded-full bg-neutral-700 shrink-0" />
                   )}

@@ -116,7 +116,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
             width={80}
             height={80}
             className="rounded-full h-20 w-20 ring-2 ring-neutral-800 shrink-0"
-            unoptimized
+
           />
         ) : (
           <div className="h-20 w-20 rounded-full bg-gradient-to-br from-neutral-700 to-neutral-800 ring-2 ring-neutral-800 shrink-0 flex items-center justify-center text-2xl font-bold text-neutral-300">
@@ -222,7 +222,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                           title="Open in YouTube Music"
                         >
                           {r.thumbnail ? (
-                            <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" unoptimized />
+                            <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" />
                           ) : (
                             <div className="h-12 w-12 rounded bg-neutral-800" />
                           )}
@@ -236,7 +236,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                           </div>
                         </a>
                       ) : r.thumbnail ? (
-                        <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover shrink-0" unoptimized />
+                        <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover shrink-0" />
                       ) : (
                         <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />
                       )}

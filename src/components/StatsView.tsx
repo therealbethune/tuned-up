@@ -204,13 +204,13 @@ export default async function StatsView({
                 {url ? (
                   <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
                     {s.thumbnail ? (
-                      <Image src={s.thumbnail} alt="" width={40} height={40} className="rounded h-10 w-10 object-cover" unoptimized />
+                      <Image src={s.thumbnail} alt="" width={40} height={40} className="rounded h-10 w-10 object-cover" />
                     ) : (
                       <div className="h-10 w-10 rounded bg-neutral-800" />
                     )}
                   </a>
                 ) : s.thumbnail ? (
-                  <Image src={s.thumbnail} alt="" width={40} height={40} className="rounded h-10 w-10 object-cover shrink-0" unoptimized />
+                  <Image src={s.thumbnail} alt="" width={40} height={40} className="rounded h-10 w-10 object-cover shrink-0" />
                 ) : (
                   <div className="h-10 w-10 rounded bg-neutral-800 shrink-0" />
                 )}

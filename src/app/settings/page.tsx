@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
-import { syncCurrentUser } from "@/lib/sync-user";
 import { SettingsForm } from "./SettingsForm";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +10,6 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
-  await syncCurrentUser();
-
   const [me] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!me) redirect("/");
 

@@ -124,7 +124,7 @@ export function SuggestedFriends({ initial }: { initial?: Suggestion[] }) {
                       width={64}
                       height={64}
                       className="rounded-full h-16 w-16 ring-2 ring-neutral-800"
-                      unoptimized
+
                     />
                   ) : (
                     <div className="h-16 w-16 rounded-full bg-gradient-to-br from-neutral-700 to-neutral-800 ring-2 ring-neutral-800 flex items-center justify-center text-xl font-bold text-neutral-300">

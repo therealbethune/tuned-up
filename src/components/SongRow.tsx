@@ -49,7 +49,7 @@ export function SongRow({
               width={56}
               height={56}
               className="rounded h-14 w-14 object-cover"
-              unoptimized
+
             />
           ) : (
             <div className="h-14 w-14 rounded bg-neutral-800" />
@@ -68,7 +68,7 @@ export function SongRow({
           </div>
         </a>
       ) : song.thumbnail ? (
-        <Image src={song.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover shrink-0" unoptimized />
+        <Image src={song.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover shrink-0" />
       ) : (
         <div className="h-14 w-14 rounded bg-neutral-800 shrink-0" />
       )}

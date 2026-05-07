@@ -152,7 +152,7 @@ export default async function FeedPage() {
               <li key={`${it.username}-${it.songId}-${it.createdAt}`} className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
                 <div className="flex items-center gap-3 mb-3">
                   {it.imageUrl ? (
-                    <Image src={it.imageUrl} alt="" width={28} height={28} className="rounded-full h-7 w-7" unoptimized />
+                    <Image src={it.imageUrl} alt="" width={28} height={28} className="rounded-full h-7 w-7" />
                   ) : (
                     <div className="h-7 w-7 rounded-full bg-neutral-700" />
                   )}
@@ -173,7 +173,7 @@ export default async function FeedPage() {
                       title="Open in YouTube Music"
                     >
                       {it.thumbnail ? (
-                        <Image src={it.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover" unoptimized />
+                        <Image src={it.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover" />
                       ) : (
                         <div className="h-14 w-14 rounded bg-neutral-800" />
                       )}
@@ -187,7 +187,7 @@ export default async function FeedPage() {
                       </div>
                     </a>
                   ) : it.thumbnail ? (
-                    <Image src={it.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover shrink-0" unoptimized />
+                    <Image src={it.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover shrink-0" />
                   ) : (
                     <div className="h-14 w-14 rounded bg-neutral-800 shrink-0" />
                   )}
@@ -296,7 +296,7 @@ async function EmptyFeed({ userId, followedIds }: { userId: string; followedIds:
                   className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900 p-3 transition-colors"
                 >
                   {u.imageUrl ? (
-                    <Image src={u.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" unoptimized />
+                    <Image src={u.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" />
                   ) : (
                     <div className="h-10 w-10 rounded-full bg-neutral-700" />
                   )}

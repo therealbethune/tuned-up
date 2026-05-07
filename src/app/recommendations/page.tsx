@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { and, desc, eq } from "drizzle-orm";
 import { db, recommendations, users, songs } from "@/db";
-import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RateButton } from "@/components/RateButton";
@@ -15,7 +14,6 @@ export const dynamic = "force-dynamic";
 export default async function RecommendationsPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
-  await syncCurrentUser();
 
   const rows = await db
     .select({
@@ -77,7 +75,7 @@ export default async function RecommendationsPage() {
               >
                 <div className="flex items-center gap-2 mb-3 text-sm">
                   {r.fromImageUrl ? (
-                    <Image src={r.fromImageUrl} alt="" width={28} height={28} className="rounded-full h-7 w-7" unoptimized />
+                    <Image src={r.fromImageUrl} alt="" width={28} height={28} className="rounded-full h-7 w-7" />
                   ) : (
                     <div className="h-7 w-7 rounded-full bg-neutral-700" />
                   )}
@@ -92,13 +90,13 @@ export default async function RecommendationsPage() {
                   {url ? (
                     <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
                       {r.thumbnail ? (
-                        <Image src={r.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover" unoptimized />
+                        <Image src={r.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover" />
                       ) : (
                         <div className="h-14 w-14 rounded bg-neutral-800" />
                       )}
                     </a>
                   ) : r.thumbnail ? (
-                    <Image src={r.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover shrink-0" unoptimized />
+                    <Image src={r.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover shrink-0" />
                   ) : (
                     <div className="h-14 w-14 rounded bg-neutral-800 shrink-0" />
                   )}

@@ -113,7 +113,7 @@ export default async function SharedRatingPage({
 
       <div className="flex items-center gap-3">
         {r.imageUrl ? (
-          <Image src={r.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" unoptimized />
+          <Image src={r.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" />
         ) : (
           <div className="h-10 w-10 rounded-full bg-neutral-700" />
         )}
@@ -128,10 +128,10 @@ export default async function SharedRatingPage({
           {r.thumbnail ? (
             url ? (
               <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
-                <Image src={r.thumbnail} alt="" width={96} height={96} className="rounded h-24 w-24 object-cover" unoptimized />
+                <Image src={r.thumbnail} alt="" width={96} height={96} className="rounded h-24 w-24 object-cover" />
               </a>
             ) : (
-              <Image src={r.thumbnail} alt="" width={96} height={96} className="rounded h-24 w-24 object-cover shrink-0" unoptimized />
+              <Image src={r.thumbnail} alt="" width={96} height={96} className="rounded h-24 w-24 object-cover shrink-0" />
             )
           ) : (
             <div className="h-24 w-24 rounded bg-neutral-800 shrink-0" />
