@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import UserProfile from "../u/[username]/UserProfile";
+import { PushBanner } from "@/components/PushBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function MePage() {
 
   return (
     <div className="space-y-4">
+      <PushBanner />
       {/* Stats lives in the profile's stats row now; this is owner-only stuff. */}
       <div className="flex justify-end gap-4 text-sm">
         <Link
