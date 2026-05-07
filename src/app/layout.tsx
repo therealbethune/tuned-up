@@ -8,7 +8,14 @@ import { db, activities } from "@/db";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import "./globals.css";
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.URL && !process.env.URL.includes("--")
+    ? process.env.URL
+    : "https://tuned-up.com");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Tuned Up",
   description: "Rate songs 1–100 and follow your friends",
   applicationName: "Tuned Up",

@@ -26,7 +26,7 @@ export async function resolveAppleMusicUrl(params: {
   try {
     const res = await fetch(url, {
       // iTunes Search has rate limits; be a polite UA.
-      headers: { "user-agent": "TunedUp/1.0 (https://tuned-up.netlify.app)" },
+      headers: { "user-agent": "TunedUp/1.0 (https://tuned-up.com)" },
       // 5s should be plenty; abort if iTunes is slow so we don't block ratings.
       signal: AbortSignal.timeout(5000),
     });

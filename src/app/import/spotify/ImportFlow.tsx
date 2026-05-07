@@ -108,9 +108,13 @@ export function ImportFlow({ configured }: { configured: boolean }) {
             </a>
             , add{" "}
             <code className="text-neutral-100">
+              https://tuned-up.com/import/spotify
+            </code>{" "}
+            as a redirect URI (and{" "}
+            <code className="text-neutral-100">
               https://tuned-up.netlify.app/import/spotify
             </code>{" "}
-            as a redirect URI, and set the env var{" "}
+            for the legacy URL), and set the env var{" "}
             <code className="text-neutral-100">NEXT_PUBLIC_SPOTIFY_CLIENT_ID</code> on Netlify.
           </p>
         </div>
