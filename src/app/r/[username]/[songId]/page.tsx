@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
+import { SignUpButton } from "@clerk/nextjs";
 import { and, eq } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
 import { ytUrlForSongId } from "@/lib/songs";
@@ -162,9 +164,49 @@ export default async function SharedRatingPage({
         {r.review && <p className="text-neutral-200 whitespace-pre-wrap">{r.review}</p>}
       </div>
 
-      <div className="text-center text-sm text-neutral-400">
-        <Link href="/" className="underline text-white">Get on Tuned Up</Link> to rate songs and follow your friends.
+      <SignedOutSharePromo username={r.username} />
+      <SignedInSharePromo username={r.username} />
+    </div>
+  );
+}
+
+async function SignedOutSharePromo({ username }: { username: string }) {
+  const { userId } = await auth();
+  if (userId) return null;
+  return (
+    <div className="rounded-xl border border-emerald-700/40 bg-gradient-to-br from-emerald-500/10 to-sky-500/5 p-5 space-y-3 text-center">
+      <div className="flex items-center justify-center gap-2 text-2xl">
+        <span aria-hidden>🎵</span>
+        <span className="font-bold tracking-tight">Tuned Up</span>
       </div>
+      <p className="text-sm text-neutral-300">
+        Rate songs 1–100, follow your friends, and see who agrees with you.
+      </p>
+      <div className="flex items-center justify-center gap-2">
+        <SignUpButton forceRedirectUrl="/welcome">
+          <button className="rounded-full bg-white text-black px-5 py-2 font-medium">
+            Get started
+          </button>
+        </SignUpButton>
+        <Link
+          href={`/u/${username}`}
+          className="rounded-full border border-neutral-700 hover:bg-neutral-900 px-5 py-2 font-medium text-sm"
+        >
+          See @{username}&apos;s profile
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+async function SignedInSharePromo({ username }: { username: string }) {
+  const { userId } = await auth();
+  if (!userId) return null;
+  return (
+    <div className="text-center text-sm text-neutral-400">
+      <Link href={`/u/${username}`} className="underline text-white">
+        See more of @{username}&apos;s ratings →
+      </Link>
     </div>
   );
 }

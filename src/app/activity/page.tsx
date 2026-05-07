@@ -50,7 +50,9 @@ export default async function ActivityPage() {
         <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-6 text-center text-neutral-400">
           <p>Nothing here yet.</p>
           <p className="text-sm mt-2">
-            <Link href="/people" className="underline text-white">Find people</Link> to follow — when they follow you back or comment on your ratings, it&apos;ll show up here.
+            Activity shows up when someone follows you, likes or comments on your ratings,
+            recommends a song to you, or rates a song you&apos;ve also rated.{" "}
+            <Link href="/people" className="underline text-white">Find people</Link> to get started.
           </p>
         </div>
       ) : (

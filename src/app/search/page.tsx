@@ -87,11 +87,20 @@ export default function SearchPage() {
           placeholder={kind === "album" ? "Album, artist…" : "Song, artist, album…"}
           className="w-full rounded-full bg-neutral-900 border border-neutral-800 pl-11 pr-12 py-2.5 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
         />
-        {loading && (
+        {loading ? (
           <div className="absolute right-4 top-1/2 -translate-y-1/2">
             <div className="h-4 w-4 rounded-full border-2 border-neutral-600 border-t-white animate-spin" />
           </div>
-        )}
+        ) : q ? (
+          <button
+            type="button"
+            onClick={() => setQ("")}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-neutral-500 hover:text-white hover:bg-neutral-800 inline-flex items-center justify-center"
+          >
+            ×
+          </button>
+        ) : null}
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
