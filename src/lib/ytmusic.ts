@@ -1,12 +1,11 @@
 // Minimal YouTube Music search via the public InnerTube API.
 // Mirrors what ytmusicapi (Python) does. Swap for Spotify later.
 
-// This is the public InnerTube web client API key shipped to every browser
-// that loads music.youtube.com. It is NOT a secret — it appears in their
-// HTML source. Netlify's secrets scanner flags the AIza-prefixed string
-// pattern by default; we disable smart detection via the
-// SECRETS_SCAN_SMART_DETECTION_ENABLED=false build env var.
-const YT_MUSIC_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30";
+// The InnerTube web client key is publicly published in music.youtube.com's
+// HTML, but we still keep it in an env var so source-code secret scanners
+// don't flag it. Set YT_MUSIC_KEY in your Netlify project env vars
+// (server-only — never exposed to the browser).
+const YT_MUSIC_KEY = process.env.YT_MUSIC_KEY ?? "";
 const ENDPOINT = `https://music.youtube.com/youtubei/v1/search?key=${YT_MUSIC_KEY}&prettyPrint=false`;
 const SONGS_PARAMS = "EgWKAQIIAWoOEAMQBBAJEA4QChAFEBA%3D";
 const ALBUMS_PARAMS = "EgWKAQIYAWoOEAMQBBAJEA4QChAFEBA%3D";
@@ -49,6 +48,11 @@ function parseDuration(s: string | null | undefined): number | null {
 }
 
 async function rawSearch(query: string, params: string): Promise<unknown> {
+  if (!YT_MUSIC_KEY) {
+    throw new Error(
+      "YT_MUSIC_KEY env var is not set. Add it to your Netlify project env vars.",
+    );
+  }
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: {
