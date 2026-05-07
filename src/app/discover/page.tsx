@@ -1,9 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
 import { desc, sql, gte } from "drizzle-orm";
 import { db, ratings, songs } from "@/db";
-import { ytUrlForSongId } from "@/lib/songs";
+import { isAlbumId, ytUrlForSongId } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
+import { RateButton } from "@/components/RateButton";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,11 @@ type DiscoverRow = {
   appleMusicUrl: string | null;
   ratingCount: number;
   avgScore: number;
+};
+
+type RecRow = DiscoverRow & {
+  reason: string;
+  durationSeconds: number | null;
 };
 
 async function trendingThisWeek(): Promise<DiscoverRow[]> {
@@ -59,6 +66,119 @@ async function topRated(): Promise<DiscoverRow[]> {
     .orderBy(desc(sql`avg(${ratings.score})`), desc(sql`count(${ratings.songId})`))
     .limit(15);
   return rows;
+}
+
+// Personal "Recommended for you" — songs the viewer hasn't rated, ranked by
+// signal-strength of what we know about their network. Two-tier:
+//   1. Songs rated by people the viewer follows (shown as "X friends · avg")
+//   2. Falls back to globally popular highly-rated tracks
+//
+// The "reason" string is the small subtext under each card.
+async function recommendedForViewer(viewerId: string | null): Promise<RecRow[]> {
+  type Row = {
+    song_id: string;
+    title: string;
+    artist: string;
+    album: string | null;
+    thumbnail: string | null;
+    apple_music_url: string | null;
+    duration_seconds: number | null;
+    rating_count: number;
+    avg_score: number;
+    friend_count: number;
+    friend_avg: number | null;
+  };
+
+  const result = await db.execute(
+    viewerId
+      ? sql`
+          WITH my_follows AS (
+            SELECT followee_id AS id
+            FROM follows
+            WHERE follower_id = ${viewerId} AND status = 'accepted'
+          ),
+          my_rated AS (
+            SELECT song_id FROM ratings WHERE user_id = ${viewerId}
+          ),
+          friend_stats AS (
+            SELECT
+              r.song_id,
+              COUNT(DISTINCT r.user_id)::int AS friend_count,
+              ROUND(AVG(r.score))::int AS friend_avg
+            FROM ratings r
+            WHERE r.user_id IN (SELECT id FROM my_follows)
+              AND r.song_id NOT IN (SELECT song_id FROM my_rated)
+            GROUP BY r.song_id
+          ),
+          global_stats AS (
+            SELECT
+              r.song_id,
+              COUNT(*)::int AS rating_count,
+              ROUND(AVG(r.score))::int AS avg_score
+            FROM ratings r
+            WHERE r.song_id NOT IN (SELECT song_id FROM my_rated)
+            GROUP BY r.song_id
+          )
+          SELECT
+            s.id AS song_id, s.title, s.artist, s.album, s.thumbnail,
+            s.apple_music_url, s.duration_seconds,
+            g.rating_count, g.avg_score,
+            COALESCE(f.friend_count, 0) AS friend_count,
+            f.friend_avg
+          FROM songs s
+          JOIN global_stats g ON g.song_id = s.id
+          LEFT JOIN friend_stats f ON f.song_id = s.id
+          ORDER BY
+            COALESCE(f.friend_count, 0) DESC,
+            COALESCE(f.friend_avg, 0) DESC,
+            g.avg_score DESC,
+            g.rating_count DESC
+          LIMIT 15
+        `
+      : sql`
+          SELECT
+            s.id AS song_id, s.title, s.artist, s.album, s.thumbnail,
+            s.apple_music_url, s.duration_seconds,
+            COUNT(*)::int AS rating_count,
+            ROUND(AVG(r.score))::int AS avg_score,
+            0 AS friend_count,
+            NULL::int AS friend_avg
+          FROM ratings r
+          JOIN songs s ON s.id = r.song_id
+          GROUP BY s.id
+          HAVING COUNT(*) >= 2
+          ORDER BY ROUND(AVG(r.score)) DESC, COUNT(*) DESC
+          LIMIT 15
+        `,
+  );
+  const raw = result as unknown;
+  const rows: Row[] = Array.isArray(raw)
+    ? (raw as Row[])
+    : Array.isArray((raw as { rows?: Row[] })?.rows)
+    ? ((raw as { rows: Row[] }).rows)
+    : [];
+
+  return rows.map((r) => {
+    const friendCount = Number(r.friend_count ?? 0);
+    let reason: string;
+    if (friendCount > 0) {
+      reason = `${friendCount} friend${friendCount === 1 ? "" : "s"} · avg ${r.friend_avg ?? r.avg_score}`;
+    } else {
+      reason = `${r.rating_count} ${r.rating_count === 1 ? "rating" : "ratings"} · avg ${r.avg_score}`;
+    }
+    return {
+      songId: r.song_id,
+      title: r.title,
+      artist: r.artist,
+      album: r.album,
+      thumbnail: r.thumbnail,
+      appleMusicUrl: r.apple_music_url,
+      ratingCount: Number(r.rating_count),
+      avgScore: Number(r.avg_score),
+      reason,
+      durationSeconds: r.duration_seconds == null ? null : Number(r.duration_seconds),
+    };
+  });
 }
 
 function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
@@ -132,8 +252,74 @@ function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
   );
 }
 
+function RecommendedRow({ rows }: { rows: RecRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-lg font-semibold">Recommended for you</h2>
+        <span className="text-xs text-neutral-500">Based on your friends and overall taste</span>
+      </div>
+      <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-2 snap-x snap-mandatory">
+        {rows.map((r) => {
+          const url = ytUrlForSongId(r.songId);
+          const songLike = {
+            id: r.songId,
+            kind: (isAlbumId(r.songId) ? "album" : "song") as "song" | "album",
+            title: r.title,
+            artist: r.artist,
+            album: r.album,
+            thumbnail: r.thumbnail,
+            durationSeconds: r.durationSeconds,
+          };
+          return (
+            <div
+              key={r.songId}
+              className="shrink-0 w-44 rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 snap-start flex flex-col"
+            >
+              {url ? (
+                <a href={url} target="_blank" rel="noreferrer" className="relative block">
+                  {r.thumbnail ? (
+                    <Image
+                      src={r.thumbnail}
+                      alt=""
+                      width={160}
+                      height={160}
+                      className="rounded w-full aspect-square object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="rounded w-full aspect-square bg-neutral-800" />
+                  )}
+                </a>
+              ) : r.thumbnail ? (
+                <Image src={r.thumbnail} alt="" width={160} height={160} className="rounded w-full aspect-square object-cover" unoptimized />
+              ) : (
+                <div className="rounded w-full aspect-square bg-neutral-800" />
+              )}
+              <div className="mt-2 min-h-[40px]">
+                <div className="font-medium text-sm truncate" title={r.title}>{r.title}</div>
+                <div className="text-xs text-neutral-400 truncate" title={r.artist}>{r.artist}</div>
+              </div>
+              <div className="text-[11px] text-neutral-500 mt-1 truncate">{r.reason}</div>
+              <div className="mt-2">
+                <RateButton song={songLike} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default async function DiscoverPage() {
-  const [trending, top] = await Promise.all([trendingThisWeek(), topRated()]);
+  const { userId } = await auth();
+  const [recs, trending, top] = await Promise.all([
+    recommendedForViewer(userId),
+    trendingThisWeek(),
+    topRated(),
+  ]);
 
   return (
     <div className="space-y-10">
@@ -143,6 +329,8 @@ export default async function DiscoverPage() {
           What everyone&apos;s rating right now and what&apos;s scored highest overall.
         </p>
       </div>
+
+      <RecommendedRow rows={recs} />
 
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
