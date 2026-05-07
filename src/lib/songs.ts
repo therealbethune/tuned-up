@@ -46,3 +46,34 @@ export function streamingSearchLinks(params: { title: string; artist: string }):
     appleMusic: `https://music.apple.com/us/search?term=${encodeURIComponent(q)}`,
   };
 }
+
+// Render a date as a friendly relative phrase: "Today", "Yesterday",
+// "3 days ago", "Last week", "Mar 5". Handles past + future cases.
+export function relativeTime(d: Date | string | number): string {
+  const date = d instanceof Date ? d : new Date(d);
+  if (isNaN(date.getTime())) return "";
+  const now = new Date();
+
+  // Day-precision diff using local time so "today" matches the calendar day.
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const dayDiff = Math.round((startOfDay(now).getTime() - startOfDay(date).getTime()) / 86400000);
+
+  if (dayDiff === 0) {
+    // Within today — also distinguish "just now" / "Xm ago" for very recent events.
+    const minutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  }
+  if (dayDiff === 1) return "Yesterday";
+  if (dayDiff < 7) return `${dayDiff} days ago`;
+  if (dayDiff < 30) {
+    const w = Math.floor(dayDiff / 7);
+    return w === 1 ? "Last week" : `${w} weeks ago`;
+  }
+  if (dayDiff < 365 && date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}

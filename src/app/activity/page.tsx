@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db, activities, users, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
+import { relativeTime } from "@/lib/songs";
 import { FollowRequestActions } from "./FollowRequestActions";
 
 export const dynamic = "force-dynamic";
@@ -119,7 +120,7 @@ export default async function ActivityPage() {
                     </span>
                   </div>
                   <div className="text-xs text-neutral-500">
-                    {new Date(a.createdAt).toLocaleDateString()}
+                    {relativeTime(a.createdAt)}
                   </div>
                 </div>
                 {a.type === "follow_request" && (

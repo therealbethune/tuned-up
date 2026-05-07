@@ -32,6 +32,7 @@ export async function GET(req: Request) {
       displayName: users.displayName,
       imageUrl: users.imageUrl,
       score: ratings.score,
+      review: ratings.review,
     })
     .from(comments)
     .innerJoin(users, eq(users.id, comments.commenterId))
@@ -100,7 +101,7 @@ export async function POST(req: Request) {
     .where(eq(users.id, userId))
     .limit(1);
   const [myRating] = await db
-    .select({ score: ratings.score })
+    .select({ score: ratings.score, review: ratings.review })
     .from(ratings)
     .where(and(eq(ratings.userId, userId), eq(ratings.songId, songId)))
     .limit(1);
@@ -115,6 +116,7 @@ export async function POST(req: Request) {
       displayName: me?.displayName,
       imageUrl: me?.imageUrl,
       score: myRating?.score ?? null,
+      review: myRating?.review ?? null,
     },
   });
 }

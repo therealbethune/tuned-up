@@ -12,6 +12,7 @@ type Comment = {
   displayName: string | null;
   imageUrl: string | null;
   score: number | null;
+  review: string | null;
 };
 
 export function CommentSection({
@@ -140,6 +141,11 @@ export function CommentSection({
                     <p className="text-sm text-neutral-200 mt-0.5 break-words whitespace-pre-wrap">
                       {c.body}
                     </p>
+                    {c.review && (
+                      <blockquote className="mt-1.5 border-l-2 border-neutral-700 pl-2 text-xs text-neutral-400 italic break-words whitespace-pre-wrap">
+                        Their review: {c.review}
+                      </blockquote>
+                    )}
                   </div>
                 </li>
               ))}

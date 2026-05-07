@@ -39,17 +39,21 @@ export function StreamingLinks({
   songId,
   title,
   artist,
+  appleMusicUrl,
   className = "",
 }: {
   songId: string;
   title: string;
   artist: string;
+  /** Direct Apple Music track URL (populated server-side via iTunes Search). */
+  appleMusicUrl?: string | null;
   className?: string;
 }) {
   const yt = ytUrlForSongId(songId);
   const spotifyDirect = spotifyDirectUrlForSongId(songId);
-  const { spotify: spotifySearch, appleMusic } = streamingSearchLinks({ title, artist });
+  const { spotify: spotifySearch, appleMusic: appleMusicSearch } = streamingSearchLinks({ title, artist });
   const spotify = spotifyDirect ?? spotifySearch;
+  const appleMusic = appleMusicUrl ?? appleMusicSearch;
 
   const linkClass =
     "inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors";

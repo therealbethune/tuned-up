@@ -51,23 +51,89 @@ async function unreadActivityCount(userId: string): Promise<number> {
   }
 }
 
+function NavLink({
+  href,
+  icon,
+  label,
+  badge,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  badge?: number;
+}) {
+  return (
+    <Link
+      href={href}
+      className="relative inline-flex items-center gap-1.5 hover:text-white text-neutral-300 px-1"
+      aria-label={label}
+    >
+      <span className="inline-flex items-center justify-center">{icon}</span>
+      <span className="hidden sm:inline">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="absolute -top-1 right-0 sm:-right-2 h-4 min-w-4 px-1 rounded-full bg-emerald-500 text-[10px] text-black font-bold tabular-nums flex items-center justify-center">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+const ICON = {
+  feed: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <circle cx="3.5" cy="6" r="1" />
+      <circle cx="3.5" cy="12" r="1" />
+      <circle cx="3.5" cy="18" r="1" />
+    </svg>
+  ),
+  discover: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </svg>
+  ),
+  search: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  ),
+  people: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  activity: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  ),
+  me: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+};
+
 async function SignedInNav({ userId }: { userId: string }) {
   const unread = await unreadActivityCount(userId);
   return (
     <>
-      <Link href="/feed" className="hover:text-white text-neutral-300">Feed</Link>
-      <Link href="/discover" className="hover:text-white text-neutral-300">Discover</Link>
-      <Link href="/search" className="hover:text-white text-neutral-300">Search</Link>
-      <Link href="/people" className="hover:text-white text-neutral-300">People</Link>
-      <Link href="/activity" className="relative hover:text-white text-neutral-300">
-        Activity
-        {unread > 0 && (
-          <span className="absolute -top-1.5 -right-2 h-4 min-w-4 px-1 rounded-full bg-emerald-500 text-[10px] text-black font-bold tabular-nums flex items-center justify-center">
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
-      </Link>
-      <Link href="/me" className="hover:text-white text-neutral-300">Me</Link>
+      <NavLink href="/feed" icon={ICON.feed} label="Feed" />
+      <NavLink href="/discover" icon={ICON.discover} label="Discover" />
+      <NavLink href="/search" icon={ICON.search} label="Search" />
+      <NavLink href="/people" icon={ICON.people} label="People" />
+      <NavLink href="/activity" icon={ICON.activity} label="Activity" badge={unread} />
+      <NavLink href="/me" icon={ICON.me} label="Me" />
       <ThemeToggle />
       <UserButton />
     </>
@@ -100,14 +166,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </head>
         <body className="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
           <header className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur sticky top-0 z-10">
-            <nav className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">
-              <Link href="/" className="font-bold text-lg tracking-tight">🎵 Tuned Up</Link>
-              <div className="flex items-center gap-4 text-sm">
+            <nav className="mx-auto max-w-3xl flex items-center justify-between px-3 py-3 gap-2">
+              <Link href="/" className="font-bold text-lg tracking-tight whitespace-nowrap">🎵 <span className="hidden sm:inline">Tuned Up</span></Link>
+              <div className="flex items-center gap-2 sm:gap-4 text-sm">
                 {userId ? <SignedInNav userId={userId} /> : <SignedOutNav />}
               </div>
             </nav>
           </header>
-          <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>
+          <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8">{children}</main>
         </body>
       </html>
     </ClerkProvider>

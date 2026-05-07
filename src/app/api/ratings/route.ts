@@ -4,6 +4,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, songs, ratings, activities } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
+import { resolveAppleMusicUrl } from "@/lib/apple-music";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,24 @@ export async function POST(req: Request) {
 
   // Detect kind from id prefix (or accept it from the client).
   const kind: "song" | "album" =
-    song.kind === "album" || song.id.startsWith("yt-album:") ? "album" : "song";
+    song.kind === "album" || song.id.startsWith("yt-album:") || song.id.startsWith("spotify-album:")
+      ? "album"
+      : "song";
+
+  // Look up the canonical Apple Music URL once on first save. We do this
+  // before the upsert so a brand-new song row gets the link immediately.
+  // If iTunes is slow/down, we just skip it (column stays null and the
+  // streaming-links UI falls back to the search URL).
+  const [existing] = await db
+    .select({ appleMusicUrl: songs.appleMusicUrl })
+    .from(songs)
+    .where(eq(songs.id, song.id))
+    .limit(1);
+
+  let appleMusicUrl: string | null = existing?.appleMusicUrl ?? null;
+  if (!appleMusicUrl) {
+    appleMusicUrl = await resolveAppleMusicUrl({ title: song.title, artist: song.artist, kind });
+  }
 
   await db
     .insert(songs)
@@ -37,6 +55,7 @@ export async function POST(req: Request) {
       album: song.album ?? null,
       thumbnail: song.thumbnail ?? null,
       durationSeconds: song.durationSeconds ?? null,
+      appleMusicUrl,
     })
     .onConflictDoUpdate({
       target: songs.id,
@@ -46,6 +65,8 @@ export async function POST(req: Request) {
         artist: song.artist,
         album: song.album ?? null,
         thumbnail: song.thumbnail ?? null,
+        // Don't blow away an existing apple_music_url with null on a re-save.
+        ...(appleMusicUrl ? { appleMusicUrl } : {}),
       },
     });
 

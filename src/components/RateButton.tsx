@@ -50,7 +50,7 @@ export function RateButton({
   }
 
   return (
-    <div className="flex flex-col gap-3 w-72 max-w-full rounded-lg border border-neutral-700 bg-neutral-900 p-3">
+    <div className="flex flex-col gap-3 w-full sm:w-72 sm:max-w-full rounded-lg border border-neutral-700 bg-neutral-900 p-3">
       <div className="flex items-center gap-3">
         <input
           type="range"

@@ -87,6 +87,7 @@ const STATEMENTS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_private" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "kind" text NOT NULL DEFAULT 'song'`,
   `ALTER TABLE "follows" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'accepted'`,
+  `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "apple_music_url" text`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

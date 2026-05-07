@@ -46,6 +46,7 @@ async function loadRating(username: string, encodedSongId: string) {
       artist: songs.artist,
       album: songs.album,
       thumbnail: songs.thumbnail,
+      appleMusicUrl: songs.appleMusicUrl,
       kind: songs.kind,
       username: users.username,
       displayName: users.displayName,
@@ -157,7 +158,7 @@ export default async function SharedRatingPage({
             </div>
           </div>
         </div>
-        <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} />
+        <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} appleMusicUrl={r.appleMusicUrl} />
         {r.review && <p className="text-neutral-200 whitespace-pre-wrap">{r.review}</p>}
       </div>
 

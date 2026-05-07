@@ -20,6 +20,7 @@ export const songs = pgTable("songs", {
   album: text("album"),
   thumbnail: text("thumbnail"),
   durationSeconds: integer("duration_seconds"),
+  appleMusicUrl: text("apple_music_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

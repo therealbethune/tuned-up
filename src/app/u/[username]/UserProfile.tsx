@@ -11,6 +11,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { isAlbumId } from "@/lib/songs";
 import { computeTasteAgreement } from "@/lib/taste";
+import { computeStreak } from "@/lib/streak";
 
 type User = typeof users.$inferSelect;
 
@@ -36,7 +37,10 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
 
   const followersCount = followerStat?.n ?? 0;
   const followingCount = followingStat?.n ?? 0;
-  const taste = viewerId && !isOwner ? await computeTasteAgreement(viewerId, target.id) : null;
+  const [taste, streak] = await Promise.all([
+    viewerId && !isOwner ? computeTasteAgreement(viewerId, target.id) : Promise.resolve(null),
+    computeStreak(target.id),
+  ]);
   const followRow = followingViewer[0];
   const followState: "none" | "pending" | "accepted" = !followRow
     ? "none"
@@ -56,6 +60,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           artist: songs.artist,
           album: songs.album,
           thumbnail: songs.thumbnail,
+          appleMusicUrl: songs.appleMusicUrl,
         })
         .from(ratings)
         .innerJoin(songs, eq(ratings.songId, songs.id))
@@ -111,9 +116,19 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         ) : (
           <div className="h-16 w-16 rounded-full bg-neutral-700" />
         )}
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">{target.displayName || target.username}</h1>
-          <p className="text-neutral-400 text-sm">@{target.username}</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold truncate">{target.displayName || target.username}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-neutral-400 text-sm">@{target.username}</p>
+            {streak > 0 && (
+              <span
+                className="text-xs rounded-full px-2 py-0.5 bg-orange-500/15 text-orange-300 border border-orange-500/30 tabular-nums"
+                title={`${streak}-day rating streak`}
+              >
+                🔥 {streak}-day streak
+              </span>
+            )}
+          </div>
         </div>
         {viewerId && viewerId !== target.id && (
           <FollowButton username={target.username} initialState={followState} />
@@ -171,6 +186,17 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           <div className="text-2xl font-bold tabular-nums">{avg ?? "—"}</div>
         </div>
       </div>
+
+      {canSeeRatings && rows.length > 0 && (
+        <div className="flex justify-end -mt-3">
+          <Link
+            href={`/u/${target.username}/stats`}
+            className="text-sm text-neutral-400 hover:text-white"
+          >
+            📊 Full stats →
+          </Link>
+        </div>
+      )}
 
       {canSeeRatings && (
         <>
@@ -238,7 +264,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                 )}
                 {viewerId && (
                   <>
-                    <div className="mt-3 flex items-center justify-between gap-4">
+                    <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-4">
                         <LikeButton
                           ratingUserId={target.id}
@@ -248,7 +274,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                         />
                         <ShareButton username={target.username} songId={r.songId} />
                       </div>
-                      <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} />
+                      <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} appleMusicUrl={r.appleMusicUrl} />
                     </div>
                     <CommentSection
                       ratingUserId={target.id}

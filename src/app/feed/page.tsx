@@ -11,7 +11,7 @@ import { CommentSection } from "@/components/CommentSection";
 import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
-import { isAlbumId } from "@/lib/songs";
+import { isAlbumId, relativeTime } from "@/lib/songs";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +40,7 @@ export default async function FeedPage() {
           artist: songs.artist,
           album: songs.album,
           thumbnail: songs.thumbnail,
+          appleMusicUrl: songs.appleMusicUrl,
           username: users.username,
           displayName: users.displayName,
           imageUrl: users.imageUrl,
@@ -158,7 +159,7 @@ export default async function FeedPage() {
                     {it.displayName || it.username}
                   </Link>
                   <span className="text-xs text-neutral-500">
-                    {new Date(it.createdAt).toLocaleDateString()}
+                    {relativeTime(it.createdAt)}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -222,7 +223,7 @@ export default async function FeedPage() {
                   </div>
                 )}
 
-                <div className="mt-3 flex items-center justify-between gap-4">
+                <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-4">
                     <LikeButton
                       ratingUserId={it.ratingUserId}
@@ -232,7 +233,7 @@ export default async function FeedPage() {
                     />
                     <ShareButton username={it.username} songId={it.songId} />
                   </div>
-                  <StreamingLinks songId={it.songId} title={it.title} artist={it.artist} />
+                  <StreamingLinks songId={it.songId} title={it.title} artist={it.artist} appleMusicUrl={it.appleMusicUrl} />
                 </div>
 
                 <CommentSection
