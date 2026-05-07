@@ -97,6 +97,14 @@ const STATEMENTS = [
   )`,
   `ALTER TABLE "push_subscriptions" ADD CONSTRAINT "push_subscriptions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   `CREATE INDEX IF NOT EXISTS "push_subscriptions_user_idx" ON "push_subscriptions" USING btree ("user_id")`,
+  `CREATE TABLE IF NOT EXISTS "dismissed_suggestions" (
+    "viewer_id" text NOT NULL,
+    "suggested_id" text NOT NULL,
+    "dismissed_at" timestamp DEFAULT now() NOT NULL,
+    CONSTRAINT "dismissed_suggestions_pk" PRIMARY KEY("viewer_id","suggested_id")
+  )`,
+  `ALTER TABLE "dismissed_suggestions" ADD CONSTRAINT "dismissed_suggestions_viewer_id_users_id_fk" FOREIGN KEY ("viewer_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `ALTER TABLE "dismissed_suggestions" ADD CONSTRAINT "dismissed_suggestions_suggested_id_users_id_fk" FOREIGN KEY ("suggested_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

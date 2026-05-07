@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { SuggestedFriends } from "@/components/SuggestedFriends";
 
 type UserResult = {
   id: string;
@@ -45,6 +46,8 @@ export default function PeoplePage() {
         <h1 className="text-2xl font-bold">Find people</h1>
         <p className="text-neutral-400 text-sm">Search by username or name. Tap a result to view their ratings and follow.</p>
       </div>
+
+      <SuggestedFriends />
 
       <div className="relative">
         <svg

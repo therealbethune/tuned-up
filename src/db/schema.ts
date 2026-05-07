@@ -49,6 +49,16 @@ export const follows = pgTable("follows", {
   index("follows_followee_idx").on(t.followeeId),
 ]);
 
+// Tracks who the viewer has explicitly dismissed from their suggested
+// friends list, so we don't re-show them.
+export const dismissedSuggestions = pgTable("dismissed_suggestions", {
+  viewerId: text("viewer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  suggestedId: text("suggested_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  dismissedAt: timestamp("dismissed_at").defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.viewerId, t.suggestedId] }),
+]);
+
 // Web Push subscriptions. One row per (user, browser/device) combo. The
 // endpoint is unique per subscription; deleting it on a 410 Gone response
 // from the push service is how we clean up stale ones.
