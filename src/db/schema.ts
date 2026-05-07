@@ -49,6 +49,19 @@ export const follows = pgTable("follows", {
   index("follows_followee_idx").on(t.followeeId),
 ]);
 
+// Web Push subscriptions. One row per (user, browser/device) combo. The
+// endpoint is unique per subscription; deleting it on a 410 Gone response
+// from the push service is how we clean up stale ones.
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  endpoint: text("endpoint").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("push_subscriptions_user_idx").on(t.userId),
+]);
+
 // Activity / notifications. type='follow' means actorId followed userId.
 // Future types: 'rating_match' (actorId rated a song userId also rated), etc.
 // A like on someone's rating. Composite key prevents duplicates;

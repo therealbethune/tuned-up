@@ -2,8 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, eq, count } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, likes, ratings, activities } from "@/db";
+import { db, likes, ratings, activities, users, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
+import { sendPushToUser } from "@/lib/push";
 
 export const runtime = "nodejs";
 
@@ -78,6 +79,25 @@ export async function POST(req: Request) {
         actorId: userId,
         type: "like",
         songId,
+      });
+
+      // Push to the rating owner.
+      const [actor] = await db
+        .select({ displayName: users.displayName, username: users.username })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const [song] = await db
+        .select({ title: songs.title })
+        .from(songs)
+        .where(eq(songs.id, songId))
+        .limit(1);
+      const actorName = actor?.displayName || actor?.username || "Someone";
+      await sendPushToUser(ratingUserId, {
+        title: `${actorName} liked your rating`,
+        body: song ? `❤️ ${song.title}` : "Open Tuned Up to see.",
+        url: `/u/${actor?.username ?? ""}`,
+        tag: `like:${userId}:${songId}`,
       });
     }
   }

@@ -2,8 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, comments, users, ratings, activities } from "@/db";
+import { db, comments, users, ratings, activities, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
+import { sendPushToUser } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,6 +87,25 @@ export async function POST(req: Request) {
       actorId: userId,
       type: "comment",
       songId,
+    });
+
+    const [actor] = await db
+      .select({ displayName: users.displayName, username: users.username })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    const [song] = await db
+      .select({ title: songs.title })
+      .from(songs)
+      .where(eq(songs.id, songId))
+      .limit(1);
+    const actorName = actor?.displayName || actor?.username || "Someone";
+    const preview = text.length > 80 ? text.slice(0, 77) + "…" : text;
+    await sendPushToUser(ratingUserId, {
+      title: `${actorName} commented on ${song?.title ?? "your rating"}`,
+      body: preview,
+      url: `/u/${actor?.username ?? ""}`,
+      tag: `comment:${userId}:${songId}`,
     });
   }
 

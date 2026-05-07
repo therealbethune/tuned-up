@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
+import { PushToggle } from "@/components/PushToggle";
 
 export function SettingsForm({
   username: initialUsername,
@@ -161,6 +162,11 @@ export function SettingsForm({
           </button>
         </label>
         {privacyMsg && <p className="text-xs text-neutral-500">{privacyMsg}</p>}
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
+        <h2 className="text-lg font-semibold">Notifications</h2>
+        <PushToggle />
       </section>
 
       <section className="space-y-3 rounded-lg border border-red-900/50 bg-red-950/10 p-4">

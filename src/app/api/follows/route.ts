@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db, follows, users, activities } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { randomUUID } from "node:crypto";
+import { sendPushToUser } from "@/lib/push";
 
 export const runtime = "nodejs";
 
@@ -100,6 +101,20 @@ export async function POST(req: Request) {
       userId: target.id,
       actorId: userId,
       type: status === "pending" ? "follow_request" : "follow",
+    });
+
+    // Push notification to the followee — actor's display name as title.
+    const [actor] = await db
+      .select({ displayName: users.displayName, username: users.username })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    const actorName = actor?.displayName || actor?.username || "Someone";
+    await sendPushToUser(target.id, {
+      title: status === "pending" ? `${actorName} wants to follow you` : `${actorName} followed you`,
+      body: status === "pending" ? "Approve them in Activity." : "View their profile in the app.",
+      url: status === "pending" ? "/activity" : `/u/${actor?.username ?? ""}`,
+      tag: `follow:${userId}`,
     });
   }
 
