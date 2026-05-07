@@ -25,6 +25,14 @@ const TAB_ICON = {
       <path d="m21 21-4.3-4.3" />
     </svg>
   ),
+  people: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
   activity: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -43,6 +51,7 @@ const TABS = [
   { href: "/feed", label: "Feed", icon: TAB_ICON.feed },
   { href: "/discover", label: "Discover", icon: TAB_ICON.discover },
   { href: "/search", label: "Search", icon: TAB_ICON.search },
+  { href: "/people", label: "People", icon: TAB_ICON.people },
   { href: "/activity", label: "Activity", icon: TAB_ICON.activity, hasUnread: true },
   { href: "/me", label: "Me", icon: TAB_ICON.me },
 ];
