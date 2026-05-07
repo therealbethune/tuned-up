@@ -35,7 +35,15 @@ export async function GET(
         </div>
       </div>
     ),
-    { width, height },
+    {
+      width,
+      height,
+      headers: {
+        // Splash content never changes for a given (w, h) — cache hard.
+        // 7 days at the edge, immutable per URL.
+        "cache-control": "public, max-age=604800, s-maxage=604800, immutable",
+      },
+    },
   );
 }
 

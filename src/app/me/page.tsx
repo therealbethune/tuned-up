@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { db, users } from "@/db";
+import { and, eq, count } from "drizzle-orm";
+import { db, users, recommendations } from "@/db";
 import UserProfile from "../u/[username]/UserProfile";
 import { PushBanner } from "@/components/PushBanner";
 
@@ -11,23 +11,36 @@ export const dynamic = "force-dynamic";
 export default async function MePage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
-  // syncCurrentUser ran in the root layout — just read the row.
+
   const [me] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!me) redirect("/");
+
+  // Pending recommendations count → drives the badge on the Recs link.
+  const [recStat] = await db
+    .select({ n: count() })
+    .from(recommendations)
+    .where(
+      and(eq(recommendations.toUserId, userId), eq(recommendations.status, "pending")),
+    );
+  const pendingRecs = Number(recStat?.n ?? 0);
 
   return (
     <div className="space-y-4">
       <PushBanner />
-      {/* Stats lives in the profile's stats row now; this is owner-only stuff. */}
       <div className="flex justify-end gap-4 text-sm">
         <Link
           href="/recommendations"
-          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5"
+          className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M3 11l18-8-8 18-2-8-8-2z" />
           </svg>
           Recs
+          {pendingRecs > 0 && (
+            <span className="ml-1 inline-flex items-center justify-center rounded-full bg-emerald-500 text-black text-[10px] font-bold tabular-nums px-1.5 h-4 min-w-4">
+              {pendingRecs > 9 ? "9+" : pendingRecs}
+            </span>
+          )}
         </Link>
         <Link
           href="/settings"
