@@ -17,6 +17,7 @@ type User = typeof users.$inferSelect;
 
 export default async function UserProfile({ target, viewerId }: { target: User; viewerId: string | null }) {
   const isOwner = viewerId === target.id;
+
   const [[followerStat], [followingStat], followingViewer] = await Promise.all([
     db
       .select({ n: count() })
@@ -69,10 +70,6 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         .limit(100)
     : [];
 
-  const avg = rows.length
-    ? Math.round(rows.reduce((a, r) => a + r.score, 0) / rows.length)
-    : null;
-
   // Comment + like counts for this user's ratings.
   const songIds = rows.map((r) => r.songId);
   let commentCounts: Map<string, number> = new Map();
@@ -110,19 +107,31 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      {/* Header: avatar + name + streak + follow */}
+      <div className="flex items-start gap-4">
         {target.imageUrl ? (
-          <Image src={target.imageUrl} alt="" width={64} height={64} className="rounded-full h-16 w-16" unoptimized />
+          <Image
+            src={target.imageUrl}
+            alt=""
+            width={80}
+            height={80}
+            className="rounded-full h-20 w-20 ring-2 ring-neutral-800 shrink-0"
+            unoptimized
+          />
         ) : (
-          <div className="h-16 w-16 rounded-full bg-neutral-700" />
+          <div className="h-20 w-20 rounded-full bg-gradient-to-br from-neutral-700 to-neutral-800 ring-2 ring-neutral-800 shrink-0 flex items-center justify-center text-2xl font-bold text-neutral-300">
+            {(target.displayName || target.username).charAt(0).toUpperCase()}
+          </div>
         )}
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold truncate">{target.displayName || target.username}</h1>
+        <div className="flex-1 min-w-0 pt-1 space-y-1.5">
+          <h1 className="text-3xl font-bold tracking-tight truncate leading-tight">
+            {target.displayName || target.username}
+          </h1>
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-neutral-400 text-sm">@{target.username}</p>
+            <span className="text-neutral-400 text-sm">@{target.username}</span>
             {streak > 0 && (
               <span
-                className="text-xs rounded-full px-2 py-0.5 bg-orange-500/15 text-orange-300 border border-orange-500/30 tabular-nums"
+                className="text-xs rounded-full px-2 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-300 border border-orange-500/40 tabular-nums font-medium"
                 title={`${streak}-day rating streak`}
               >
                 🔥 {streak}-day streak
@@ -131,7 +140,38 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           </div>
         </div>
         {viewerId && viewerId !== target.id && (
-          <FollowButton username={target.username} initialState={followState} />
+          <div className="pt-1 shrink-0">
+            <FollowButton username={target.username} initialState={followState} />
+          </div>
+        )}
+      </div>
+
+      {/* Followers / following / stats — single row, all clickable. The
+          stats link is the universal entry to /u/[username]/stats. */}
+      <div className="flex items-center gap-5 text-sm border-y border-neutral-800 py-3">
+        <Link
+          href={`/u/${target.username}/followers`}
+          className="hover:text-white text-neutral-300 transition-colors"
+        >
+          <span className="font-bold text-white tabular-nums">{followersCount}</span>{" "}
+          <span className="text-neutral-400">{followersCount === 1 ? "follower" : "followers"}</span>
+        </Link>
+        <Link
+          href={`/u/${target.username}/following`}
+          className="hover:text-white text-neutral-300 transition-colors"
+        >
+          <span className="font-bold text-white tabular-nums">{followingCount}</span>{" "}
+          <span className="text-neutral-400">following</span>
+        </Link>
+        {canSeeRatings && rows.length > 0 && (
+          <Link
+            href={`/u/${target.username}/stats`}
+            className="ml-auto inline-flex items-center gap-1 text-neutral-300 hover:text-white transition-colors"
+          >
+            <span className="font-bold text-white tabular-nums">{rows.length}</span>
+            <span className="text-neutral-400">ratings</span>
+            <span className="text-neutral-500 ml-1">→</span>
+          </Link>
         )}
       </div>
 
@@ -159,136 +199,101 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         </div>
       )}
 
-      <div className="flex gap-6 text-sm">
-        <Link
-          href={`/u/${target.username}/followers`}
-          className="hover:text-white text-neutral-300 transition-colors"
-        >
-          <span className="font-bold text-white tabular-nums">{followersCount}</span>{" "}
-          <span className="text-neutral-400">{followersCount === 1 ? "follower" : "followers"}</span>
-        </Link>
-        <Link
-          href={`/u/${target.username}/following`}
-          className="hover:text-white text-neutral-300 transition-colors"
-        >
-          <span className="font-bold text-white tabular-nums">{followingCount}</span>{" "}
-          <span className="text-neutral-400">following</span>
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
-          <div className="text-neutral-400">Songs rated</div>
-          <div className="text-2xl font-bold">{rows.length}</div>
-        </div>
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
-          <div className="text-neutral-400">Average score</div>
-          <div className="text-2xl font-bold tabular-nums">{avg ?? "—"}</div>
-        </div>
-      </div>
-
-      {canSeeRatings && rows.length > 0 && (
-        <div className="flex justify-end -mt-3">
-          <Link
-            href={`/u/${target.username}/stats`}
-            className="text-sm text-neutral-400 hover:text-white"
-          >
-            📊 Full stats →
-          </Link>
-        </div>
-      )}
-
       {canSeeRatings && (
         <>
           <h2 className="text-lg font-semibold pt-2">Ratings</h2>
           {rows.length === 0 ? (
-            <p className="text-neutral-500 text-sm">No ratings yet. <Link href="/search" className="underline">Rate something.</Link></p>
+            <p className="text-neutral-500 text-sm">
+              No ratings yet. <Link href="/search" className="underline">Rate something.</Link>
+            </p>
           ) : (
-        <ul className="space-y-2">
-          {rows.map((r) => {
-            const url = ytUrlForSongId(r.songId);
-            return (
-              <li key={r.songId} className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
-                <div className="flex items-center gap-3">
-                {url ? (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="relative shrink-0 group"
-                    title="Open in YouTube Music"
-                  >
-                    {r.thumbnail ? (
-                      <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" unoptimized />
-                    ) : (
-                      <div className="h-12 w-12 rounded bg-neutral-800" />
-                    )}
-                    <div className="absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
-                      <svg
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+            <ul className="space-y-2">
+              {rows.map((r) => {
+                const url = ytUrlForSongId(r.songId);
+                return (
+                  <li key={r.songId} className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
+                    <div className="flex items-center gap-3">
+                      {url ? (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="relative shrink-0 group"
+                          title="Open in YouTube Music"
+                        >
+                          {r.thumbnail ? (
+                            <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" unoptimized />
+                          ) : (
+                            <div className="h-12 w-12 rounded bg-neutral-800" />
+                          )}
+                          <div className="absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+                            <svg
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden
+                            >
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
+                        </a>
+                      ) : r.thumbnail ? (
+                        <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover shrink-0" unoptimized />
+                      ) : (
+                        <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {url ? (
+                            <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate hover:underline">
+                              {r.title}
+                            </a>
+                          ) : (
+                            <div className="font-medium truncate">{r.title}</div>
+                          )}
+                          {isAlbumId(r.songId) && (
+                            <span className="shrink-0 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                              Album
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-neutral-400 truncate">
+                          {r.artist}{r.album ? ` · ${r.album}` : ""}
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold tabular-nums">{r.score}</div>
                     </div>
-                  </a>
-                ) : r.thumbnail ? (
-                  <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover shrink-0" unoptimized />
-                ) : (
-                  <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {url ? (
-                      <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate hover:underline">
-                        {r.title}
-                      </a>
-                    ) : (
-                      <div className="font-medium truncate">{r.title}</div>
+                    {r.review && <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap">{r.review}</p>}
+                    {isOwner && (
+                      <div className="mt-3">
+                        <OwnRatingForm rating={{ songId: r.songId, title: r.title, score: r.score, review: r.review }} />
+                      </div>
                     )}
-                    {isAlbumId(r.songId) && (
-                      <span className="shrink-0 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                        Album
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm text-neutral-400 truncate">{r.artist}{r.album ? ` · ${r.album}` : ""}</div>
-                </div>
-                <div className="text-2xl font-bold tabular-nums">{r.score}</div>
-                </div>
-                {r.review && <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap">{r.review}</p>}
-                {isOwner && (
-                  <div className="mt-3">
-                    <OwnRatingForm rating={{ songId: r.songId, title: r.title, score: r.score, review: r.review }} />
-                  </div>
-                )}
-                {viewerId && (
-                  <>
-                    <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-                      <div className="flex items-center gap-4">
-                        <LikeButton
+                    {viewerId && (
+                      <>
+                        <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-4">
+                            <LikeButton
+                              ratingUserId={target.id}
+                              songId={r.songId}
+                              initialLiked={myLikes.has(r.songId)}
+                              initialCount={likeCounts.get(r.songId) ?? 0}
+                            />
+                            <ShareButton username={target.username} songId={r.songId} />
+                          </div>
+                          <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} appleMusicUrl={r.appleMusicUrl} />
+                        </div>
+                        <CommentSection
                           ratingUserId={target.id}
                           songId={r.songId}
-                          initialLiked={myLikes.has(r.songId)}
-                          initialCount={likeCounts.get(r.songId) ?? 0}
+                          viewerId={viewerId}
+                          initialCount={commentCounts.get(r.songId) ?? 0}
                         />
-                        <ShareButton username={target.username} songId={r.songId} />
-                      </div>
-                      <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} appleMusicUrl={r.appleMusicUrl} />
-                    </div>
-                    <CommentSection
-                      ratingUserId={target.id}
-                      songId={r.songId}
-                      viewerId={viewerId}
-                      initialCount={commentCounts.get(r.songId) ?? 0}
-                    />
-                  </>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </>
       )}
     </div>
