@@ -6,6 +6,8 @@ import Link from "next/link";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { db, activities } from "@/db";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MobileTabBar } from "@/components/MobileTabBar";
+import { syncCurrentUser } from "@/lib/sync-user";
 import "./globals.css";
 
 const siteUrl =
@@ -135,16 +137,25 @@ async function SignedInNav({ userId }: { userId: string }) {
   const unread = await unreadActivityCount(userId);
   return (
     <>
-      <NavLink href="/feed" icon={ICON.feed} label="Feed" />
-      <NavLink href="/discover" icon={ICON.discover} label="Discover" />
-      <NavLink href="/search" icon={ICON.search} label="Search" />
-      <NavLink href="/people" icon={ICON.people} label="People" />
-      <NavLink href="/activity" icon={ICON.activity} label="Activity" badge={unread} />
-      <NavLink href="/me" icon={ICON.me} label="Me" />
+      {/* Desktop: full nav. Mobile: bottom tab bar handles primary nav,
+          so here we only show theme + UserButton. */}
+      <span className="hidden sm:contents">
+        <NavLink href="/feed" icon={ICON.feed} label="Feed" />
+        <NavLink href="/discover" icon={ICON.discover} label="Discover" />
+        <NavLink href="/search" icon={ICON.search} label="Search" />
+        <NavLink href="/people" icon={ICON.people} label="People" />
+        <NavLink href="/activity" icon={ICON.activity} label="Activity" badge={unread} />
+        <NavLink href="/me" icon={ICON.me} label="Me" />
+      </span>
       <ThemeToggle />
       <UserButton />
     </>
   );
+}
+
+async function getUnreadForTabBar(userId: string | null): Promise<number> {
+  if (!userId) return 0;
+  return unreadActivityCount(userId);
 }
 
 function SignedOutNav() {
@@ -163,16 +174,32 @@ function SignedOutNav() {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
+  // Mirror the Clerk session into our users table on every page load.
+  // Cheap (insert ... on conflict do update on imageUrl only) and it
+  // closes the gap where a signed-in user could touch a page that
+  // doesn't otherwise sync (the homepage, profile pages, etc.).
+  if (userId) {
+    try {
+      await syncCurrentUser();
+    } catch {
+      /* don't block rendering on a bad sync */
+    }
+  }
+  const unread = await getUnreadForTabBar(userId);
   return (
     <ClerkProvider>
       <html lang="en" className="dark" suppressHydrationWarning>
         <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
           <Script id="theme-bootstrap" strategy="beforeInteractive">
             {themeBootstrapScript}
           </Script>
         </head>
-        <body className="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
-          <header className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur sticky top-0 z-10">
+        <body className="min-h-screen bg-neutral-950 text-neutral-100 antialiased pb-20 sm:pb-0">
+          <header
+            className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur sticky top-0 z-10"
+            style={{ paddingTop: "env(safe-area-inset-top)" }}
+          >
             <nav className="mx-auto max-w-3xl flex items-center justify-between px-3 py-3 gap-2">
               <Link href="/" className="font-bold text-lg tracking-tight whitespace-nowrap">🎵 <span className="hidden sm:inline">Tuned Up</span></Link>
               <div className="flex items-center gap-2 sm:gap-4 text-sm">
@@ -181,6 +208,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </nav>
           </header>
           <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8">{children}</main>
+          {userId && <MobileTabBar unread={unread} />}
         </body>
       </html>
     </ClerkProvider>
