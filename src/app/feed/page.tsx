@@ -11,6 +11,7 @@ import { CommentSection } from "@/components/CommentSection";
 import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
+import { RecommendButton } from "@/components/RecommendButton";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 
 export const dynamic = "force-dynamic";
@@ -215,11 +216,14 @@ export default async function FeedPage() {
                 {it.review && <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap">{it.review}</p>}
 
                 {it.ratingUserId !== userId && (
-                  <div className="mt-3 flex items-center justify-between gap-3">
+                  <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                     <span className="text-xs text-neutral-500">
                       {myScore != null ? "You also rated this" : "What do you think?"}
                     </span>
-                    <RateButton song={songLike} initialScore={myScore} />
+                    <div className="flex items-center gap-3">
+                      <RecommendButton song={songLike} />
+                      <RateButton song={songLike} initialScore={myScore} />
+                    </div>
                   </div>
                 )}
 

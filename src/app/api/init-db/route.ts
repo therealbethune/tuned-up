@@ -105,6 +105,19 @@ const STATEMENTS = [
   )`,
   `ALTER TABLE "dismissed_suggestions" ADD CONSTRAINT "dismissed_suggestions_viewer_id_users_id_fk" FOREIGN KEY ("viewer_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   `ALTER TABLE "dismissed_suggestions" ADD CONSTRAINT "dismissed_suggestions_suggested_id_users_id_fk" FOREIGN KEY ("suggested_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE TABLE IF NOT EXISTS "recommendations" (
+    "id" text PRIMARY KEY NOT NULL,
+    "from_user_id" text NOT NULL,
+    "to_user_id" text NOT NULL,
+    "song_id" text NOT NULL,
+    "message" text,
+    "status" text NOT NULL DEFAULT 'pending',
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `ALTER TABLE "recommendations" ADD CONSTRAINT "recommendations_from_fk" FOREIGN KEY ("from_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `ALTER TABLE "recommendations" ADD CONSTRAINT "recommendations_to_fk" FOREIGN KEY ("to_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE INDEX IF NOT EXISTS "recommendations_to_idx" ON "recommendations" USING btree ("to_user_id","created_at")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "recommendations_unique" ON "recommendations" USING btree ("from_user_id","to_user_id","song_id")`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

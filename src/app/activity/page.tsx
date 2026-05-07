@@ -116,7 +116,20 @@ export default async function ActivityPage() {
                           )}
                         </>
                       )}
-                      {!["follow", "follow_request", "comment", "like", "rating_match"].includes(a.type) && a.type}
+                      {a.type === "recommendation" && (
+                        <>
+                          recommended
+                          {a.songTitle ? (
+                            <>
+                              {" "}<span className="text-neutral-200">{a.songTitle}</span>
+                            </>
+                          ) : (
+                            " a song"
+                          )}{" "}
+                          to you
+                        </>
+                      )}
+                      {!["follow", "follow_request", "comment", "like", "rating_match", "recommendation"].includes(a.type) && a.type}
                     </span>
                   </div>
                   <div className="text-xs text-neutral-500">

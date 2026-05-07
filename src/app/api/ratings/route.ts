@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, eq, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, songs, ratings, activities } from "@/db";
+import { db, songs, ratings, activities, recommendations } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
 
@@ -112,6 +112,19 @@ export async function POST(req: Request) {
       }
     }
   }
+
+  // Mark any pending recommendations of this song to this user as 'rated' —
+  // they've now done what was suggested.
+  await db
+    .update(recommendations)
+    .set({ status: "rated" })
+    .where(
+      and(
+        eq(recommendations.toUserId, userId),
+        eq(recommendations.songId, song.id),
+        eq(recommendations.status, "pending"),
+      ),
+    );
 
   return NextResponse.json({ ok: true });
 }

@@ -3,6 +3,7 @@ import { RateButton } from "./RateButton";
 import type { SongResult } from "@/lib/ytmusic";
 import { ytUrlForSongId } from "@/lib/songs";
 import { StreamingLinks } from "./StreamingLinks";
+import { RecommendButton } from "./RecommendButton";
 
 function durationLabel(seconds: number | null | undefined): string | null {
   if (seconds == null) return null;
@@ -95,7 +96,12 @@ export function SongRow({
         <StreamingLinks songId={song.id} title={song.title} artist={song.artist} className="mt-1" />
       </div>
 
-      {right ?? <RateButton song={song} initialScore={score ?? null} />}
+      {right ?? (
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <RateButton song={song} initialScore={score ?? null} />
+          <RecommendButton song={song} />
+        </div>
+      )}
     </div>
   );
 }

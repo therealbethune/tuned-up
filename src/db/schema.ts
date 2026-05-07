@@ -49,6 +49,21 @@ export const follows = pgTable("follows", {
   index("follows_followee_idx").on(t.followeeId),
 ]);
 
+// One user recommending a song to another. status: 'pending' | 'rated' |
+// 'dismissed'. Rating the song flips the status to 'rated' automatically.
+export const recommendations = pgTable("recommendations", {
+  id: text("id").primaryKey(),
+  fromUserId: text("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  toUserId: text("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  songId: text("song_id").notNull(),
+  message: text("message"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("recommendations_to_idx").on(t.toUserId, t.createdAt),
+  uniqueIndex("recommendations_unique").on(t.fromUserId, t.toUserId, t.songId),
+]);
+
 // Tracks who the viewer has explicitly dismissed from their suggested
 // friends list, so we don't re-show them.
 export const dismissedSuggestions = pgTable("dismissed_suggestions", {
