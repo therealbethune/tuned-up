@@ -13,6 +13,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RecommendButton } from "@/components/RecommendButton";
 import { isAlbumId, relativeTime } from "@/lib/songs";
+import { scoreLabel } from "@/lib/score-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -210,7 +211,9 @@ export default async function FeedPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-3xl font-bold tabular-nums">{it.score}</div>
-                    <div className="text-xs text-neutral-500">/ 100</div>
+                    <div className={`text-[11px] font-medium ${scoreLabel(it.score).color}`}>
+                      {scoreLabel(it.score).label}
+                    </div>
                   </div>
                 </div>
                 {it.review && <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap">{it.review}</p>}

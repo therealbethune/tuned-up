@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SongResult } from "@/lib/ytmusic";
+import { scoreLabel } from "@/lib/score-labels";
 
 export function RateButton({
   song,
@@ -49,6 +50,8 @@ export function RateButton({
     );
   }
 
+  const label = scoreLabel(score);
+
   return (
     <div className="flex flex-col gap-3 w-full sm:w-72 sm:max-w-full rounded-lg border border-neutral-700 bg-neutral-900 p-3">
       <div className="flex items-center gap-3">
@@ -60,7 +63,10 @@ export function RateButton({
           onChange={(e) => setScore(Number(e.target.value))}
           className="flex-1 accent-white"
         />
-        <span className="font-mono text-base w-10 text-right tabular-nums">{score}</span>
+        <div className="text-right">
+          <div className="font-mono text-base tabular-nums">{score}</div>
+          <div className={`text-[11px] font-medium ${label.color}`}>{label.label}</div>
+        </div>
       </div>
       <textarea
         value={review}

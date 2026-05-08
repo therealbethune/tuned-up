@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
 import { ytUrlForSongId } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
+import { scoreLabel } from "@/lib/score-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -154,9 +155,11 @@ export default async function SharedRatingPage({
               )}
             </div>
             <div className="text-neutral-400">{r.artist}{r.album ? ` · ${r.album}` : ""}</div>
-            <div className="mt-3 flex items-baseline gap-2">
+            <div className="mt-3 flex items-baseline gap-3">
               <span className="text-5xl font-bold tabular-nums text-emerald-400">{r.score}</span>
-              <span className="text-neutral-500">/ 100</span>
+              <span className={`text-base font-semibold ${scoreLabel(r.score).color}`}>
+                {scoreLabel(r.score).label}
+              </span>
             </div>
           </div>
         </div>

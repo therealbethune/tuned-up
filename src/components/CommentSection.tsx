@@ -97,6 +97,10 @@ export function CommentSection({
       if (res.ok && j.comment) {
         setComments((prev) => [...(prev ?? []), j.comment]);
         setBody("");
+        // Dismiss the iOS keyboard once a comment is in.
+        if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
       } else {
         setError(j.error || `Couldn't post (HTTP ${res.status}).`);
       }
@@ -140,6 +144,9 @@ export function CommentSection({
         setComments((prev) => [...(prev ?? []), j.comment]);
         setReplyBody("");
         setReplyTo(null);
+        if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
       } else {
         setReplyError(j.error || `Couldn't post reply (HTTP ${res.status}).`);
       }
@@ -329,7 +336,7 @@ function CommentRow({
           {c.commenterId === viewerId && (
             <button
               onClick={onDelete}
-              className="ml-auto text-neutral-500 hover:text-red-400"
+              className="ml-auto -mr-1 -mt-1 -mb-1 text-neutral-500 hover:text-red-400 inline-flex items-center justify-center h-7 w-7"
               title="Delete"
               aria-label="Delete comment"
             >

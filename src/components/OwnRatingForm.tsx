@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { scoreLabel } from "@/lib/score-labels";
 
 export type OwnRating = {
   songId: string;
@@ -79,7 +80,12 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
           onChange={(e) => setScore(Number(e.target.value))}
           className="flex-1 accent-white"
         />
-        <span className="font-mono text-base w-10 text-right tabular-nums">{score}</span>
+        <div className="text-right">
+          <div className="font-mono text-base tabular-nums">{score}</div>
+          <div className={`text-[11px] font-medium ${scoreLabel(score).color}`}>
+            {scoreLabel(score).label}
+          </div>
+        </div>
       </div>
       <textarea
         value={review}

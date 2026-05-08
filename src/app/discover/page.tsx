@@ -6,6 +6,7 @@ import { db, ratings, songs } from "@/db";
 import { isAlbumId, ytUrlForSongId } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RateButton } from "@/components/RateButton";
+import { scoreLabel } from "@/lib/score-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -241,8 +242,11 @@ function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
             </div>
             <div className="text-right shrink-0">
               <div className="text-xl font-bold tabular-nums">{r.avgScore}</div>
-              <div className="text-xs text-neutral-500">
-                avg · {r.ratingCount} {r.ratingCount === 1 ? "rating" : "ratings"}
+              <div className={`text-[10px] font-medium ${scoreLabel(r.avgScore).color}`}>
+                {scoreLabel(r.avgScore).label}
+              </div>
+              <div className="text-[10px] text-neutral-500">
+                {r.ratingCount} {r.ratingCount === 1 ? "rating" : "ratings"}
               </div>
             </div>
           </li>

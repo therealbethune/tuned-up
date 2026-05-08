@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { and, eq } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
+import { scoreLabel } from "@/lib/score-labels";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,7 +116,9 @@ export async function GET(req: Request) {
               <span style={{ fontSize: 140, fontWeight: 900, lineHeight: 1, color: "#10b981" }}>
                 {row.score}
               </span>
-              <span style={{ fontSize: 40, color: "#737373" }}>/ 100</span>
+              <span style={{ fontSize: 36, color: "#a3e635", fontWeight: 700 }}>
+                {scoreLabel(row.score).label}
+              </span>
             </div>
           </div>
         </div>

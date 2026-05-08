@@ -4,6 +4,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
 import { ytUrlForSongId } from "@/lib/songs";
 import { computeStreak } from "@/lib/streak";
+import { scoreLabel } from "@/lib/score-labels";
 
 type User = typeof users.$inferSelect;
 
@@ -98,9 +99,14 @@ export default async function StatsView({
 
       <section className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
         <Stat label="Songs rated" value={total.toString()} />
-        <Stat label="Average" value={avg.toString()} accent="emerald" />
-        <Stat label="Highest" value={max.toString()} />
-        <Stat label="Lowest" value={min.toString()} />
+        <Stat
+          label="Average"
+          value={avg.toString()}
+          sublabel={scoreLabel(avg).label}
+          accent="emerald"
+        />
+        <Stat label="Highest" value={max.toString()} sublabel={scoreLabel(max).label} />
+        <Stat label="Lowest" value={min.toString()} sublabel={scoreLabel(min).label} />
         <Stat
           label="Streak"
           value={streak > 0 ? `🔥 ${streak}` : "—"}
@@ -224,7 +230,12 @@ export default async function StatsView({
                   )}
                   <div className="text-sm text-neutral-400 truncate">{s.artist}</div>
                 </div>
-                <div className="text-xl font-bold tabular-nums">{s.score}</div>
+                <div className="text-right">
+                  <div className="text-xl font-bold tabular-nums">{s.score}</div>
+                  <div className={`text-[10px] font-medium ${scoreLabel(s.score).color}`}>
+                    {scoreLabel(s.score).label}
+                  </div>
+                </div>
               </li>
             );
           })}
