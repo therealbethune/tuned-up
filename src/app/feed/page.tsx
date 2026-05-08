@@ -13,6 +13,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RecommendButton } from "@/components/RecommendButton";
 import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
+import { ConnectSpotifyBanner } from "@/components/ConnectSpotifyBanner";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 
@@ -138,6 +139,8 @@ export default async function FeedPage() {
         <h1 className="text-2xl font-bold">Feed</h1>
         <Link href="/search" className="text-sm text-neutral-400 hover:text-white">+ Rate a song</Link>
       </div>
+
+      <ConnectSpotifyBanner connected={spotifyConnected} />
 
       {items.length === 0 ? (
         <EmptyFeed userId={userId} followedIds={followedIds} />

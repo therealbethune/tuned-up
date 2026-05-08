@@ -2,9 +2,10 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { and, eq, count } from "drizzle-orm";
-import { db, users, recommendations } from "@/db";
+import { db, users, recommendations, spotifyAccounts } from "@/db";
 import UserProfile from "../u/[username]/UserProfile";
 import { PushBanner } from "@/components/PushBanner";
+import { ConnectSpotifyBanner } from "@/components/ConnectSpotifyBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +25,16 @@ export default async function MePage() {
     );
   const pendingRecs = Number(recStat?.n ?? 0);
 
+  const [spotifyLink] = await db
+    .select({ id: spotifyAccounts.userId })
+    .from(spotifyAccounts)
+    .where(eq(spotifyAccounts.userId, userId));
+  const spotifyConnected = Boolean(spotifyLink);
+
   return (
     <div className="space-y-4">
       <PushBanner />
+      <ConnectSpotifyBanner connected={spotifyConnected} />
       <div className="flex justify-end gap-4 text-sm">
         <Link
           href="/recommendations"

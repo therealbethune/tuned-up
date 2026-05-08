@@ -107,19 +107,41 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
 
       {step === 1 && (
         <div className="space-y-4">
-          <div className="rounded-lg border border-emerald-700/40 bg-emerald-500/5 p-4 flex items-center justify-between gap-4">
-            <div>
-              <div className="font-medium">Got Spotify?</div>
-              <p className="text-sm text-neutral-400">
-                Import your top tracks and rate them in seconds.
-              </p>
+          <div className="rounded-lg border border-emerald-700/40 bg-emerald-500/5 p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-emerald-500 text-black inline-flex items-center justify-center shrink-0">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <circle cx="12" cy="12" r="10" />
+                  <path
+                    d="M7.5 14.4c2.4-1.4 5.7-1.7 9-.8m-9-3.6c2.9-1.6 7-2 10.5-.8m-10.5-3c3.4-1.6 8.5-1.8 12.5-.4"
+                    stroke="#000"
+                    strokeWidth="1.6"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">Connect Spotify</div>
+                <p className="text-sm text-neutral-400 mt-0.5">
+                  Save songs to your Liked Songs as you rate them. You can also import your top tracks in seconds.
+                </p>
+              </div>
             </div>
-            <a
-              href="/import/spotify"
-              className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-4 py-1.5 text-sm whitespace-nowrap"
-            >
-              Import
-            </a>
+            <div className="flex items-center gap-3">
+              <a
+                href="/api/spotify/connect?return=/welcome"
+                className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-4 py-1.5 text-sm whitespace-nowrap"
+              >
+                Connect Spotify
+              </a>
+              <a
+                href="/import/spotify"
+                className="text-sm text-neutral-400 hover:text-white"
+              >
+                Import top tracks →
+              </a>
+            </div>
           </div>
 
           <div className="relative">
