@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { scoreLabel } from "@/lib/score-labels";
 
@@ -13,33 +13,63 @@ export type OwnRating = {
 export function OwnRatingForm({ rating }: { rating: OwnRating }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [score, setScore] = useState(rating.score);
+  const [scoreText, setScoreText] = useState<string>(String(rating.score));
   const [review, setReview] = useState(rating.review ?? "");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const numberRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (editing) {
+      requestAnimationFrame(() => {
+        numberRef.current?.focus();
+        numberRef.current?.select();
+      });
+    }
+  }, [editing]);
 
   function reset() {
-    setScore(rating.score);
+    setScoreText(String(rating.score));
     setReview(rating.review ?? "");
+    setError(null);
+  }
+
+  function changeScore(raw: string) {
+    setScoreText(raw.replace(/[^0-9]/g, "").slice(0, 3));
+  }
+
+  function clampedScore(): number | null {
+    if (scoreText === "") return null;
+    const n = parseInt(scoreText, 10);
+    if (isNaN(n)) return null;
+    return Math.max(1, Math.min(100, n));
   }
 
   async function save() {
+    const score = clampedScore();
+    if (score == null) {
+      setError("Enter a score from 1 to 100.");
+      return;
+    }
     setBusy(true);
-    // The /api/ratings POST endpoint upserts. We only have the songId here,
-    // not the full song metadata — but the song row already exists, so we
-    // can't use the existing handler which validates a full song body.
-    // Use a dedicated edit endpoint instead.
-    const res = await fetch("/api/ratings/update", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ songId: rating.songId, score, review: review.trim() || null }),
-    });
-    setBusy(false);
-    if (res.ok) {
-      setEditing(false);
-      router.refresh();
-    } else {
-      const j = await res.json().catch(() => ({}));
-      alert(j.error || "Save failed");
+    setError(null);
+    try {
+      const res = await fetch("/api/ratings/update", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ songId: rating.songId, score, review: review.trim() || null }),
+      });
+      if (res.ok) {
+        setEditing(false);
+        router.refresh();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error || `Save failed (HTTP ${res.status}).`);
+      }
+    } catch (e) {
+      setError((e as Error).message || "Network error — try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -69,22 +99,39 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
     );
   }
 
+  const score = clampedScore();
+  const label = score != null ? scoreLabel(score) : null;
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-neutral-700 bg-neutral-900 p-3">
       <div className="flex items-center gap-3">
         <input
-          type="range"
-          min={1}
-          max={100}
-          value={score}
-          onChange={(e) => setScore(Number(e.target.value))}
-          className="flex-1 accent-white"
+          ref={numberRef}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          enterKeyHint="done"
+          value={scoreText}
+          onChange={(e) => changeScore(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              save();
+            }
+          }}
+          aria-label="Score from 1 to 100"
+          placeholder="1–100"
+          className="w-24 rounded-md bg-neutral-950 border border-neutral-800 px-3 py-2 text-2xl font-bold tabular-nums text-center placeholder:text-neutral-700 focus:outline-none focus:border-neutral-600"
         />
-        <div className="text-right">
-          <div className="font-mono text-base tabular-nums">{score}</div>
-          <div className={`text-[11px] font-medium ${scoreLabel(score).color}`}>
-            {scoreLabel(score).label}
-          </div>
+        <div className="flex-1">
+          {label ? (
+            <>
+              <div className={`text-base font-semibold ${label.color}`}>{label.label}</div>
+              <div className="text-xs text-neutral-500">out of 100</div>
+            </>
+          ) : (
+            <div className="text-xs text-neutral-500">Type your score</div>
+          )}
         </div>
       </div>
       <textarea
@@ -110,13 +157,14 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
           </button>
           <button
             onClick={save}
-            disabled={busy}
+            disabled={busy || score == null}
             className="rounded-full bg-white text-black px-4 py-1 text-sm font-medium disabled:opacity-50"
           >
             {busy ? "Saving…" : "Save"}
           </button>
         </div>
       </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
 }
