@@ -175,6 +175,8 @@ export async function GET() {
     DATABASE_URL: !!process.env.DATABASE_URL,
     INIT_DB_TOKEN: !!process.env.INIT_DB_TOKEN,
     CLERK_SECRET_KEY: !!process.env.CLERK_SECRET_KEY,
+    NEXT_PUBLIC_SPOTIFY_CLIENT_ID: !!process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID,
+    SPOTIFY_CLIENT_SECRET: !!process.env.SPOTIFY_CLIENT_SECRET,
   };
   return NextResponse.json({ hint: "POST with Authorization: Bearer <INIT_DB_TOKEN>", env });
 }
