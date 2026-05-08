@@ -34,11 +34,13 @@ export function CommentSection({
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // The id of the comment we're replying to (controls which inline reply
   // form is open). null means "post a top-level comment via the bottom box".
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const inputRef = useRef<MentionInputHandle | null>(null);
   const replyInputRef = useRef<MentionInputHandle | null>(null);
 
@@ -84,19 +86,22 @@ export function CommentSection({
     const text = body.trim();
     if (!text || busy) return;
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch("/api/comments", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ratingUserId, songId, body: text }),
       });
-      const j = await res.json();
+      const j = await res.json().catch(() => ({}));
       if (res.ok && j.comment) {
         setComments((prev) => [...(prev ?? []), j.comment]);
         setBody("");
       } else {
-        alert(j.error || "Failed to post comment");
+        setError(j.error || `Couldn't post (HTTP ${res.status}).`);
       }
+    } catch (e) {
+      setError((e as Error).message || "Network error — try again.");
     } finally {
       setBusy(false);
     }
@@ -118,6 +123,7 @@ export function CommentSection({
     const text = replyBody.trim();
     if (!text || replyBusy) return;
     setReplyBusy(true);
+    setReplyError(null);
     try {
       const res = await fetch("/api/comments", {
         method: "POST",
@@ -129,14 +135,16 @@ export function CommentSection({
           parentCommentId: parentId,
         }),
       });
-      const j = await res.json();
+      const j = await res.json().catch(() => ({}));
       if (res.ok && j.comment) {
         setComments((prev) => [...(prev ?? []), j.comment]);
         setReplyBody("");
         setReplyTo(null);
       } else {
-        alert(j.error || "Failed to post reply");
+        setReplyError(j.error || `Couldn't post reply (HTTP ${res.status}).`);
       }
+    } catch (e) {
+      setReplyError((e as Error).message || "Network error — try again.");
     } finally {
       setReplyBusy(false);
     }
@@ -203,39 +211,44 @@ export function CommentSection({
                         />
                       ))}
                       {replyTo === c.id && (
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            submitReply(c.id);
-                          }}
-                          className="flex gap-2"
-                        >
-                          <div className="flex-1">
-                            <MentionInput
-                              ref={replyInputRef}
-                              value={replyBody}
-                              onChange={setReplyBody}
-                              onSubmit={() => submitReply(c.id)}
-                              placeholder={`Reply to @${c.username}…`}
-                              maxLength={1000}
-                              className="w-full rounded-full bg-neutral-950 border border-neutral-800 px-3 py-1.5 text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
-                            />
-                          </div>
-                          <button
-                            type="submit"
-                            disabled={replyBusy || !replyBody.trim()}
-                            className="rounded-full bg-white text-black px-3 py-1.5 text-sm font-medium disabled:opacity-50 shrink-0"
+                        <div>
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              submitReply(c.id);
+                            }}
+                            className="flex gap-2"
                           >
-                            Post
-                          </button>
-                          <button
-                            type="button"
-                            onClick={cancelReply}
-                            className="text-xs text-neutral-500 hover:text-white px-1"
-                          >
-                            Cancel
-                          </button>
-                        </form>
+                            <div className="flex-1">
+                              <MentionInput
+                                ref={replyInputRef}
+                                value={replyBody}
+                                onChange={setReplyBody}
+                                onSubmit={() => submitReply(c.id)}
+                                placeholder={`Reply to @${c.username}…`}
+                                maxLength={1000}
+                                className="w-full rounded-full bg-neutral-950 border border-neutral-800 px-3 py-1.5 text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              disabled={replyBusy || !replyBody.trim()}
+                              className="rounded-full bg-white text-black px-3 py-1.5 text-sm font-medium disabled:opacity-50 shrink-0"
+                            >
+                              {replyBusy ? "…" : "Post"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelReply}
+                              className="text-xs text-neutral-500 hover:text-white px-1"
+                            >
+                              Cancel
+                            </button>
+                          </form>
+                          {replyError && (
+                            <p className="mt-1 text-xs text-red-400">{replyError}</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -244,32 +257,35 @@ export function CommentSection({
             </ul>
           )}
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              submitTopLevel();
-            }}
-            className="flex gap-2"
-          >
-            <div className="flex-1">
-              <MentionInput
-                ref={inputRef}
-                value={body}
-                onChange={setBody}
-                onSubmit={submitTopLevel}
-                placeholder="Add a comment… use @ to mention"
-                maxLength={1000}
-                className="w-full rounded-full bg-neutral-950 border border-neutral-800 px-3 py-1.5 text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={busy || !body.trim()}
-              className="rounded-full bg-white text-black px-3 py-1.5 text-sm font-medium disabled:opacity-50 shrink-0"
+          <div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitTopLevel();
+              }}
+              className="flex gap-2"
             >
-              Post
-            </button>
-          </form>
+              <div className="flex-1">
+                <MentionInput
+                  ref={inputRef}
+                  value={body}
+                  onChange={setBody}
+                  onSubmit={submitTopLevel}
+                  placeholder="Add a comment… use @ to mention"
+                  maxLength={1000}
+                  className="w-full rounded-full bg-neutral-950 border border-neutral-800 px-3 py-1.5 text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={busy || !body.trim()}
+                className="rounded-full bg-white text-black px-3 py-1.5 text-sm font-medium disabled:opacity-50 shrink-0"
+              >
+                {busy ? "…" : "Post"}
+              </button>
+            </form>
+            {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+          </div>
         </div>
       )}
     </div>

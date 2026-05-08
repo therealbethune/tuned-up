@@ -3,10 +3,12 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import Image from "next/image";
+import { extractMentions } from "@/lib/mentions";
 
 type Candidate = {
   id: string;
@@ -176,6 +178,44 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
     }, 120);
   }
 
+  // Surface every @-mention currently in the value, plus whether each one
+  // resolves to a real user. Gives the typer immediate feedback that the tag
+  // is recognized — no need to wait until they post.
+  const mentionsInValue = useMemo(() => extractMentions(value), [value]);
+  const [resolved, setResolved] = useState<Map<string, boolean>>(new Map());
+  useEffect(() => {
+    const unresolved = mentionsInValue.filter((u) => !resolved.has(u));
+    if (unresolved.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      unresolved.map(async (u) => {
+        try {
+          const r = await fetch(`/api/users/search?q=${encodeURIComponent(u)}`);
+          const j = await r.json();
+          const found = (j.results ?? []).some(
+            (x: { username?: string }) => (x.username ?? "").toLowerCase() === u,
+          );
+          return [u, found] as const;
+        } catch {
+          return [u, false] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      setResolved((prev) => {
+        const next = new Map(prev);
+        for (const [u, ok] of entries) next.set(u, ok);
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // We intentionally key off the joined list so we re-resolve only when
+    // the *set* of mentions changes, not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mentionsInValue.join("|")]);
+
   const showTypeahead = mentionAt != null && candidates.length > 0;
 
   const sharedProps = {
@@ -200,7 +240,7 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
         <input {...sharedProps} />
       )}
       {showTypeahead && (
-        <ul className="absolute left-0 right-0 bottom-full mb-1 z-20 max-h-56 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-lg text-sm">
+        <ul className="absolute left-0 right-0 bottom-full mb-1 z-30 max-h-56 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-lg text-sm">
           {candidates.map((c, i) => (
             <li key={c.id}>
               <button
@@ -233,6 +273,44 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
             </li>
           ))}
         </ul>
+      )}
+
+      {mentionsInValue.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
+          {mentionsInValue.map((u) => {
+            const status = resolved.get(u);
+            if (status === true) {
+              return (
+                <span
+                  key={u}
+                  className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-300"
+                  title={`Will tag @${u}`}
+                >
+                  ✓ @{u}
+                </span>
+              );
+            }
+            if (status === false) {
+              return (
+                <span
+                  key={u}
+                  className="px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/40 text-red-300"
+                  title="No user with this handle"
+                >
+                  ✗ @{u}
+                </span>
+              );
+            }
+            return (
+              <span
+                key={u}
+                className="px-2 py-0.5 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-400"
+              >
+                … @{u}
+              </span>
+            );
+          })}
+        </div>
       )}
     </div>
   );
