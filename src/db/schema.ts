@@ -102,16 +102,20 @@ export const likes = pgTable("likes", {
 ]);
 
 // A comment on someone's rating of a song. Targets the (userId, songId)
-// composite primary key of `ratings`.
+// composite primary key of `ratings`. parentCommentId is null for top-level
+// comments and set for replies — replies always live one level deep (a
+// reply to a reply re-parents to the same top-level).
 export const comments = pgTable("comments", {
   id: text("id").primaryKey(),
   ratingUserId: text("rating_user_id").notNull(),
   songId: text("song_id").notNull(),
   commenterId: text("commenter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  parentCommentId: text("parent_comment_id"),
   body: text("body").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("comments_target_idx").on(t.ratingUserId, t.songId, t.createdAt),
+  index("comments_parent_idx").on(t.parentCommentId),
 ]);
 
 export const activities = pgTable("activities", {

@@ -34,7 +34,8 @@ function destinationFor(a: ActivityRow): string {
     case "comment":
     case "like":
     case "mention":
-      // Tapping a like/comment/mention jumps to the actor's profile —
+    case "reply":
+      // Tapping a like/comment/mention/reply jumps to the actor's profile —
       // typically you want to see who reacted before anything else.
       return `/u/${a.actorUsername}`;
     case "rating_match":
@@ -208,6 +209,18 @@ function ActivityVerb({ a }: { a: ActivityRow }) {
     return (
       <>
         mentioned you
+        {a.songTitle ? (
+          <>
+            {" "}on <span className="text-neutral-200">{a.songTitle}</span>
+          </>
+        ) : null}
+      </>
+    );
+  }
+  if (a.type === "reply") {
+    return (
+      <>
+        replied to your comment
         {a.songTitle ? (
           <>
             {" "}on <span className="text-neutral-200">{a.songTitle}</span>

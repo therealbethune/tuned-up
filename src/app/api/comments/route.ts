@@ -30,6 +30,7 @@ export async function GET(req: Request) {
       body: comments.body,
       createdAt: comments.createdAt,
       commenterId: comments.commenterId,
+      parentCommentId: comments.parentCommentId,
       username: users.username,
       displayName: users.displayName,
       imageUrl: users.imageUrl,
@@ -54,7 +55,8 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   await syncCurrentUser();
 
-  const { ratingUserId, songId, body } = (await req.json().catch(() => ({}))) ?? {};
+  const { ratingUserId, songId, body, parentCommentId: parentIdRaw } =
+    (await req.json().catch(() => ({}))) ?? {};
   const text = (body ?? "").toString().trim();
   if (!ratingUserId || !songId || !text) {
     return NextResponse.json({ error: "ratingUserId, songId, and body are required" }, { status: 400 });
@@ -71,12 +73,36 @@ export async function POST(req: Request) {
     .limit(1);
   if (!r) return NextResponse.json({ error: "rating not found" }, { status: 404 });
 
+  // If this is a reply, validate the parent and flatten any reply-to-reply
+  // chain (so replies are always at depth 1).
+  let parentCommentId: string | null = null;
+  let parentCommenterId: string | null = null;
+  if (parentIdRaw) {
+    const [p] = await db
+      .select({
+        id: comments.id,
+        commenterId: comments.commenterId,
+        ratingUserId: comments.ratingUserId,
+        songId: comments.songId,
+        parentCommentId: comments.parentCommentId,
+      })
+      .from(comments)
+      .where(eq(comments.id, String(parentIdRaw)))
+      .limit(1);
+    if (p && p.ratingUserId === ratingUserId && p.songId === songId) {
+      // Flatten — reply to a reply attaches to the same top-level parent.
+      parentCommentId = p.parentCommentId ?? p.id;
+      parentCommenterId = p.commenterId;
+    }
+  }
+
   const id = randomUUID();
   await db.insert(comments).values({
     id,
     ratingUserId,
     songId,
     commenterId: userId,
+    parentCommentId,
     body: text,
   });
 
@@ -141,7 +167,23 @@ export async function POST(req: Request) {
     }
   }
 
-  // Notify the rating owner unless they're commenting on their own rating.
+  // Activity + push to the rating owner. For top-level comments, type is
+  // 'comment'. For replies, the rating owner still gets one but typed as
+  // 'comment' (same UX) — the reply-specific notification goes to the
+  // parent comment author below.
+  const [actor] = await db
+    .select({ displayName: users.displayName, username: users.username })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const [song] = await db
+    .select({ title: songs.title })
+    .from(songs)
+    .where(eq(songs.id, songId))
+    .limit(1);
+  const actorName = actor?.displayName || actor?.username || "Someone";
+  const preview = text.length > 80 ? text.slice(0, 77) + "…" : text;
+
   if (ratingUserId !== userId) {
     await db.insert(activities).values({
       id: randomUUID(),
@@ -150,25 +192,34 @@ export async function POST(req: Request) {
       type: "comment",
       songId,
     });
-
-    const [actor] = await db
-      .select({ displayName: users.displayName, username: users.username })
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
-    const [song] = await db
-      .select({ title: songs.title })
-      .from(songs)
-      .where(eq(songs.id, songId))
-      .limit(1);
-    const actorName = actor?.displayName || actor?.username || "Someone";
-    const preview = text.length > 80 ? text.slice(0, 77) + "…" : text;
     await sendPushToUser(ratingUserId, {
       title: `${actorName} commented on ${song?.title ?? "your rating"}`,
       body: preview,
       url: `/u/${actor?.username ?? ""}`,
       tag: `comment:${userId}:${songId}`,
     });
+  }
+
+  // If this is a reply, additionally notify the parent comment's author —
+  // unless they're the rating owner (already notified above) or themselves.
+  if (parentCommenterId && parentCommenterId !== userId && parentCommenterId !== ratingUserId) {
+    try {
+      await db.insert(activities).values({
+        id: randomUUID(),
+        userId: parentCommenterId,
+        actorId: userId,
+        type: "reply",
+        songId,
+      });
+      await sendPushToUser(parentCommenterId, {
+        title: `${actorName} replied to your comment`,
+        body: preview,
+        url: `/u/${actor?.username ?? ""}`,
+        tag: `reply:${userId}:${songId}`,
+      });
+    } catch (e) {
+      console.error("[comments POST] reply notify failed:", e);
+    }
   }
 
   // Return the new comment with commenter info to avoid a second round-trip.
@@ -194,6 +245,7 @@ export async function POST(req: Request) {
       body: text,
       createdAt: new Date(),
       commenterId: userId,
+      parentCommentId,
       username: me?.username,
       displayName: me?.displayName,
       imageUrl: me?.imageUrl,

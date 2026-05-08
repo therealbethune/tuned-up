@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { SongResult } from "@/lib/ytmusic";
+import { MentionInput } from "@/components/MentionInput";
 
 type FoundUser = {
   id: string;
@@ -178,10 +179,11 @@ export function RecommendButton({ song }: { song: SongResult }) {
                     Change
                   </button>
                 </div>
-                <textarea
+                <MentionInput
+                  as="textarea"
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Add a note (optional)…"
+                  onChange={setMessage}
+                  placeholder="Add a note (optional). Use @ to mention…"
                   rows={3}
                   maxLength={200}
                   className="w-full rounded-md bg-neutral-950 border border-neutral-800 p-2 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 resize-none"

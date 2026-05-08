@@ -1,11 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, recommendations, users, songs, activities } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
+import { extractMentions } from "@/lib/mentions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -161,13 +162,16 @@ export async function POST(req: Request) {
     }
 
     // Push notification — best-effort.
+    let actorName = "Someone";
+    let actorUsername = "";
     try {
       const [me] = await db
         .select({ displayName: users.displayName, username: users.username })
         .from(users)
         .where(eq(users.id, userId))
         .limit(1);
-      const actorName = me?.displayName || me?.username || "Someone";
+      actorName = me?.displayName || me?.username || "Someone";
+      actorUsername = me?.username ?? "";
       await sendPushToUser(target.id, {
         title: `${actorName} recommends ${song.title}`,
         body: message || `${song.artist} — open Tuned Up to rate it.`,
@@ -176,6 +180,50 @@ export async function POST(req: Request) {
       });
     } catch (e) {
       console.error("[recommendations POST] push send failed:", e);
+    }
+
+    // Notify any users @mentioned in the message body — but skip the
+    // sender (self) and the recipient (already notified above).
+    if (message) {
+      try {
+        const mentioned = extractMentions(message);
+        if (mentioned.length > 0) {
+          const mUsers = await db
+            .select({ id: users.id, username: users.username })
+            .from(users)
+            .where(inArray(users.username, mentioned));
+          for (const u of mUsers) {
+            if (u.id === userId || u.id === target.id) continue;
+            await db
+              .delete(activities)
+              .where(
+                and(
+                  eq(activities.userId, u.id),
+                  eq(activities.actorId, userId),
+                  eq(activities.type, "mention"),
+                  eq(activities.songId, song.id),
+                ),
+              );
+            await db.insert(activities).values({
+              id: randomUUID(),
+              userId: u.id,
+              actorId: userId,
+              type: "mention",
+              songId: song.id,
+            });
+            const preview =
+              message.length > 100 ? message.slice(0, 97) + "…" : message;
+            await sendPushToUser(u.id, {
+              title: `${actorName} mentioned you on ${song.title}`,
+              body: preview,
+              url: actorUsername ? `/u/${actorUsername}` : "/feed",
+              tag: `mention:${userId}:${song.id}:${u.id}`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("[recommendations POST] mention notify failed:", e);
+      }
     }
 
     return NextResponse.json({ ok: true, id: recId });
