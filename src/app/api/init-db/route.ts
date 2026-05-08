@@ -122,6 +122,19 @@ const STATEMENTS = [
   `ALTER TABLE "recommendations" ADD CONSTRAINT "recommendations_to_fk" FOREIGN KEY ("to_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   `CREATE INDEX IF NOT EXISTS "recommendations_to_idx" ON "recommendations" USING btree ("to_user_id","created_at")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "recommendations_unique" ON "recommendations" USING btree ("from_user_id","to_user_id","song_id")`,
+  // Spotify track-id resolution cache on songs (so "Open in Spotify" is direct, not a search).
+  `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "spotify_track_id" text`,
+  // Per-user linked Spotify accounts (stores refresh + cached access tokens).
+  `CREATE TABLE IF NOT EXISTS "spotify_accounts" (
+    "user_id" text PRIMARY KEY NOT NULL,
+    "spotify_user_id" text NOT NULL,
+    "refresh_token" text NOT NULL,
+    "access_token" text,
+    "expires_at" timestamp,
+    "scope" text NOT NULL,
+    "connected_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `ALTER TABLE "spotify_accounts" ADD CONSTRAINT "spotify_accounts_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

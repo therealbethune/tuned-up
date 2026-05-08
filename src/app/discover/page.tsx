@@ -17,6 +17,7 @@ type DiscoverRow = {
   album: string | null;
   thumbnail: string | null;
   appleMusicUrl: string | null;
+  spotifyTrackId: string | null;
   ratingCount: number;
   avgScore: number;
 };
@@ -36,6 +37,7 @@ async function trendingThisWeek(): Promise<DiscoverRow[]> {
       album: songs.album,
       thumbnail: songs.thumbnail,
       appleMusicUrl: songs.appleMusicUrl,
+      spotifyTrackId: songs.spotifyTrackId,
       ratingCount: sql<number>`count(${ratings.songId})::int`,
       avgScore: sql<number>`round(avg(${ratings.score}))::int`,
     })
@@ -57,6 +59,7 @@ async function topRated(): Promise<DiscoverRow[]> {
       album: songs.album,
       thumbnail: songs.thumbnail,
       appleMusicUrl: songs.appleMusicUrl,
+      spotifyTrackId: songs.spotifyTrackId,
       ratingCount: sql<number>`count(${ratings.songId})::int`,
       avgScore: sql<number>`round(avg(${ratings.score}))::int`,
     })
@@ -83,6 +86,7 @@ async function recommendedForViewer(viewerId: string | null): Promise<RecRow[]> 
     album: string | null;
     thumbnail: string | null;
     apple_music_url: string | null;
+    spotify_track_id: string | null;
     duration_seconds: number | null;
     rating_count: number;
     avg_score: number;
@@ -122,7 +126,7 @@ async function recommendedForViewer(viewerId: string | null): Promise<RecRow[]> 
           )
           SELECT
             s.id AS song_id, s.title, s.artist, s.album, s.thumbnail,
-            s.apple_music_url, s.duration_seconds,
+            s.apple_music_url, s.spotify_track_id, s.duration_seconds,
             g.rating_count, g.avg_score,
             COALESCE(f.friend_count, 0) AS friend_count,
             f.friend_avg
@@ -139,7 +143,7 @@ async function recommendedForViewer(viewerId: string | null): Promise<RecRow[]> 
       : sql`
           SELECT
             s.id AS song_id, s.title, s.artist, s.album, s.thumbnail,
-            s.apple_music_url, s.duration_seconds,
+            s.apple_music_url, s.spotify_track_id, s.duration_seconds,
             COUNT(*)::int AS rating_count,
             ROUND(AVG(r.score))::int AS avg_score,
             0 AS friend_count,
@@ -174,6 +178,7 @@ async function recommendedForViewer(viewerId: string | null): Promise<RecRow[]> 
       album: r.album,
       thumbnail: r.thumbnail,
       appleMusicUrl: r.apple_music_url,
+      spotifyTrackId: r.spotify_track_id,
       ratingCount: Number(r.rating_count),
       avgScore: Number(r.avg_score),
       reason,
@@ -238,7 +243,14 @@ function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
               <div className="text-sm text-neutral-400 truncate">
                 {r.artist}{r.album ? ` · ${r.album}` : ""}
               </div>
-              <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} appleMusicUrl={r.appleMusicUrl} className="mt-1" />
+              <StreamingLinks
+                songId={r.songId}
+                title={r.title}
+                artist={r.artist}
+                appleMusicUrl={r.appleMusicUrl}
+                spotifyTrackId={r.spotifyTrackId}
+                className="mt-1"
+              />
             </div>
             <div className="text-right shrink-0">
               <div className="text-xl font-bold tabular-nums">{r.avgScore}</div>

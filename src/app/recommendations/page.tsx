@@ -29,6 +29,7 @@ export default async function RecommendationsPage() {
       album: songs.album,
       thumbnail: songs.thumbnail,
       appleMusicUrl: songs.appleMusicUrl,
+      spotifyTrackId: songs.spotifyTrackId,
       kind: songs.kind,
       durationSeconds: songs.durationSeconds,
     })
@@ -138,6 +139,7 @@ export default async function RecommendationsPage() {
                     title={r.title}
                     artist={r.artist}
                     appleMusicUrl={r.appleMusicUrl}
+                    spotifyTrackId={r.spotifyTrackId}
                   />
                 </div>
               </li>

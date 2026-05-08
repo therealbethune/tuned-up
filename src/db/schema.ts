@@ -23,7 +23,23 @@ export const songs = pgTable("songs", {
   thumbnail: text("thumbnail"),
   durationSeconds: integer("duration_seconds"),
   appleMusicUrl: text("apple_music_url"),
+  // Resolved Spotify track id (just the bare id, no `spotify:` prefix). Set
+  // once via the Spotify Search API the first time we need a deep link.
+  spotifyTrackId: text("spotify_track_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// One row per user who has linked their Spotify account. Stores the
+// long-lived refresh token plus a cached access token; helpers in
+// `lib/spotify-server.ts` auto-refresh expired tokens.
+export const spotifyAccounts = pgTable("spotify_accounts", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  spotifyUserId: text("spotify_user_id").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessToken: text("access_token"),
+  expiresAt: timestamp("expires_at"),
+  scope: text("scope").notNull(),
+  connectedAt: timestamp("connected_at").defaultNow().notNull(),
 });
 
 export const ratings = pgTable("ratings", {

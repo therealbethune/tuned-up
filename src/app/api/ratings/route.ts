@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { db, songs, ratings, activities, recommendations } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
+import { ensureSpotifyTrackIdCached } from "@/lib/spotify-server";
 
 export const runtime = "nodejs";
 
@@ -69,6 +70,13 @@ export async function POST(req: Request) {
         ...(appleMusicUrl ? { appleMusicUrl } : {}),
       },
     });
+
+  // Best-effort: resolve & cache the Spotify track id for tracks (not albums)
+  // so the "Open in Spotify" link is direct, not a search. Fire-and-forget —
+  // failures shouldn't block the rating from saving.
+  if (kind === "song" && !song.id.startsWith("spotify:")) {
+    ensureSpotifyTrackIdCached(song.id, song.title, song.artist).catch(() => {});
+  }
 
   // Detect whether this is a NEW rating (vs an update of an existing one) by
   // checking for a prior row before the upsert.

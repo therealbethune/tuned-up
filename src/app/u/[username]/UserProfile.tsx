@@ -62,6 +62,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           album: songs.album,
           thumbnail: songs.thumbnail,
           appleMusicUrl: songs.appleMusicUrl,
+          spotifyTrackId: songs.spotifyTrackId,
         })
         .from(ratings)
         .innerJoin(songs, eq(ratings.songId, songs.id))
@@ -279,7 +280,13 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                             />
                             <ShareButton username={target.username} songId={r.songId} />
                           </div>
-                          <StreamingLinks songId={r.songId} title={r.title} artist={r.artist} appleMusicUrl={r.appleMusicUrl} />
+                          <StreamingLinks
+                            songId={r.songId}
+                            title={r.title}
+                            artist={r.artist}
+                            appleMusicUrl={r.appleMusicUrl}
+                            spotifyTrackId={r.spotifyTrackId}
+                          />
                         </div>
                         <CommentSection
                           ratingUserId={target.id}

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { and, desc, eq, inArray, notInArray, sql, count } from "drizzle-orm";
-import { db, ratings, songs, users, follows, comments, likes } from "@/db";
+import { db, ratings, songs, users, follows, comments, likes, spotifyAccounts } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
@@ -12,6 +12,7 @@ import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RecommendButton } from "@/components/RecommendButton";
+import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 
@@ -43,6 +44,7 @@ export default async function FeedPage() {
           album: songs.album,
           thumbnail: songs.thumbnail,
           appleMusicUrl: songs.appleMusicUrl,
+          spotifyTrackId: songs.spotifyTrackId,
           username: users.username,
           displayName: users.displayName,
           imageUrl: users.imageUrl,
@@ -65,6 +67,14 @@ export default async function FeedPage() {
         .where(and(eq(ratings.userId, userId), inArray(ratings.songId, songIds)))
     : [];
   const myRatingsMap = new Map(myRatingsRows.map((r) => [r.songId, r.score]));
+
+  // Has the viewer linked their Spotify account? (Used to render the
+  // "Save to Spotify" button on each rating card.)
+  const [spotifyLink] = await db
+    .select({ id: spotifyAccounts.userId })
+    .from(spotifyAccounts)
+    .where(eq(spotifyAccounts.userId, userId));
+  const spotifyConnected = Boolean(spotifyLink);
 
   // Comment counts per (ratingUserId, songId) grouped by both.
   let commentCounts: Map<string, number> = new Map();
@@ -240,8 +250,20 @@ export default async function FeedPage() {
                     />
                     <ShareButton username={it.username} songId={it.songId} />
                   </div>
-                  <StreamingLinks songId={it.songId} title={it.title} artist={it.artist} appleMusicUrl={it.appleMusicUrl} />
+                  <StreamingLinks
+                    songId={it.songId}
+                    title={it.title}
+                    artist={it.artist}
+                    appleMusicUrl={it.appleMusicUrl}
+                    spotifyTrackId={it.spotifyTrackId}
+                  />
                 </div>
+
+                {!isAlbumId(it.songId) && spotifyConnected && (
+                  <div className="mt-2">
+                    <SaveToSpotifyButton songId={it.songId} connected={spotifyConnected} />
+                  </div>
+                )}
 
                 <CommentSection
                   ratingUserId={it.ratingUserId}
