@@ -8,6 +8,8 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   onboardedAt: timestamp("onboarded_at"),
   isPrivate: boolean("is_private").notNull().default(false),
+  timezone: text("timezone"),
+  lastStreakWarnDate: text("last_streak_warn_date"),
 }, (t) => [uniqueIndex("users_username_idx").on(t.username)]);
 
 // 'song' | 'album'. The table name is historical — these are really

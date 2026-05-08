@@ -176,9 +176,9 @@ export function CommentSection({
     <div className="mt-3">
       <button
         onClick={toggle}
-        className="text-xs text-neutral-400 hover:text-white inline-flex items-center gap-1.5"
+        className="text-sm text-neutral-400 hover:text-white inline-flex items-center gap-1.5 -my-1 px-1.5 py-1 rounded-md active:scale-95 transition-transform"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
         {count > 0 ? `${count} ${count === 1 ? "comment" : "comments"}` : "Comment"}

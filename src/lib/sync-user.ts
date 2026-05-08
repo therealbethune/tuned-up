@@ -8,6 +8,7 @@ export type SyncedUser = {
   displayName: string | null;
   imageUrl: string | null;
   onboardedAt: Date | null;
+  timezone: string | null;
 };
 
 export async function syncCurrentUser(): Promise<SyncedUser | null> {
@@ -45,6 +46,7 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
       displayName: users.displayName,
       imageUrl: users.imageUrl,
       onboardedAt: users.onboardedAt,
+      timezone: users.timezone,
     })
     .from(users)
     .where(eq(users.id, u.id))

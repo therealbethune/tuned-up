@@ -8,6 +8,7 @@ import { db, activities } from "@/db";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { syncCurrentUser } from "@/lib/sync-user";
+import { TimezoneSync } from "@/components/TimezoneSync";
 import "./globals.css";
 
 const siteUrl =
@@ -174,13 +175,10 @@ function SignedOutNav() {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
-  // Mirror the Clerk session into our users table on every page load.
-  // Cheap (insert ... on conflict do update on imageUrl only) and it
-  // closes the gap where a signed-in user could touch a page that
-  // doesn't otherwise sync (the homepage, profile pages, etc.).
+  let synced: Awaited<ReturnType<typeof syncCurrentUser>> = null;
   if (userId) {
     try {
-      await syncCurrentUser();
+      synced = await syncCurrentUser();
     } catch {
       /* don't block rendering on a bad sync */
     }
@@ -225,6 +223,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </header>
           <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8">{children}</main>
           {userId && <MobileTabBar unread={unread} />}
+          {userId && <TimezoneSync serverTimezone={synced?.timezone ?? null} />}
         </body>
       </html>
     </ClerkProvider>

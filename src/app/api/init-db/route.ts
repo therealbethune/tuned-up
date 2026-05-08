@@ -87,6 +87,8 @@ const STATEMENTS = [
   `UPDATE "users" SET "onboarded_at" = "created_at" WHERE "onboarded_at" IS NULL AND EXISTS (SELECT 1 FROM "ratings" WHERE "ratings"."user_id" = "users"."id")`,
   // Newer columns added in later batches — all idempotent.
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_private" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "timezone" text`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_streak_warn_date" text`,
   `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "kind" text NOT NULL DEFAULT 'song'`,
   `ALTER TABLE "follows" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'accepted'`,
   `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "apple_music_url" text`,
