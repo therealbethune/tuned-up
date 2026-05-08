@@ -33,8 +33,9 @@ function destinationFor(a: ActivityRow): string {
       return `/u/${a.actorUsername}`;
     case "comment":
     case "like":
-      // Both target your own rating, but jumping to the actor's profile
-      // is more useful (users typically want to see who interacted).
+    case "mention":
+      // Tapping a like/comment/mention jumps to the actor's profile —
+      // typically you want to see who reacted before anything else.
       return `/u/${a.actorUsername}`;
     case "rating_match":
       return `/u/${a.actorUsername}`;
@@ -200,6 +201,18 @@ function ActivityVerb({ a }: { a: ActivityRow }) {
           " a song"
         )}{" "}
         to you
+      </>
+    );
+  }
+  if (a.type === "mention") {
+    return (
+      <>
+        mentioned you
+        {a.songTitle ? (
+          <>
+            {" "}on <span className="text-neutral-200">{a.songTitle}</span>
+          </>
+        ) : null}
       </>
     );
   }

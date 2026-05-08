@@ -1,10 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, comments, users, ratings, activities, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
+import { extractMentions } from "@/lib/mentions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +79,67 @@ export async function POST(req: Request) {
     commenterId: userId,
     body: text,
   });
+
+  // Notify mentioned users — but skip the comment author and the rating
+  // owner (who already gets the comment notification a few lines below).
+  const mentionedUsernames = extractMentions(text);
+  if (mentionedUsernames.length > 0) {
+    try {
+      const mentionedUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          displayName: users.displayName,
+        })
+        .from(users)
+        .where(inArray(users.username, mentionedUsernames));
+
+      const [author] = await db
+        .select({ displayName: users.displayName, username: users.username })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const authorName = author?.displayName || author?.username || "Someone";
+
+      const [songRow] = await db
+        .select({ title: songs.title })
+        .from(songs)
+        .where(eq(songs.id, songId))
+        .limit(1);
+
+      for (const u of mentionedUsers) {
+        if (u.id === userId || u.id === ratingUserId) continue;
+        // Dedupe a previous mention from the same actor on the same comment
+        // target so refreshing a comment doesn't pile up activity entries.
+        await db
+          .delete(activities)
+          .where(
+            and(
+              eq(activities.userId, u.id),
+              eq(activities.actorId, userId),
+              eq(activities.type, "mention"),
+              eq(activities.songId, songId),
+            ),
+          );
+        await db.insert(activities).values({
+          id: randomUUID(),
+          userId: u.id,
+          actorId: userId,
+          type: "mention",
+          songId,
+        });
+        const preview = text.length > 100 ? text.slice(0, 97) + "…" : text;
+        await sendPushToUser(u.id, {
+          title: `${authorName} mentioned you${songRow ? ` on ${songRow.title}` : ""}`,
+          body: preview,
+          url: `/u/${author?.username ?? ""}`,
+          tag: `mention:${userId}:${songId}:${u.id}`,
+        });
+      }
+    } catch (e) {
+      console.error("[comments POST] mention notify failed:", e);
+    }
+  }
 
   // Notify the rating owner unless they're commenting on their own rating.
   if (ratingUserId !== userId) {

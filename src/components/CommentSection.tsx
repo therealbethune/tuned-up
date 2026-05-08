@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { renderWithMentions } from "@/lib/mentions";
 
 type Comment = {
   id: string;
@@ -13,6 +14,13 @@ type Comment = {
   imageUrl: string | null;
   score: number | null;
   review: string | null;
+};
+
+type MentionCandidate = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  imageUrl: string | null;
 };
 
 export function CommentSection({
@@ -33,6 +41,14 @@ export function CommentSection({
   const [busy, setBusy] = useState(false);
   const count = comments?.length ?? initialCount;
 
+  // Mention typeahead state
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [mentionAt, setMentionAt] = useState<number | null>(null);
+  const [mentionPartial, setMentionPartial] = useState<string>("");
+  const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const candReqId = useRef(0);
+
   async function load() {
     setLoading(true);
     try {
@@ -51,6 +67,95 @@ export function CommentSection({
     setOpen(!open);
   }
 
+  // Detect whether the cursor is inside a `@partial` token. If so, surface
+  // the typeahead. Otherwise hide it.
+  function detectMention(value: string, cursor: number) {
+    const before = value.slice(0, cursor);
+    const lastAt = before.lastIndexOf("@");
+    if (lastAt < 0) {
+      setMentionAt(null);
+      setMentionPartial("");
+      return;
+    }
+    const between = before.slice(lastAt + 1);
+    if (!/^[a-zA-Z0-9_]*$/.test(between)) {
+      setMentionAt(null);
+      setMentionPartial("");
+      return;
+    }
+    // The @ must be at the start or preceded by whitespace.
+    if (lastAt > 0 && !/\s/.test(value[lastAt - 1])) {
+      setMentionAt(null);
+      setMentionPartial("");
+      return;
+    }
+    setMentionAt(lastAt);
+    setMentionPartial(between);
+    setActiveIdx(0);
+  }
+
+  function onChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value;
+    setBody(v);
+    detectMention(v, e.target.selectionStart ?? v.length);
+  }
+
+  // Debounced fetch of mention candidates.
+  useEffect(() => {
+    if (mentionAt == null || mentionPartial.length < 1) {
+      setCandidates([]);
+      return;
+    }
+    const id = ++candReqId.current;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(mentionPartial)}`);
+        const data = await res.json();
+        if (id !== candReqId.current) return;
+        setCandidates((data.results ?? []).slice(0, 5));
+      } catch {
+        if (id === candReqId.current) setCandidates([]);
+      }
+    }, 100);
+    return () => clearTimeout(t);
+  }, [mentionAt, mentionPartial]);
+
+  function pickMention(c: MentionCandidate) {
+    if (mentionAt == null) return;
+    const tokenLen = 1 + mentionPartial.length; // "@" + partial
+    const before = body.slice(0, mentionAt);
+    const after = body.slice(mentionAt + tokenLen);
+    const insert = `@${c.username} `;
+    const next = before + insert + after;
+    setBody(next);
+    setMentionAt(null);
+    setMentionPartial("");
+    setCandidates([]);
+    const newCursor = before.length + insert.length;
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(newCursor, newCursor);
+    });
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (mentionAt == null || candidates.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIdx((i) => (i + 1) % candidates.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx((i) => (i - 1 + candidates.length) % candidates.length);
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      pickMention(candidates[activeIdx]);
+    } else if (e.key === "Escape") {
+      setMentionAt(null);
+      setMentionPartial("");
+      setCandidates([]);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const text = body.trim();
@@ -66,6 +171,9 @@ export function CommentSection({
       if (res.ok && j.comment) {
         setComments((prev) => [...(prev ?? []), j.comment]);
         setBody("");
+        setMentionAt(null);
+        setMentionPartial("");
+        setCandidates([]);
       } else {
         alert(j.error || "Failed to post comment");
       }
@@ -85,6 +193,8 @@ export function CommentSection({
       setComments((prev) => (prev ?? []).filter((c) => c.id !== id));
     }
   }
+
+  const showTypeahead = mentionAt != null && candidates.length > 0;
 
   return (
     <div className="mt-3">
@@ -139,7 +249,7 @@ export function CommentSection({
                       )}
                     </div>
                     <p className="text-sm text-neutral-200 mt-0.5 break-words whitespace-pre-wrap">
-                      {c.body}
+                      {renderWithMentions(c.body)}
                     </p>
                     {c.review && (
                       <blockquote className="mt-1.5 border-l-2 border-neutral-700 pl-2 text-xs text-neutral-400 italic break-words whitespace-pre-wrap">
@@ -152,11 +262,21 @@ export function CommentSection({
             </ul>
           )}
 
-          <form onSubmit={submit} className="flex gap-2">
+          <form onSubmit={submit} className="relative flex gap-2">
             <input
+              ref={inputRef}
               value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Add a comment…"
+              onChange={onChange}
+              onKeyDown={onKeyDown}
+              onBlur={() => {
+                // Close the typeahead on blur, but only after the click has
+                // a chance to register on a suggestion.
+                setTimeout(() => {
+                  setMentionAt(null);
+                  setCandidates([]);
+                }, 120);
+              }}
+              placeholder="Add a comment… use @ to mention"
               maxLength={1000}
               className="flex-1 rounded-full bg-neutral-950 border border-neutral-800 px-3 py-1.5 text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
             />
@@ -167,6 +287,35 @@ export function CommentSection({
             >
               Post
             </button>
+
+            {showTypeahead && (
+              <ul className="absolute left-0 right-12 bottom-full mb-1 z-20 max-h-56 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-lg text-sm">
+                {candidates.map((c, i) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      // onMouseDown so we trigger before the input's onBlur.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        pickMention(c);
+                      }}
+                      onMouseEnter={() => setActiveIdx(i)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left ${
+                        i === activeIdx ? "bg-neutral-800" : "hover:bg-neutral-800/60"
+                      }`}
+                    >
+                      {c.imageUrl ? (
+                        <Image src={c.imageUrl} alt="" width={24} height={24} className="rounded-full h-6 w-6" />
+                      ) : (
+                        <div className="h-6 w-6 rounded-full bg-neutral-700" />
+                      )}
+                      <span className="font-medium truncate">{c.displayName || c.username}</span>
+                      <span className="text-neutral-500 truncate">@{c.username}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </form>
         </div>
       )}
