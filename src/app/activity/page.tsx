@@ -24,8 +24,13 @@ type ActivityRow = {
 };
 
 // Pick the most useful destination per activity type. Tapping the row
-// jumps the user to wherever they're most likely to want to go.
-function destinationFor(a: ActivityRow): string {
+// jumps the user to wherever they're most likely to want to go — typically
+// the rating page where the action happened, not the actor's profile.
+function destinationFor(a: ActivityRow, viewerUsername: string | null): string {
+  // Helper: rating page for a given username + song.
+  const ratingPage = (username: string, songId: string) =>
+    `/r/${username}/${encodeBase64Url(songId)}`;
+
   switch (a.type) {
     case "recommendation":
       return "/recommendations";
@@ -36,15 +41,25 @@ function destinationFor(a: ActivityRow): string {
     case "like":
     case "mention":
     case "reply":
-      // Tapping a like/comment/mention/reply jumps to the actor's profile —
-      // typically you want to see who reacted before anything else.
+      // The action was on the VIEWER's rating; show that rating with the
+      // comment/like attached. Falls back to actor profile if we don't
+      // have the data we need.
+      if (a.songId && viewerUsername) {
+        return ratingPage(viewerUsername, a.songId);
+      }
       return `/u/${a.actorUsername}`;
     case "rating_match":
+      // Actor rated a song the viewer also rated — show the actor's rating
+      // (the new one) so the viewer sees what number they slapped on it.
+      if (a.songId) {
+        return ratingPage(a.actorUsername, a.songId);
+      }
       return `/u/${a.actorUsername}`;
     case "rec_rated":
-      // Jump to the shared rating page if we have a song.
+      // The actor (recipient of your recommendation) just rated it. Take
+      // them to the actor's rating page so they see the score.
       if (a.songId) {
-        return `/r/${a.actorUsername}/${encodeBase64Url(a.songId)}`;
+        return ratingPage(a.actorUsername, a.songId);
       }
       return `/u/${a.actorUsername}`;
     case "streak_milestone":
@@ -57,6 +72,15 @@ function destinationFor(a: ActivityRow): string {
 export default async function ActivityPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
+
+  // Viewer's username — needed so comment/like/mention/reply rows can
+  // deep-link to the viewer's rating page (where the action happened).
+  const [viewer] = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const viewerUsername = viewer?.username ?? null;
 
   const rows: ActivityRow[] = await db
     .select({
@@ -103,7 +127,7 @@ export default async function ActivityPage() {
       ) : (
         <ul className="space-y-2">
           {rows.map((a) => (
-            <ActivityRowItem key={a.id} a={a} />
+            <ActivityRowItem key={a.id} a={a} viewerUsername={viewerUsername} />
           ))}
         </ul>
       )}
@@ -111,12 +135,18 @@ export default async function ActivityPage() {
   );
 }
 
-function ActivityRowItem({ a }: { a: ActivityRow }) {
+function ActivityRowItem({
+  a,
+  viewerUsername,
+}: {
+  a: ActivityRow;
+  viewerUsername: string | null;
+}) {
   const unread = !a.readAt;
   // follow_request rows have inline action buttons and shouldn't be tappable
   // as a whole — clicks could conflict with the Accept/Decline buttons.
   const wholeRowTappable = a.type !== "follow_request";
-  const dest = destinationFor(a);
+  const dest = destinationFor(a, viewerUsername);
 
   const Inner = (
     <>
