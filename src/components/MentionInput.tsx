@@ -170,11 +170,22 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
     }
   }
 
+  // Track the blur-debounce timeout so we can cancel it on unmount and avoid
+  // setState on a torn-down component.
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+    };
+  }, []);
+
   function handleBlur() {
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     // Let click-on-suggestion fire first.
-    setTimeout(() => {
+    blurTimeoutRef.current = setTimeout(() => {
       setMentionAt(null);
       setCandidates([]);
+      blurTimeoutRef.current = null;
     }, 120);
   }
 

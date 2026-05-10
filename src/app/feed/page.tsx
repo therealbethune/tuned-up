@@ -363,13 +363,32 @@ async function EmptyFeed({ userId, followedIds }: { userId: string; followedIds:
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-6 text-center text-neutral-400 space-y-3">
-        <p>Your feed is empty.</p>
-        <p className="text-sm">
-          Try <Link href="/discover" className="underline text-white">Discover</Link> to see what&apos;s trending,{" "}
-          <Link href="/people" className="underline text-white">find people</Link> to follow,{" "}
-          or <Link href="/search" className="underline text-white">rate a song</Link> to start your own feed.
+      <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-8 text-center space-y-3">
+        <div className="text-4xl">🎧</div>
+        <h2 className="text-lg font-semibold">Your feed is quiet</h2>
+        <p className="text-sm text-neutral-400 max-w-sm mx-auto">
+          Follow some people or rate a few songs and this turns into your friends&apos; track-by-track music diary.
         </p>
+        <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+          <Link
+            href="/search"
+            className="rounded-full bg-white text-black text-sm font-semibold px-4 py-2"
+          >
+            + Rate a song
+          </Link>
+          <Link
+            href="/discover"
+            className="rounded-full border border-neutral-700 hover:bg-neutral-900 text-sm px-4 py-2"
+          >
+            Discover
+          </Link>
+          <Link
+            href="/people"
+            className="rounded-full border border-neutral-700 hover:bg-neutral-900 text-sm px-4 py-2"
+          >
+            Find people
+          </Link>
+        </div>
       </div>
 
       {withRatings.length > 0 && (

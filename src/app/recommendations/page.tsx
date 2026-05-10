@@ -50,11 +50,18 @@ export default async function RecommendationsPage() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-6 text-center text-neutral-400">
-          <p>No recommendations yet.</p>
-          <p className="text-sm mt-2">
-            <Link href="/people" className="underline text-white">Find people</Link> to follow — once they recommend a song, it&apos;ll show up here.
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-8 text-center space-y-3">
+          <div className="text-4xl">📬</div>
+          <h2 className="text-lg font-semibold">No incoming recs yet</h2>
+          <p className="text-sm text-neutral-400 max-w-sm mx-auto">
+            When someone you know sends you a song, it lands here. The faster you rate it, the faster they get a 🎯 push back.
           </p>
+          <Link
+            href="/people"
+            className="inline-block rounded-full bg-white text-black text-sm font-semibold px-4 py-2 mt-2"
+          >
+            Find people to follow
+          </Link>
         </div>
       ) : (
         <ul className="space-y-3">

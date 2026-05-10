@@ -114,6 +114,17 @@ export function RateButton({
     setTimeout(() => setOpen(false), 200);
   }
 
+  // Escape-to-close while the dialog is open. Bound on document so it works
+  // regardless of focus location.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") close();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   async function submit() {
     const score = clampedScore();
     if (score == null) {

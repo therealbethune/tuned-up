@@ -108,10 +108,14 @@ export default function PeoplePage() {
       )}
 
       {!loading && q.trim().length >= 2 && results.length === 0 && (
-        <p className="text-neutral-500 text-sm">No people found.</p>
+        <p className="text-neutral-500 text-sm">
+          Nobody named &ldquo;{q.trim()}&rdquo; yet. Maybe they haven&apos;t signed up?
+        </p>
       )}
       {!loading && q.trim().length < 2 && (
-        <p className="text-neutral-500 text-sm">Type at least 2 characters.</p>
+        <p className="text-neutral-500 text-sm">
+          Type a name or @handle to find people.
+        </p>
       )}
     </div>
   );

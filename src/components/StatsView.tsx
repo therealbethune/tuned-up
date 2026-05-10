@@ -15,11 +15,29 @@ export default async function StatsView({
   target: User;
   isOwner: boolean;
 }) {
-  const [allRatings, topSongs, topArtists, monthly, streak] = await Promise.all([
-    db
-      .select({ score: ratings.score, createdAt: ratings.createdAt })
-      .from(ratings)
-      .where(eq(ratings.userId, target.id)),
+  // Aggregate everything we need from the rating table in a single query
+  // (total/avg/min/max + the 10 score-bin counts) instead of fetching every
+  // rating row and computing histogram in JS. For users with 1000+ ratings
+  // this drops the page from "load 1000 rows" to "load 1 row".
+  const [aggResult, topSongs, topArtists, monthly, streak] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COALESCE(ROUND(AVG(score))::int, 0) AS avg,
+        COALESCE(MIN(score), 0) AS min,
+        COALESCE(MAX(score), 0) AS max,
+        COUNT(*) FILTER (WHERE score BETWEEN 1 AND 10)::int AS b0,
+        COUNT(*) FILTER (WHERE score BETWEEN 11 AND 20)::int AS b1,
+        COUNT(*) FILTER (WHERE score BETWEEN 21 AND 30)::int AS b2,
+        COUNT(*) FILTER (WHERE score BETWEEN 31 AND 40)::int AS b3,
+        COUNT(*) FILTER (WHERE score BETWEEN 41 AND 50)::int AS b4,
+        COUNT(*) FILTER (WHERE score BETWEEN 51 AND 60)::int AS b5,
+        COUNT(*) FILTER (WHERE score BETWEEN 61 AND 70)::int AS b6,
+        COUNT(*) FILTER (WHERE score BETWEEN 71 AND 80)::int AS b7,
+        COUNT(*) FILTER (WHERE score BETWEEN 81 AND 90)::int AS b8,
+        COUNT(*) FILTER (WHERE score BETWEEN 91 AND 100)::int AS b9
+      FROM ratings WHERE user_id = ${target.id}
+    `),
     db
       .select({
         songId: songs.id,
@@ -57,16 +75,24 @@ export default async function StatsView({
     computeStreak(target.id),
   ]);
 
-  const total = allRatings.length;
-  const avg = total ? Math.round(allRatings.reduce((a, r) => a + r.score, 0) / total) : 0;
-  const min = total ? Math.min(...allRatings.map((r) => r.score)) : 0;
-  const max = total ? Math.max(...allRatings.map((r) => r.score)) : 0;
-
-  const bins = Array.from({ length: 10 }, () => 0);
-  for (const r of allRatings) {
-    const idx = Math.min(9, Math.floor((r.score - 1) / 10));
-    bins[idx]++;
-  }
+  // Drizzle's neon-http `db.execute` returns either an array or
+  // { rows: [...] }; tolerate both.
+  const aggRaw = aggResult as unknown;
+  const aggRows = Array.isArray(aggRaw)
+    ? (aggRaw as Array<Record<string, number>>)
+    : Array.isArray((aggRaw as { rows?: Array<Record<string, number>> })?.rows)
+      ? ((aggRaw as { rows: Array<Record<string, number>> }).rows)
+      : [];
+  const agg = aggRows[0] ?? { total: 0, avg: 0, min: 0, max: 0 };
+  const total = Number(agg.total ?? 0);
+  const avg = Number(agg.avg ?? 0);
+  const min = Number(agg.min ?? 0);
+  const max = Number(agg.max ?? 0);
+  const bins = [
+    Number(agg.b0 ?? 0), Number(agg.b1 ?? 0), Number(agg.b2 ?? 0), Number(agg.b3 ?? 0),
+    Number(agg.b4 ?? 0), Number(agg.b5 ?? 0), Number(agg.b6 ?? 0), Number(agg.b7 ?? 0),
+    Number(agg.b8 ?? 0), Number(agg.b9 ?? 0),
+  ];
   const maxBin = Math.max(1, ...bins);
   const maxMonth = Math.max(1, ...monthly.map((m) => m.n));
 

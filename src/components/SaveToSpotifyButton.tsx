@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const ERROR_AUTO_RESET_MS = 2500;
 
 // Tiny Spotify glyph — same vibe as the icon in StreamingLinks.
 function SpotifyIcon({ size = 16 }: { size?: number }) {
@@ -28,8 +30,24 @@ export function SaveToSpotifyButton({
 }) {
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cancel the pending auto-reset on unmount so we don't setState after.
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, []);
 
   if (!connected) return null;
+
+  function scheduleReset() {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => {
+      setState("idle");
+      resetTimerRef.current = null;
+    }, ERROR_AUTO_RESET_MS);
+  }
 
   async function save() {
     if (state === "saving" || state === "saved") return;
@@ -53,15 +71,14 @@ export function SaveToSpotifyButton({
           rate_limited: "Try again later",
         };
         setErrorMsg(errMap[j.error] || j.error || "Couldn't save");
-        // Auto-reset so they can retry.
-        setTimeout(() => setState("idle"), 2500);
+        scheduleReset();
         return;
       }
       setState("saved");
     } catch {
       setState("error");
       setErrorMsg("Network error");
-      setTimeout(() => setState("idle"), 2000);
+      scheduleReset();
     }
   }
 

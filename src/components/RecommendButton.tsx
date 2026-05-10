@@ -21,7 +21,8 @@ export function RecommendButton({ song }: { song: SongResult }) {
   const [done, setDone] = useState(false);
   const reqId = useRef(0);
 
-  // Debounced user search.
+  // Debounced user search with AbortController so unmount + rapid retypes
+  // don't dump stale data into state or warn about setState-on-unmounted.
   useEffect(() => {
     if (!open || picked) return;
     const term = q.trim();
@@ -30,13 +31,27 @@ export function RecommendButton({ song }: { song: SongResult }) {
       return;
     }
     const id = ++reqId.current;
+    const ctrl = new AbortController();
     const t = setTimeout(async () => {
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(term)}`);
-      const data = await res.json();
-      if (id !== reqId.current) return;
-      setResults(data.results ?? []);
+      try {
+        const res = await fetch(
+          `/api/users/search?q=${encodeURIComponent(term)}`,
+          { signal: ctrl.signal },
+        );
+        if (id !== reqId.current) return;
+        const data = await res.json();
+        if (id !== reqId.current) return;
+        setResults(data.results ?? []);
+      } catch (e) {
+        // AbortError when superseded — silent. Other errors clear results.
+        if ((e as Error).name === "AbortError") return;
+        if (id === reqId.current) setResults([]);
+      }
     }, 200);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
   }, [q, open, picked]);
 
   function reset() {
@@ -46,6 +61,19 @@ export function RecommendButton({ song }: { song: SongResult }) {
     setMessage("");
     setDone(false);
   }
+
+  // Escape closes the dialog.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        reset();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   async function send() {
     if (!picked || busy) return;
