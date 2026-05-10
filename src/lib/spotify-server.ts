@@ -13,13 +13,16 @@ const CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || process.env.SPOTI
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 
 // Scopes needed for: importing top tracks, reading saved songs, saving
-// new tracks to the user's library, AND reading what's currently playing
-// for the "now listening" widget on the profile.
+// new tracks to the user's library, reading what's currently playing
+// for the "now listening" widget, AND user-read-private so /me returns
+// the product field (premium vs free) — important for diagnosing
+// dev-mode 403s which require Premium for the app owner.
 export const SPOTIFY_LINK_SCOPES = [
   "user-top-read",
   "user-library-read",
   "user-library-modify",
   "user-read-email",
+  "user-read-private",
   "user-read-currently-playing",
   "user-read-playback-state",
 ].join(" ");
