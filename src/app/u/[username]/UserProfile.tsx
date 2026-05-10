@@ -13,8 +13,32 @@ import { isAlbumId } from "@/lib/songs";
 import { computeTasteAgreement } from "@/lib/taste";
 import { computeStreak } from "@/lib/streak";
 import { streakPercentile } from "@/lib/streak-milestones";
+import { safeQuery } from "@/lib/safe-query";
 
 type User = typeof users.$inferSelect;
+
+// Visual tier for the streak badge so longer streaks pop more.
+function streakTierEmoji(streak: number): string {
+  if (streak >= 365) return "🏆";
+  if (streak >= 100) return "💎";
+  if (streak >= 60) return "🥇";
+  if (streak >= 30) return "🥈";
+  if (streak >= 14) return "🥉";
+  return "🔥";
+}
+
+// Friendly "joined" phrase for the profile header.
+function joinedAgo(d: Date | string | number): string {
+  const date = d instanceof Date ? d : new Date(d);
+  if (isNaN(date.getTime())) return "";
+  const days = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (days <= 1) return "today";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(months / 12);
+  return `${years}y ago`;
+}
 
 export default async function UserProfile({ target, viewerId }: { target: User; viewerId: string | null }) {
   const isOwner = viewerId === target.id;
@@ -43,8 +67,11 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     viewerId && !isOwner ? computeTasteAgreement(viewerId, target.id) : Promise.resolve(null),
     computeStreak(target.id),
   ]);
-  // Top X% percentile shown alongside the streak badge.
-  const streakPct = streak > 0 ? Math.max(1, 100 - (await streakPercentile(streak))) : 0;
+  // Top X% percentile shown alongside the streak badge. Defensive: if the
+  // streak-cache columns aren't migrated yet, fall back to "no badge".
+  const streakPct = streak > 0
+    ? Math.max(1, 100 - (await safeQuery(() => streakPercentile(streak), 0, "streak-pct")))
+    : 0;
   const followRow = followingViewer[0];
   const followState: "none" | "pending" | "accepted" = !followRow
     ? "none"
@@ -138,10 +165,15 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                 className="text-xs rounded-full px-2 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-300 border border-orange-500/40 tabular-nums font-medium"
                 title={`${streak}-day rating streak — top ${streakPct}% of streak holders`}
               >
-                🔥 {streak}-day streak
+                {streakTierEmoji(streak)} {streak}-day streak
                 {streakPct > 0 && streakPct <= 50 && (
                   <span className="ml-1 text-amber-200/80">· top {streakPct}%</span>
                 )}
+              </span>
+            )}
+            {target.createdAt && (
+              <span className="text-xs text-neutral-500" title={new Date(target.createdAt).toLocaleString()}>
+                Joined {joinedAgo(target.createdAt)}
               </span>
             )}
           </div>

@@ -6,6 +6,7 @@ import { db, users, recommendations, spotifyAccounts } from "@/db";
 import UserProfile from "../u/[username]/UserProfile";
 import { PushBanner } from "@/components/PushBanner";
 import { ConnectSpotifyBanner } from "@/components/ConnectSpotifyBanner";
+import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +26,15 @@ export default async function MePage() {
     );
   const pendingRecs = Number(recStat?.n ?? 0);
 
-  const [spotifyLink] = await db
-    .select({ id: spotifyAccounts.userId })
-    .from(spotifyAccounts)
-    .where(eq(spotifyAccounts.userId, userId));
-  const spotifyConnected = Boolean(spotifyLink);
+  const spotifyConnected = (await safeQuery(
+    () =>
+      db
+        .select({ id: spotifyAccounts.userId })
+        .from(spotifyAccounts)
+        .where(eq(spotifyAccounts.userId, userId)),
+    [] as { id: string }[],
+    "me-spotify-link",
+  )).length > 0;
 
   return (
     <div className="space-y-4">

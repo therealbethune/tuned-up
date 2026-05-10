@@ -1,5 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
+
+// Same encoding as /r/[username]/[songId] uses — keeps colons in yt:<id> safe.
+function encodeAlbumIdForUrl(songId: string): string {
+  return Buffer.from(songId, "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 import { auth } from "@clerk/nextjs/server";
 import { desc, sql, gte } from "drizzle-orm";
 import { db, ratings, songs } from "@/db";
@@ -233,13 +242,12 @@ function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
               <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />
             )}
             <div className="flex-1 min-w-0">
-              {url ? (
-                <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate block hover:underline">
-                  {r.title}
-                </a>
-              ) : (
-                <div className="font-medium truncate">{r.title}</div>
-              )}
+              <Link
+                href={`/album/${encodeAlbumIdForUrl(r.songId)}`}
+                className="font-medium truncate block hover:underline"
+              >
+                {r.title}
+              </Link>
               <div className="text-sm text-neutral-400 truncate">
                 {r.artist}{r.album ? ` · ${r.album}` : ""}
               </div>

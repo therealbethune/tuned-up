@@ -3,13 +3,44 @@ import { useEffect, useRef, useState } from "react";
 import { SongRow } from "@/components/SongRow";
 import type { SongResult, ItemKind } from "@/lib/ytmusic";
 
+const RECENT_KEY = "tu_recent_searches";
+const RECENT_MAX = 8;
+
+function loadRecents(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((s) => typeof s === "string").slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecent(term: string) {
+  if (typeof window === "undefined") return;
+  const t = term.trim();
+  if (t.length < 2) return;
+  const list = loadRecents();
+  const next = [t, ...list.filter((s) => s.toLowerCase() !== t.toLowerCase())].slice(0, RECENT_MAX);
+  try {
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {}
+}
+
 export default function SearchPage() {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<ItemKind>("song");
   const [results, setResults] = useState<SongResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recents, setRecents] = useState<string[]>([]);
   const reqId = useRef(0);
+
+  useEffect(() => {
+    setRecents(loadRecents());
+  }, []);
 
   useEffect(() => {
     const term = q.trim();
@@ -29,6 +60,10 @@ export default function SearchPage() {
         if (!res.ok) throw new Error(data.error || "search failed");
         setResults(data.results ?? []);
         setError(null);
+        if ((data.results ?? []).length > 0) {
+          saveRecent(term);
+          setRecents(loadRecents());
+        }
       } catch (e) {
         if (id !== reqId.current) return;
         setError((e as Error).message);
@@ -127,7 +162,35 @@ export default function SearchPage() {
         <p className="text-neutral-500 text-sm">No results.</p>
       )}
       {!loading && q.trim().length < 2 && (
-        <p className="text-neutral-500 text-sm">Type at least 2 characters.</p>
+        <div className="space-y-3">
+          {recents.length > 0 ? (
+            <>
+              <h2 className="text-xs uppercase tracking-wider text-neutral-500">Recent searches</h2>
+              <div className="flex flex-wrap gap-2">
+                {recents.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setQ(r)}
+                    className="text-xs rounded-full border border-neutral-700 hover:border-neutral-500 hover:bg-neutral-900 px-3 py-1.5 text-neutral-300"
+                  >
+                    {r}
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    try { window.localStorage.removeItem(RECENT_KEY); } catch {}
+                    setRecents([]);
+                  }}
+                  className="text-xs text-neutral-500 hover:text-red-400 px-2"
+                >
+                  Clear
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="text-neutral-500 text-sm">Type at least 2 characters to search.</p>
+          )}
+        </div>
       )}
     </div>
   );

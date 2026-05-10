@@ -51,8 +51,8 @@ export default async function FollowList({
   const heading = direction === "followers" ? "Followers" : "Following";
   const empty =
     direction === "followers"
-      ? "No followers yet."
-      : `${target.displayName || target.username} isn't following anyone yet.`;
+      ? `Nobody's following ${target.displayName || target.username} yet — be the first.`
+      : `${target.displayName || target.username} hasn't followed anyone yet. Their feed must be lonely.`;
 
   return (
     <div className="space-y-6">

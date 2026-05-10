@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { and, desc, eq, inArray, notInArray, sql, count } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, notInArray, sql, count } from "drizzle-orm";
 import { db, ratings, songs, users, follows, comments, likes, spotifyAccounts } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId } from "@/lib/songs";
@@ -14,16 +14,30 @@ import { StreamingLinks } from "@/components/StreamingLinks";
 import { RecommendButton } from "@/components/RecommendButton";
 import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { ConnectSpotifyBanner } from "@/components/ConnectSpotifyBanner";
+import { SafeCardBoundary } from "@/components/SafeCardBoundary";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
+import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
 
-export default async function FeedPage() {
+// How many feed items per page. We over-select by 1 so we can tell whether
+// there are more items to load without a separate count query.
+const FEED_PAGE_SIZE = 25;
+
+export default async function FeedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ before?: string }>;
+}) {
   const { userId } = await auth();
   if (!userId) redirect("/");
   const me = await syncCurrentUser();
   if (me && !me.onboardedAt) redirect("/welcome");
+
+  const sp = await searchParams;
+  const beforeIso = sp.before;
+  const beforeDate = beforeIso ? new Date(beforeIso) : null;
 
   const followedRows = await db
     .select({ id: follows.followeeId })
@@ -32,7 +46,7 @@ export default async function FeedPage() {
   const followedIds = followedRows.map((r) => r.id);
   followedIds.push(userId); // include self
 
-  const items = followedIds.length
+  const itemsPlusOne = followedIds.length
     ? await db
         .select({
           ratingUserId: ratings.userId,
@@ -53,10 +67,21 @@ export default async function FeedPage() {
         .from(ratings)
         .innerJoin(songs, eq(ratings.songId, songs.id))
         .innerJoin(users, eq(ratings.userId, users.id))
-        .where(inArray(ratings.userId, followedIds))
+        .where(
+          beforeDate
+            ? and(
+                inArray(ratings.userId, followedIds),
+                lt(ratings.createdAt, beforeDate),
+              )
+            : inArray(ratings.userId, followedIds),
+        )
         .orderBy(desc(ratings.createdAt))
-        .limit(50)
+        .limit(FEED_PAGE_SIZE + 1)
     : [];
+
+  const hasMore = itemsPlusOne.length > FEED_PAGE_SIZE;
+  const items = hasMore ? itemsPlusOne.slice(0, FEED_PAGE_SIZE) : itemsPlusOne;
+  const oldestCreatedAt = items.length > 0 ? items[items.length - 1].createdAt : null;
 
   // Viewer's own ratings on the songs visible in the feed (so we can show
   // an accurate "Rated X" label on the inline RateButton).
@@ -70,12 +95,18 @@ export default async function FeedPage() {
   const myRatingsMap = new Map(myRatingsRows.map((r) => [r.songId, r.score]));
 
   // Has the viewer linked their Spotify account? (Used to render the
-  // "Save to Spotify" button on each rating card.)
-  const [spotifyLink] = await db
-    .select({ id: spotifyAccounts.userId })
-    .from(spotifyAccounts)
-    .where(eq(spotifyAccounts.userId, userId));
-  const spotifyConnected = Boolean(spotifyLink);
+  // "Save to Spotify" button on each rating card.) Defensive: if the table
+  // hasn't migrated yet on a fresh deploy, treat as not-connected.
+  const spotifyLinkRows = await safeQuery(
+    () =>
+      db
+        .select({ id: spotifyAccounts.userId })
+        .from(spotifyAccounts)
+        .where(eq(spotifyAccounts.userId, userId)),
+    [] as { id: string }[],
+    "feed-spotify-link",
+  );
+  const spotifyConnected = spotifyLinkRows.length > 0;
 
   // Comment counts per (ratingUserId, songId) grouped by both.
   let commentCounts: Map<string, number> = new Map();
@@ -163,7 +194,8 @@ export default async function FeedPage() {
               durationSeconds: null,
             };
             return (
-              <li key={`${it.username}-${it.songId}-${it.createdAt}`} className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
+              <SafeCardBoundary key={`${it.username}-${it.songId}-${it.createdAt}`}>
+              <li className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
                 <div className="flex items-center gap-3 mb-3">
                   {it.imageUrl ? (
                     <Image src={it.imageUrl} alt="" width={28} height={28} className="rounded-full h-7 w-7" />
@@ -275,9 +307,36 @@ export default async function FeedPage() {
                   initialCount={cCount}
                 />
               </li>
+              </SafeCardBoundary>
             );
           })}
         </ul>
+      )}
+
+      {hasMore && oldestCreatedAt && (
+        <div className="pt-2 flex justify-center">
+          <Link
+            href={`/feed?before=${encodeURIComponent(
+              oldestCreatedAt instanceof Date
+                ? oldestCreatedAt.toISOString()
+                : String(oldestCreatedAt),
+            )}`}
+            className="rounded-full border border-neutral-700 hover:border-neutral-500 hover:bg-neutral-900 text-sm px-4 py-2 active:scale-95 transition"
+          >
+            Load older →
+          </Link>
+        </div>
+      )}
+
+      {beforeIso && (
+        <div className="pt-2 flex justify-center">
+          <Link
+            href="/feed"
+            className="text-xs text-neutral-500 hover:text-white"
+          >
+            ↑ Back to top
+          </Link>
+        </div>
       )}
     </div>
   );
