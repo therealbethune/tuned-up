@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { SpotifyIconOnGreen } from "@/components/icons";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // Connect / disconnect a Spotify account. Designed to live on /settings.
 // `connected` and `spotifyUserId` are passed in by the server so the first
@@ -13,15 +15,16 @@ export function SpotifyAccountCard({
 }) {
   const [busy, setBusy] = useState(false);
   const [localConnected, setLocalConnected] = useState(connected);
+  const [confirming, setConfirming] = useState(false);
 
   async function disconnect() {
-    if (!confirm("Disconnect Spotify? You'll need to reconnect to save songs.")) return;
     setBusy(true);
     try {
       const res = await fetch("/api/spotify/account", { method: "DELETE" });
       if (res.ok) setLocalConnected(false);
     } finally {
       setBusy(false);
+      setConfirming(false);
     }
   }
 
@@ -29,16 +32,7 @@ export function SpotifyAccountCard({
     <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
       <div className="flex items-start gap-3">
         <div className="h-10 w-10 rounded-full bg-emerald-500/15 text-emerald-400 inline-flex items-center justify-center shrink-0">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <circle cx="12" cy="12" r="10" />
-            <path
-              d="M7.5 14.4c2.4-1.4 5.7-1.7 9-.8m-9-3.6c2.9-1.6 7-2 10.5-.8m-10.5-3c3.4-1.6 8.5-1.8 12.5-.4"
-              stroke="#000"
-              strokeWidth="1.6"
-              fill="none"
-              strokeLinecap="round"
-            />
-          </svg>
+          <SpotifyIconOnGreen size={22} />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold">Spotify</h3>
@@ -48,7 +42,7 @@ export function SpotifyAccountCard({
                 Connected{spotifyUserId ? ` as ${spotifyUserId}` : ""}. You can save rated songs straight to your Liked Songs.
               </p>
               <button
-                onClick={disconnect}
+                onClick={() => setConfirming(true)}
                 disabled={busy}
                 className="mt-2 text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
               >
@@ -70,6 +64,16 @@ export function SpotifyAccountCard({
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={disconnect}
+        title="Disconnect Spotify?"
+        body="You'll need to reconnect to save songs to your Liked Songs."
+        confirmLabel="Disconnect"
+        destructive
+        busy={busy}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { SongResult } from "@/lib/ytmusic";
 import { SongRow } from "@/components/SongRow";
+import { SpotifyIconOnGreen } from "@/components/icons";
 
 type SuggestedUser = {
   id: string;
@@ -110,16 +111,7 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
           <div className="rounded-lg border border-emerald-700/40 bg-emerald-500/5 p-4 space-y-3">
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 rounded-full bg-emerald-500 text-black inline-flex items-center justify-center shrink-0">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <circle cx="12" cy="12" r="10" />
-                  <path
-                    d="M7.5 14.4c2.4-1.4 5.7-1.7 9-.8m-9-3.6c2.9-1.6 7-2 10.5-.8m-10.5-3c3.4-1.6 8.5-1.8 12.5-.4"
-                    stroke="#000"
-                    strokeWidth="1.6"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <SpotifyIconOnGreen size={22} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-medium">Connect Spotify</div>

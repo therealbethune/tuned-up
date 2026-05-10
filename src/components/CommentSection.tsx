@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { renderWithMentions } from "@/lib/mentions";
 import { MentionInput, type MentionInputHandle } from "@/components/MentionInput";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Comment = {
   id: string;
@@ -157,18 +158,34 @@ export function CommentSection({
     }
   }
 
-  async function del(id: string) {
-    if (!confirm("Delete this comment?")) return;
-    const res = await fetch("/api/comments", {
-      method: "DELETE",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ commentId: id }),
-    });
-    if (res.ok) {
-      // Also drop any replies whose parent we just removed.
-      setComments((prev) =>
-        (prev ?? []).filter((c) => c.id !== id && c.parentCommentId !== id),
-      );
+  // Two-step delete confirmation via the in-app dialog (replaces
+  // window.confirm). Stash the id while the modal is open.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  function requestDelete(id: string) {
+    setPendingDeleteId(id);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDeleteId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/comments", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ commentId: pendingDeleteId }),
+      });
+      if (res.ok) {
+        const id = pendingDeleteId;
+        // Also drop any replies whose parent we just removed.
+        setComments((prev) =>
+          (prev ?? []).filter((c) => c.id !== id && c.parentCommentId !== id),
+        );
+      }
+    } finally {
+      setDeleting(false);
+      setPendingDeleteId(null);
     }
   }
 
@@ -203,7 +220,7 @@ export function CommentSection({
                   <CommentRow
                     c={c}
                     viewerId={viewerId}
-                    onDelete={() => del(c.id)}
+                    onDelete={() => requestDelete(c.id)}
                     onReply={() => startReply(c)}
                   />
                   {/* Replies + inline reply form */}
@@ -215,7 +232,7 @@ export function CommentSection({
                           key={r.id}
                           c={r}
                           viewerId={viewerId}
-                          onDelete={() => del(r.id)}
+                          onDelete={() => requestDelete(r.id)}
                           onReply={() => startReply(r)}
                         />
                       ))}
@@ -297,6 +314,17 @@ export function CommentSection({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onClose={() => setPendingDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Delete this comment?"
+        body="This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        busy={deleting}
+      />
     </div>
   );
 }

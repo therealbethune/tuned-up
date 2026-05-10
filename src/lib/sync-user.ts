@@ -1,5 +1,4 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 
 export type SyncedUser = {
@@ -21,10 +20,11 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
     `user_${u.id.slice(-6)}`;
   const displayName = [u.firstName, u.lastName].filter(Boolean).join(" ") || username;
 
-  // Insert preserves onboardedAt and isPrivate; we only touch the avatar on
-  // updates so a user-edited username/displayName from /settings isn't
-  // overwritten on every page load.
-  await db
+  // Single round-trip: upsert + RETURNING the fields callers need. Insert
+  // preserves onboardedAt and isPrivate; updates only touch the avatar so
+  // a user-edited username/displayName from /settings isn't overwritten
+  // on every page load.
+  const [row] = await db
     .insert(users)
     .values({
       id: u.id,
@@ -37,20 +37,15 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
       set: {
         imageUrl: u.imageUrl ?? null,
       },
-    });
-
-  const [row] = await db
-    .select({
+    })
+    .returning({
       id: users.id,
       username: users.username,
       displayName: users.displayName,
       imageUrl: users.imageUrl,
       onboardedAt: users.onboardedAt,
       timezone: users.timezone,
-    })
-    .from(users)
-    .where(eq(users.id, u.id))
-    .limit(1);
+    });
 
   return row ?? null;
 }

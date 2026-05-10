@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { SpotifyIconOnGreen } from "@/components/icons";
 import {
   exchangeCodeForToken,
   fetchTopTracks,
@@ -137,16 +138,7 @@ export function ImportFlow({ configured }: { configured: boolean }) {
           onClick={connect}
           className="inline-flex items-center gap-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-5 py-2.5"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <circle cx="12" cy="12" r="10" />
-            <path
-              d="M7.5 14.4c2.4-1.4 5.7-1.7 9-.8m-9-3.6c2.9-1.6 7-2 10.5-.8m-10.5-3c3.4-1.6 8.5-1.8 12.5-.4"
-              stroke="black"
-              strokeWidth="1.6"
-              fill="none"
-              strokeLinecap="round"
-            />
-          </svg>
+          <SpotifyIconOnGreen size={18} />
           Connect Spotify
         </button>
         <p className="text-xs text-neutral-500">

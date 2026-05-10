@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { PushToggle } from "@/components/PushToggle";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export function SettingsForm({
   username: initialUsername,
@@ -72,13 +73,21 @@ export function SettingsForm({
     }
   }
 
-  async function deleteAccount() {
-    const ok = window.confirm(
-      "Permanently delete your account, all your ratings, comments, likes, and follows? This cannot be undone.",
-    );
-    if (!ok) return;
-    const sure = window.prompt('Type DELETE to confirm.');
-    if (sure?.trim().toUpperCase() !== "DELETE") return;
+  // Two-stage delete: warn dialog → type-DELETE confirm dialog → call API.
+  // Replaces stacked window.confirm + window.prompt which iOS Safari
+  // sometimes swallows / styles inconsistently.
+  const [deleteStage, setDeleteStage] = useState<"closed" | "warn" | "confirm">("closed");
+  const [confirmText, setConfirmText] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function executeDelete() {
+    if (confirmText.trim().toUpperCase() !== "DELETE") {
+      setDeleteError('Type DELETE to confirm.');
+      return;
+    }
+    setDeletingAccount(true);
+    setDeleteError(null);
     const res = await fetch("/api/account/delete", { method: "POST" });
     if (res.ok) {
       try {
@@ -88,7 +97,8 @@ export function SettingsForm({
       }
     } else {
       const j = await res.json().catch(() => ({}));
-      alert(j.error || "Delete failed");
+      setDeleteError(j.error || "Delete failed");
+      setDeletingAccount(false);
     }
   }
 
@@ -175,12 +185,86 @@ export function SettingsForm({
           Permanently delete your account and all associated data.
         </p>
         <button
-          onClick={deleteAccount}
+          onClick={() => {
+            setConfirmText("");
+            setDeleteError(null);
+            setDeleteStage("warn");
+          }}
           className="rounded-full border border-red-700 text-red-300 hover:bg-red-900/20 px-4 py-1.5 text-sm font-medium"
         >
           Delete account
         </button>
       </section>
+
+      {/* Stage 1 — explain the consequences. */}
+      <ConfirmDialog
+        open={deleteStage === "warn"}
+        onClose={() => setDeleteStage("closed")}
+        onConfirm={() => setDeleteStage("confirm")}
+        title="Delete your account?"
+        body="Your ratings, comments, likes, follows, and recommendations will be permanently removed. This cannot be undone."
+        confirmLabel="I understand, continue"
+        destructive
+      />
+
+      {/* Stage 2 — make them type DELETE. We render a custom layout instead
+          of using ConfirmDialog so the input fits in the body. */}
+      {deleteStage === "confirm" && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !deletingAccount) setDeleteStage("closed");
+          }}
+        >
+          <div
+            className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-xl border border-red-900/50 bg-neutral-950 p-5 space-y-4"
+            style={{ paddingBottom: "max(env(safe-area-inset-bottom), 1.25rem)" }}
+          >
+            <div>
+              <h2 id="delete-confirm-title" className="text-base font-semibold">
+                Type <span className="font-mono text-red-300">DELETE</span> to confirm
+              </h2>
+              <p className="text-sm text-neutral-400 mt-1">
+                Last chance. Your account will be permanently destroyed.
+              </p>
+            </div>
+            <input
+              autoFocus
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="DELETE"
+              autoCorrect="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              className="w-full rounded-md bg-neutral-900 border border-neutral-700 focus:border-red-500 focus:outline-none px-3 py-2 font-mono"
+            />
+            {deleteError && (
+              <p className="text-xs text-red-400">{deleteError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteStage("closed")}
+                disabled={deletingAccount}
+                className="rounded-full border border-neutral-700 hover:bg-neutral-900 text-sm px-4 py-1.5 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeDelete}
+                disabled={
+                  deletingAccount || confirmText.trim().toUpperCase() !== "DELETE"
+                }
+                className="rounded-full bg-red-500 hover:bg-red-400 text-white text-sm font-semibold px-4 py-1.5 active:scale-95 transition-transform disabled:opacity-50"
+              >
+                {deletingAccount ? "Deleting…" : "Delete forever"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

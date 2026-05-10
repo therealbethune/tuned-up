@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { scoreLabel } from "@/lib/score-labels";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export type OwnRating = {
   songId: string;
@@ -73,8 +74,9 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
     }
   }
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   async function del() {
-    if (!confirm(`Delete your rating of "${rating.title}"?`)) return;
     setBusy(true);
     const res = await fetch("/api/ratings", {
       method: "DELETE",
@@ -82,20 +84,38 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
       body: JSON.stringify({ songId: rating.songId }),
     });
     setBusy(false);
+    setConfirmingDelete(false);
     if (res.ok) router.refresh();
-    else alert("Delete failed");
+    else setError("Delete failed — try again.");
   }
 
   if (!editing) {
     return (
-      <div className="flex items-center gap-3 text-xs text-neutral-500">
-        <button onClick={() => setEditing(true)} className="hover:text-white">
-          Edit
-        </button>
-        <button onClick={del} disabled={busy} className="hover:text-red-400 disabled:opacity-50">
-          Delete
-        </button>
-      </div>
+      <>
+        <div className="flex items-center gap-3 text-xs text-neutral-500">
+          <button onClick={() => setEditing(true)} className="hover:text-white">
+            Edit
+          </button>
+          <button
+            onClick={() => setConfirmingDelete(true)}
+            disabled={busy}
+            className="hover:text-red-400 disabled:opacity-50"
+          >
+            Delete
+          </button>
+          {error && <span className="text-red-400">{error}</span>}
+        </div>
+        <ConfirmDialog
+          open={confirmingDelete}
+          onClose={() => setConfirmingDelete(false)}
+          onConfirm={del}
+          title="Delete this rating?"
+          body={`Your rating of "${rating.title}" will be removed.`}
+          confirmLabel="Delete"
+          destructive
+          busy={busy}
+        />
+      </>
     );
   }
 

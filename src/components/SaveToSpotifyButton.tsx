@@ -1,23 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { SpotifyIcon } from "@/components/icons";
 
 const ERROR_AUTO_RESET_MS = 2500;
-
-// Tiny Spotify glyph — same vibe as the icon in StreamingLinks.
-function SpotifyIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <circle cx="12" cy="12" r="10" />
-      <path
-        d="M7.5 14.4c2.4-1.4 5.7-1.7 9-.8m-9-3.6c2.9-1.6 7-2 10.5-.8m-10.5-3c3.4-1.6 8.5-1.8 12.5-.4"
-        stroke="white"
-        strokeWidth="1.6"
-        fill="none"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 // Adds a song to the viewer's Spotify "Liked Songs" library. Renders nothing
 // when `connected` is false (settings page nudges users to connect first).
