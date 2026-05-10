@@ -3,6 +3,7 @@ import Link from "next/link";
 import { and, desc, eq, count, inArray } from "drizzle-orm";
 import { db, ratings, songs, follows, users, comments, likes, spotifyAccounts } from "@/db";
 import { SpotifyIcon } from "@/components/icons";
+import { renderWithMentions } from "@/lib/mentions";
 import { FollowButton } from "./FollowButton";
 import { ytUrlForSongId } from "@/lib/songs";
 import { OwnRatingForm } from "@/components/OwnRatingForm";
@@ -335,7 +336,11 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                       </div>
                       <div className="text-2xl font-bold tabular-nums">{r.score}</div>
                     </div>
-                    {r.review && <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap">{r.review}</p>}
+                    {r.review && (
+                      <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap break-words">
+                        {renderWithMentions(r.review)}
+                      </p>
+                    )}
                     {isOwner && (
                       <div className="mt-3">
                         <OwnRatingForm rating={{ songId: r.songId, title: r.title, score: r.score, review: r.review }} />

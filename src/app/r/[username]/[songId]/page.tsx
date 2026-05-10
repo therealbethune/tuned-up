@@ -6,6 +6,7 @@ import { auth } from "@clerk/nextjs/server";
 import { SignUpButton } from "@clerk/nextjs";
 import { and, eq } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
+import { renderWithMentions } from "@/lib/mentions";
 import { ytUrlForSongId } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { scoreLabel } from "@/lib/score-labels";
@@ -165,7 +166,11 @@ export default async function SharedRatingPage({
           appleMusicUrl={r.appleMusicUrl}
           spotifyTrackId={r.spotifyTrackId}
         />
-        {r.review && <p className="text-neutral-200 whitespace-pre-wrap">{r.review}</p>}
+        {r.review && (
+          <p className="text-neutral-200 whitespace-pre-wrap break-words">
+            {renderWithMentions(r.review)}
+          </p>
+        )}
       </div>
 
       <SignedOutSharePromo username={r.username} />

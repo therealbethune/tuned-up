@@ -19,6 +19,7 @@ import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
 import { encodeBase64Url } from "@/lib/encoding";
+import { renderWithMentions } from "@/lib/mentions";
 
 export const dynamic = "force-dynamic";
 
@@ -283,7 +284,11 @@ export default async function FeedPage({
                     </div>
                   </div>
                 </div>
-                {it.review && <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap">{it.review}</p>}
+                {it.review && (
+                  <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap break-words">
+                    {renderWithMentions(it.review)}
+                  </p>
+                )}
 
                 {it.ratingUserId !== userId && (
                   <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">

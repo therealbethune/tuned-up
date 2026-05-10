@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, songs, ratings, activities, recommendations, users } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
@@ -13,6 +13,7 @@ import {
   refreshUserStreak,
 } from "@/lib/streak-milestones";
 import { encodeBase64Url } from "@/lib/encoding";
+import { extractMentions } from "@/lib/mentions";
 
 export const runtime = "nodejs";
 
@@ -116,6 +117,70 @@ export async function POST(req: Request) {
       target: [ratings.userId, ratings.songId],
       set: { score: Math.round(s), review: review ?? null, updatedAt: now },
     });
+
+  // Notify mentioned users — anyone @-tagged in the review gets a push +
+  // activity row pointing at this rating. Cap at 10 to prevent
+  // pingflood-via-stuffed-caption, parallel via allSettled, dedupe prior
+  // mention activities so editing doesn't pile up entries.
+  if (typeof review === "string" && review.includes("@")) {
+    const mentioned = extractMentions(review).slice(0, 10);
+    if (mentioned.length > 0) {
+      try {
+        const [mUsers, [author]] = await Promise.all([
+          db
+            .select({ id: users.id, username: users.username })
+            .from(users)
+            .where(inArray(users.username, mentioned)),
+          db
+            .select({ displayName: users.displayName, username: users.username })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1),
+        ]);
+        const authorName = author?.displayName || author?.username || "Someone";
+        const finalScore = Math.round(s);
+        const preview =
+          review.length > 100 ? review.slice(0, 97) + "…" : review;
+        // Skip self-mentions.
+        await Promise.allSettled(
+          mUsers
+            .filter((u) => u.id !== userId)
+            .map(async (u) => {
+              await db
+                .delete(activities)
+                .where(
+                  and(
+                    eq(activities.userId, u.id),
+                    eq(activities.actorId, userId),
+                    eq(activities.type, "mention"),
+                    eq(activities.songId, song.id),
+                  ),
+                );
+              await db.insert(activities).values({
+                id: randomUUID(),
+                userId: u.id,
+                actorId: userId,
+                type: "mention",
+                songId: song.id,
+                // Author of the rating is the rating owner. We're the actor.
+                ratingUserId: userId,
+              });
+              await sendPushToUser(u.id, {
+                title: `${authorName} mentioned you in a rating`,
+                body: `${song.title} — ${finalScore}/100${preview ? `: ${preview}` : ""}`,
+                // Mentioned user might not follow the author; link to the
+                // standalone rating page where the review (with the @) is
+                // guaranteed to render.
+                url: `/r/${encodeURIComponent(author?.username ?? "")}/${encodeBase64Url(song.id)}`,
+                tag: `mention-rating:${userId}:${song.id}:${u.id}`,
+              });
+            }),
+        );
+      } catch (e) {
+        console.error("[ratings POST] mention notify failed:", e);
+      }
+    }
+  }
 
   // Notify everyone else who's already rated the same song that someone new
   // has now rated it too. Only fires the FIRST time this user rates the song.

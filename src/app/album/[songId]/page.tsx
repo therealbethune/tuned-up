@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 //
 // URL: /album/<base64-songId>  (encoding lets us route ids like "yt:abc:def")
 import { decodeBase64Url } from "@/lib/encoding";
+import { renderWithMentions } from "@/lib/mentions";
 function decodeSongId(s: string): string {
   try {
     return decodeBase64Url(s);
@@ -223,7 +224,7 @@ export default async function AlbumPage({
                 </div>
                 {r.review && (
                   <p className="mt-2 text-sm text-neutral-300 whitespace-pre-wrap break-words">
-                    {r.review}
+                    {renderWithMentions(r.review)}
                   </p>
                 )}
               </li>

@@ -379,7 +379,7 @@ function CommentRow({
         </p>
         {c.review && (
           <blockquote className="mt-1.5 border-l-2 border-neutral-700 pl-2 text-xs text-neutral-400 italic break-words whitespace-pre-wrap">
-            Their review: {c.review}
+            Their review: {renderWithMentions(c.review)}
           </blockquote>
         )}
         <button

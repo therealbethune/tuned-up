@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { scoreLabel } from "@/lib/score-labels";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { MentionInput } from "@/components/MentionInput";
 
 export type OwnRating = {
   songId: string;
@@ -158,10 +159,11 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
           )}
         </div>
       </div>
-      <textarea
+      <MentionInput
+        as="textarea"
         value={review}
-        onChange={(e) => setReview(e.target.value)}
-        placeholder="Why this score? (optional)"
+        onChange={setReview}
+        placeholder="Why this score? Use @ to tag friends. (optional)"
         rows={3}
         maxLength={500}
         className="rounded-md bg-neutral-950 border border-neutral-800 p-2 text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 resize-none"

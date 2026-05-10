@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { SongResult } from "@/lib/ytmusic";
 import { scoreLabel } from "@/lib/score-labels";
 import { isAlbumId } from "@/lib/songs";
+import { MentionInput } from "@/components/MentionInput";
 
 type FriendRating = {
   userId: string;
@@ -275,12 +276,13 @@ export function RateButton({
             </div>
           </div>
 
-          {/* Optional review */}
+          {/* Optional review — supports @-mentions */}
           <div>
-            <textarea
+            <MentionInput
+              as="textarea"
               value={review}
-              onChange={(e) => setReview(e.target.value)}
-              placeholder="Why this score? (optional)"
+              onChange={setReview}
+              placeholder="Why this score? Use @ to tag friends. (optional)"
               rows={3}
               maxLength={500}
               className="w-full rounded-md bg-neutral-900 border border-neutral-800 p-3 text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 resize-none"
