@@ -24,12 +24,12 @@ export async function computeStreak(userId: string): Promise<number> {
 
   const rows = await db
     .select({
-      day: sql<string>`to_char(${ratings.createdAt} AT TIME ZONE ${tz}, 'YYYY-MM-DD')`,
+      day: sql<string>`to_char(timezone(${tz}, ${ratings.createdAt}), 'YYYY-MM-DD')`,
     })
     .from(ratings)
     .where(eq(ratings.userId, userId))
-    .groupBy(sql`to_char(${ratings.createdAt} AT TIME ZONE ${tz}, 'YYYY-MM-DD')`)
-    .orderBy(sql`to_char(${ratings.createdAt} AT TIME ZONE ${tz}, 'YYYY-MM-DD') desc`);
+    .groupBy(sql`to_char(timezone(${tz}, ${ratings.createdAt}), 'YYYY-MM-DD')`)
+    .orderBy(sql`to_char(timezone(${tz}, ${ratings.createdAt}), 'YYYY-MM-DD') desc`);
 
   if (rows.length === 0) return 0;
 

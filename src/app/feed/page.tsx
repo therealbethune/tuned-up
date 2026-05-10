@@ -64,6 +64,10 @@ export default async function FeedPage({
           username: users.username,
           displayName: users.displayName,
           imageUrl: users.imageUrl,
+          // Rater's cached streak so we can show a "🔥 N" pill on each
+          // card. Refreshed on every new rating (refreshUserStreak in
+          // /api/ratings) so this stays close to live without recomputing.
+          currentStreak: users.currentStreak,
         })
         .from(ratings)
         .innerJoin(songs, eq(ratings.songId, songs.id))
@@ -206,7 +210,7 @@ export default async function FeedPage({
                 data-target-highlight=""
                 className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 scroll-mt-20"
               >
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
                   {it.imageUrl ? (
                     <Image src={it.imageUrl} alt="" width={28} height={28} loading="lazy" className="rounded-full h-7 w-7" />
                   ) : (
@@ -215,6 +219,14 @@ export default async function FeedPage({
                   <Link href={`/u/${it.username}`} className="text-sm font-medium hover:underline">
                     {it.displayName || it.username}
                   </Link>
+                  {(it.currentStreak ?? 0) >= 3 && (
+                    <span
+                      className="text-[10px] rounded-full px-1.5 py-0.5 bg-orange-500/15 text-orange-300 border border-orange-500/30 tabular-nums leading-none inline-flex items-center gap-0.5"
+                      title={`${it.currentStreak}-day rating streak`}
+                    >
+                      🔥 {it.currentStreak}
+                    </span>
+                  )}
                   <span className="text-xs text-neutral-500">
                     {relativeTime(it.createdAt)}
                   </span>
