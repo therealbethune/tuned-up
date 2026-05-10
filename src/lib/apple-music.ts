@@ -10,33 +10,49 @@ type ITunesResult = {
   collectionViewUrl?: string;
 };
 
+async function searchItunes(params: {
+  title: string;
+  artist: string;
+  kind?: "song" | "album";
+}): Promise<ITunesResult | null> {
+  const term = `${params.title} ${params.artist}`.trim();
+  if (!term) return null;
+  const entity = params.kind === "album" ? "album" : "song";
+  const url = `https://itunes.apple.com/search?media=music&entity=${entity}&limit=1&term=${encodeURIComponent(term)}`;
+  try {
+    const res = await fetch(url, {
+      headers: { "user-agent": "TunedUp/1.0 (https://tuned-up.com)" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data: { results?: ITunesResult[] } = await res.json();
+    return data.results?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveAppleMusicUrl(params: {
   title: string;
   artist: string;
   kind?: "song" | "album";
 }): Promise<string | null> {
-  const term = `${params.title} ${params.artist}`.trim();
-  if (!term) return null;
+  const r = await searchItunes(params);
+  if (!r) return null;
+  const link = params.kind === "album" ? r.collectionViewUrl : r.trackViewUrl;
+  return link ?? null;
+}
 
-  const entity = params.kind === "album" ? "album" : "song";
-  const url = `https://itunes.apple.com/search?media=music&entity=${entity}&limit=1&term=${encodeURIComponent(
-    term,
-  )}`;
-
-  try {
-    const res = await fetch(url, {
-      // iTunes Search has rate limits; be a polite UA.
-      headers: { "user-agent": "TunedUp/1.0 (https://tuned-up.com)" },
-      // 5s should be plenty; abort if iTunes is slow so we don't block ratings.
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const data: { results?: ITunesResult[] } = await res.json();
-    const r = data.results?.[0];
-    if (!r) return null;
-    const link = entity === "album" ? r.collectionViewUrl : r.trackViewUrl;
-    return link ?? null;
-  } catch {
-    return null;
-  }
+// Apple Music catalog ID needed by MusicKit JS to add a song to the user's
+// library. Same iTunes Search call returns `trackId` (the catalog ID) and
+// `collectionId` (album catalog ID).
+export async function resolveAppleMusicTrackId(params: {
+  title: string;
+  artist: string;
+  kind?: "song" | "album";
+}): Promise<string | null> {
+  const r = await searchItunes(params);
+  if (!r) return null;
+  const id = params.kind === "album" ? r.collectionId : r.trackId;
+  return id ? String(id) : null;
 }

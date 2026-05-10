@@ -13,6 +13,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RecommendButton } from "@/components/RecommendButton";
 import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
+import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
 import { ConnectSpotifyBanner } from "@/components/ConnectSpotifyBanner";
 import { SafeCardBoundary } from "@/components/SafeCardBoundary";
 import { isAlbumId, relativeTime } from "@/lib/songs";
@@ -321,9 +322,12 @@ export default async function FeedPage({
                   />
                 </div>
 
-                {!isAlbumId(it.songId) && spotifyConnected && (
-                  <div className="mt-2">
-                    <SaveToSpotifyButton songId={it.songId} connected={spotifyConnected} />
+                {!isAlbumId(it.songId) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {spotifyConnected && (
+                      <SaveToSpotifyButton songId={it.songId} connected={spotifyConnected} />
+                    )}
+                    <SaveToAppleMusicButton songId={it.songId} />
                   </div>
                 )}
 
