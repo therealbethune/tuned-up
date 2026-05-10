@@ -61,7 +61,13 @@ export function SpotifyAccountCard({
                   </a>
                 </div>
               )}
-              <div className="mt-2 flex items-center gap-3">
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <a
+                  href="/import/spotify"
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-semibold px-2.5 py-1 active:scale-95"
+                >
+                  Bulk-rate top tracks →
+                </a>
                 <button
                   onClick={() => setConfirming(true)}
                   disabled={busy}

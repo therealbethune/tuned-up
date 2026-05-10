@@ -16,6 +16,7 @@ import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
 import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { SafeCardBoundary } from "@/components/SafeCardBoundary";
+import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
@@ -171,6 +172,44 @@ export default async function FeedPage({
         .where(and(eq(ratings.userId, userId), inArray(ratings.songId, songIds)))
     : [];
   const myRatingsMap = new Map(myRatingsRows.map((r) => [r.songId, r.score]));
+
+  // For each song in the feed, who else (among the viewer's follows) has
+  // rated it? Surfaces as a small avatar stack under the card — "Sarah,
+  // Alex +2 also rated this". Only show users the viewer follows (incl.
+  // self for completeness, though we hide self in render).
+  type OtherRater = {
+    songId: string;
+    raterId: string;
+    username: string;
+    displayName: string | null;
+    imageUrl: string | null;
+    score: number;
+  };
+  const otherRatersBySong = new Map<string, OtherRater[]>();
+  if (songIds.length && followedIds.length) {
+    const rows = await db
+      .select({
+        songId: ratings.songId,
+        raterId: ratings.userId,
+        username: users.username,
+        displayName: users.displayName,
+        imageUrl: users.imageUrl,
+        score: ratings.score,
+      })
+      .from(ratings)
+      .innerJoin(users, eq(users.id, ratings.userId))
+      .where(
+        and(
+          inArray(ratings.songId, songIds),
+          inArray(ratings.userId, followedIds),
+        ),
+      );
+    for (const r of rows) {
+      const arr = otherRatersBySong.get(r.songId) ?? [];
+      arr.push(r);
+      otherRatersBySong.set(r.songId, arr);
+    }
+  }
 
   // Has the viewer linked their Spotify account? (Used to render the
   // "Save to Spotify" button on each rating card.) Defensive: if the table
@@ -362,6 +401,57 @@ export default async function FeedPage({
                   </p>
                 )}
 
+                {/* "Other friends who rated this" avatar stack — collapsed
+                    to 3 overlapping avatars + +N count. Self-excluded
+                    since the viewer's own rating shows separately above,
+                    and the rating-card's owner is excluded since the
+                    whole card is about them. */}
+                {(() => {
+                  const others = (otherRatersBySong.get(it.songId) ?? []).filter(
+                    (o) => o.raterId !== userId && o.raterId !== it.ratingUserId,
+                  );
+                  if (others.length === 0) return null;
+                  const shown = others.slice(0, 3);
+                  return (
+                    <Link
+                      href={`/album/${encodeBase64Url(it.songId)}`}
+                      className="mt-3 inline-flex items-center gap-2 text-xs text-neutral-400 hover:text-white"
+                      title="See all ratings of this song"
+                    >
+                      <span className="inline-flex -space-x-1.5">
+                        {shown.map((o) =>
+                          o.imageUrl ? (
+                            <Image
+                              key={o.raterId}
+                              src={o.imageUrl}
+                              alt=""
+                              width={22}
+                              height={22}
+                              loading="lazy"
+                              className="h-[22px] w-[22px] rounded-full ring-2 ring-neutral-900 object-cover"
+                            />
+                          ) : (
+                            <span
+                              key={o.raterId}
+                              className="h-[22px] w-[22px] rounded-full bg-neutral-700 ring-2 ring-neutral-900 inline-flex items-center justify-center text-[10px] font-medium text-neutral-300"
+                            >
+                              {(o.displayName || o.username).charAt(0).toUpperCase()}
+                            </span>
+                          ),
+                        )}
+                      </span>
+                      <span className="text-neutral-300">
+                        {shown.length === 1
+                          ? (shown[0].displayName || shown[0].username)
+                          : shown.length === 2
+                            ? `${shown[0].displayName || shown[0].username} + 1`
+                            : `${shown[0].displayName || shown[0].username} + ${others.length - 1}`}
+                        <span className="text-neutral-500"> also rated</span>
+                      </span>
+                    </Link>
+                  );
+                })()}
+
                 {it.ratingUserId !== userId && (
                   <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                     <span className="text-xs text-neutral-500">
@@ -375,7 +465,10 @@ export default async function FeedPage({
                 )}
 
                 <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    {!isAlbumId(it.songId) && (
+                      <AudioPreviewButton songId={it.songId} />
+                    )}
                     <LikeButton
                       ratingUserId={it.ratingUserId}
                       songId={it.songId}

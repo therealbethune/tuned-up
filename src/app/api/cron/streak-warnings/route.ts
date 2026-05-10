@@ -49,6 +49,14 @@ export async function POST(req: Request) {
   // 21:00 hour AND who haven't been warned today. Avoids paying the
   // per-user DB query on the 23/24 fraction of users not in their warning
   // window.
+  // Two warning windows per local day:
+  //   - 21:00 (primary): gentle nudge, "your N-day streak is at risk"
+  //   - 23:00 (urgent):  last-chance, "only an hour left to save your streak"
+  // The lastStreakWarnDate field encodes the highest stage we've reached
+  // today: bare YYYY-MM-DD means primary sent; YYYY-MM-DD:urgent means
+  // urgent also sent. So a user can receive exactly one of each per day,
+  // and never if they already rated.
+  type Stage = "primary" | "urgent";
   type CandidateUser = {
     id: string;
     timezone: string;
@@ -56,6 +64,7 @@ export async function POST(req: Request) {
     todayStr: string;
     dayStartUTC: Date;
     cachedStreak: number;
+    stage: Stage;
   };
   const candidates: CandidateUser[] = [];
 
@@ -73,19 +82,26 @@ export async function POST(req: Request) {
       errors.push(`${u.id}: timezone ${u.timezone} — ${(e as Error).message}`);
       continue;
     }
-    if (localHour !== 21) continue;
-    if (u.lastStreakWarnDate === todayStr) continue;
+    let stage: Stage;
+    if (localHour === 21) stage = "primary";
+    else if (localHour === 23) stage = "urgent";
+    else continue;
+
+    // Has this user already received this stage today?
+    const alreadyPrimary =
+      u.lastStreakWarnDate === todayStr ||
+      u.lastStreakWarnDate === `${todayStr}:urgent`;
+    const alreadyUrgent = u.lastStreakWarnDate === `${todayStr}:urgent`;
+    if (stage === "primary" && alreadyPrimary) continue;
+    if (stage === "urgent" && alreadyUrgent) continue;
     candidates.push({
       id: u.id,
       timezone: u.timezone,
       lastStreakWarnDate: u.lastStreakWarnDate,
       todayStr,
       dayStartUTC,
-      // Use the cached streak instead of recomputing — refreshed on every
-      // rating insert. May be stale by ≤24h but good enough to gate the
-      // "is there a streak to lose?" check; the actual ≥1 threshold is
-      // very forgiving.
       cachedStreak: u.currentStreak ?? 0,
+      stage,
     });
   }
 
@@ -124,15 +140,23 @@ export async function POST(req: Request) {
     if (c.cachedStreak < 1) continue;
 
     try {
+      const isUrgent = c.stage === "urgent";
       await sendPushToUser(c.id, {
-        title: `🔥 Your ${c.cachedStreak}-day streak is at risk`,
-        body: "Rate a song before midnight to keep it going.",
+        title: isUrgent
+          ? `⏰ 1 hour left — save your ${c.cachedStreak}-day streak`
+          : `🔥 Your ${c.cachedStreak}-day streak is at risk`,
+        body: isUrgent
+          ? "Rate one song before midnight or it resets to 0."
+          : "Rate a song before midnight to keep it going.",
         url: "/search",
-        tag: `streak-warning:${c.id}:${c.todayStr}`,
+        tag: `streak-warning:${c.id}:${c.todayStr}:${c.stage}`,
       });
+      // Stamp the highest stage we've sent today. "primary" → todayStr;
+      // "urgent" → `${todayStr}:urgent` so the dedup check above sees it.
+      const stamp = isUrgent ? `${c.todayStr}:urgent` : c.todayStr;
       await db
         .update(users)
-        .set({ lastStreakWarnDate: c.todayStr })
+        .set({ lastStreakWarnDate: stamp })
         .where(eq(users.id, c.id));
       warned++;
     } catch (e) {
