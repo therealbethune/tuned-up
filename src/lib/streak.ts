@@ -1,5 +1,5 @@
 import { db, ratings, users } from "@/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { dateStringInTimezone } from "@/lib/timezone";
 
 // Return the user's current consecutive-day rating streak.
@@ -10,10 +10,14 @@ import { dateStringInTimezone } from "@/lib/timezone";
 // Timezone-aware: uses the user's stored IANA tz so a PST user's 11pm
 // rating is "today", not tomorrow per UTC. Falls back to UTC if no tz set.
 //
-// Performance note: this fetches one row per DISTINCT day (via GROUP BY),
-// not one row per rating. For an active user that's at most ~365 rows/yr —
-// totally fine. An earlier rewrite to a SQL window function tried to be
-// cleverer and broke; this version is the boring-and-correct baseline.
+// Implementation: we do the timezone conversion in JavaScript (via
+// Intl.DateTimeFormat) instead of SQL. Earlier versions used `AT TIME ZONE`
+// or `timezone()` in SQL with the tz value as a bound parameter — both
+// silently broke under Drizzle's neon-http driver (parameter type
+// inference issue with the AT TIME ZONE operator) and returned 0 for
+// every user. Fetching raw timestamps is fine: an active user has at most
+// ~one rating per song per day; even at 5k ratings that's ~40KB of
+// timestamps. Way under serverless budgets.
 export async function computeStreak(userId: string): Promise<number> {
   const [u] = await db
     .select({ tz: users.timezone })
@@ -23,26 +27,41 @@ export async function computeStreak(userId: string): Promise<number> {
   const tz = u?.tz || "UTC";
 
   const rows = await db
-    .select({
-      day: sql<string>`to_char(timezone(${tz}, ${ratings.createdAt}), 'YYYY-MM-DD')`,
-    })
+    .select({ createdAt: ratings.createdAt })
     .from(ratings)
-    .where(eq(ratings.userId, userId))
-    .groupBy(sql`to_char(timezone(${tz}, ${ratings.createdAt}), 'YYYY-MM-DD')`)
-    .orderBy(sql`to_char(timezone(${tz}, ${ratings.createdAt}), 'YYYY-MM-DD') desc`);
+    .where(eq(ratings.userId, userId));
 
   if (rows.length === 0) return 0;
 
-  const days = new Set(rows.map((r) => r.day));
-  const now = new Date();
+  // Bucket into a Set of "YYYY-MM-DD in user's tz" strings.
+  const days = new Set<string>();
+  for (const r of rows) {
+    try {
+      days.add(dateStringInTimezone(r.createdAt as Date, tz));
+    } catch {
+      // Bad / unknown tz — skip just this row rather than failing the whole
+      // compute. The /api/account/timezone route now validates against
+      // Intl.DateTimeFormat so this branch is unreachable for new writes.
+    }
+  }
 
-  // What's "today" in the user's tz?
-  const todayStr = dateStringInTimezone(now, tz);
+  const now = new Date();
+  let todayStr: string;
+  try {
+    todayStr = dateStringInTimezone(now, tz);
+  } catch {
+    todayStr = dateStringInTimezone(now, "UTC");
+  }
+
+  // Cursor is just a tz-agnostic date-counter. We compare via the
+  // YYYY-MM-DD string format; the Date itself only serves as the step.
   const [yy, mm, dd] = todayStr.split("-").map(Number);
   let cursor = new Date(Date.UTC(yy, mm - 1, dd));
   const cursorStr = (d: Date) =>
     `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 
+  // Allow "today" OR "yesterday" as the head of the streak so users
+  // viewing in the morning before they've rated don't see it read 0.
   if (!days.has(cursorStr(cursor))) {
     cursor = new Date(cursor.getTime() - 86400000);
     if (!days.has(cursorStr(cursor))) return 0;
