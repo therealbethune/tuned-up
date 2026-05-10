@@ -6,12 +6,17 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 // Connect / disconnect a Spotify account. Designed to live on /settings.
 // `connected` and `spotifyUserId` are passed in by the server so the first
 // paint already shows the right state (no client-side fetch required).
+// `missingScopes` lists any scopes we now require but the stored token
+// doesn't have — pre-existing connections from before we added new
+// scopes will be in this state and need a one-tap re-link.
 export function SpotifyAccountCard({
   connected,
   spotifyUserId,
+  missingScopes = [],
 }: {
   connected: boolean;
   spotifyUserId: string | null;
+  missingScopes?: string[];
 }) {
   const [busy, setBusy] = useState(false);
   const [localConnected, setLocalConnected] = useState(connected);
@@ -41,13 +46,39 @@ export function SpotifyAccountCard({
               <p className="text-xs text-neutral-400 mt-0.5">
                 Connected{spotifyUserId ? ` as ${spotifyUserId}` : ""}. You can save rated songs straight to your Liked Songs.
               </p>
-              <button
-                onClick={() => setConfirming(true)}
-                disabled={busy}
-                className="mt-2 text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
-              >
-                {busy ? "Disconnecting…" : "Disconnect"}
-              </button>
+              {missingScopes.length > 0 && (
+                <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-200 px-2 py-1.5 space-y-1.5">
+                  <p className="text-[11px]">
+                    New permissions are available
+                    {missingScopes.includes("user-read-currently-playing") && " (Now Playing)"}
+                    . Re-link to enable.
+                  </p>
+                  <a
+                    href="/api/spotify/connect?return=/settings"
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-semibold px-2.5 py-1 active:scale-95"
+                  >
+                    Refresh permissions
+                  </a>
+                </div>
+              )}
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  onClick={() => setConfirming(true)}
+                  disabled={busy}
+                  className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+                >
+                  {busy ? "Disconnecting…" : "Disconnect"}
+                </button>
+                <a
+                  href="/api/spotify/diagnose"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-neutral-500 hover:text-neutral-300"
+                  title="JSON diagnostic of your Spotify connection"
+                >
+                  Diagnose
+                </a>
+              </div>
             </>
           ) : (
             <>

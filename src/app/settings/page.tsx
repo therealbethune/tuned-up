@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db, users, spotifyAccounts } from "@/db";
 import { SettingsForm } from "./SettingsForm";
 import { SpotifyAccountCard } from "@/components/SpotifyAccountCard";
+import { SPOTIFY_LINK_SCOPES } from "@/lib/spotify-server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,19 @@ export default async function SettingsPage({
   const [link] = await db
     .select({
       spotifyUserId: spotifyAccounts.spotifyUserId,
+      scope: spotifyAccounts.scope,
     })
     .from(spotifyAccounts)
     .where(eq(spotifyAccounts.userId, userId));
+
+  // Check whether the user's stored scopes cover every scope we currently
+  // request. If they connected before we added a new scope (now-playing,
+  // for instance), this is false and we surface a "Refresh permissions"
+  // affordance on the Spotify card.
+  const requiredScopes = SPOTIFY_LINK_SCOPES.split(" ");
+  const missingScopes = link
+    ? requiredScopes.filter((s) => !link.scope.split(" ").includes(s))
+    : [];
 
   const sp = await searchParams;
 
@@ -53,6 +64,7 @@ export default async function SettingsPage({
         <SpotifyAccountCard
           connected={Boolean(link)}
           spotifyUserId={link?.spotifyUserId ?? null}
+          missingScopes={missingScopes}
         />
       </div>
     </div>
