@@ -51,7 +51,13 @@ export async function GET(req: Request) {
     redirect_uri: redirectUri,
     scope: SPOTIFY_LINK_SCOPES,
     state,
-    show_dialog: "false",
+    // show_dialog=true forces Spotify to actually show the consent screen
+    // even if the user has previously authorized. Required so that a
+    // re-connect after fixing dev-mode User Management (or after we add
+    // new scopes) actually re-evaluates the authorization grant —
+    // otherwise Spotify silently re-uses the prior grant and the token
+    // stays bound to the old ACL state.
+    show_dialog: "true",
   });
   return NextResponse.redirect(`${AUTH_URL}?${params.toString()}`);
 }
