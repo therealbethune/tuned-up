@@ -1,14 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-
-// Same encoding as /r/[username]/[songId] uses — keeps colons in yt:<id> safe.
-function encodeAlbumIdForUrl(songId: string): string {
-  return Buffer.from(songId, "utf8")
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
+import { encodeBase64Url as encodeAlbumIdForUrl } from "@/lib/encoding";
 import { auth } from "@clerk/nextjs/server";
 import { desc, sql, gte } from "drizzle-orm";
 import { db, ratings, songs } from "@/db";

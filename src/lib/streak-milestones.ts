@@ -2,7 +2,7 @@
 // these thresholds for the first time, we drop a `streak_milestone` activity
 // addressed to each of their followers + push the user a celebratory note.
 
-import { and, eq, gte, ne, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, users, follows, activities } from "@/db";
 import { sendPushToUser } from "@/lib/push";
@@ -158,5 +158,3 @@ export async function getStreakStanding(userId: string): Promise<{
   return { streak, topPercent: Math.max(1, 100 - pct) };
 }
 
-// Re-exported for tests / linting hygiene
-export const _internal = { gte, ne };

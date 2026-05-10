@@ -23,7 +23,17 @@ function verifyState(state: string): { userId: string; returnTo: string } | null
   } catch {
     return null;
   }
-  const returnTo = encReturn ? decodeURIComponent(encReturn) : "/settings";
+  // Defense-in-depth: even though /connect already sanitized this, validate
+  // again on the callback so a tampered cookie / out-of-flow request can't
+  // bounce the user off-site.
+  const decoded = encReturn ? decodeURIComponent(encReturn) : "/settings";
+  const returnTo =
+    decoded.startsWith("/") &&
+    !decoded.startsWith("//") &&
+    !decoded.includes("://") &&
+    decoded.length < 200
+      ? decoded
+      : "/settings";
   return { userId, returnTo };
 }
 

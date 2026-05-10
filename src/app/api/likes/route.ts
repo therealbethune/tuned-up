@@ -51,16 +51,40 @@ export async function POST(req: Request) {
           eq(likes.likerId, userId),
         ),
       );
+    // Drop the corresponding activity row so unlikes don't leave dangling
+    // notifications. Best-effort.
+    if (ratingUserId !== userId) {
+      try {
+        await db
+          .delete(activities)
+          .where(
+            and(
+              eq(activities.userId, ratingUserId),
+              eq(activities.actorId, userId),
+              eq(activities.type, "like"),
+              eq(activities.songId, songId),
+            ),
+          );
+      } catch {
+        /* swallow */
+      }
+    }
     liked = false;
   } else {
-    await db
+    // Use the unique constraint as the single source of truth: if a parallel
+    // request beat us to it, onConflictDoNothing returns 0 affected rows and
+    // we skip the side-effects (no double activity, no double push).
+    const inserted = await db
       .insert(likes)
       .values({ ratingUserId, songId, likerId: userId })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ likerId: likes.likerId });
+    const wasFirstInsert = inserted.length > 0;
     liked = true;
 
-    // Activity for the rating owner — skip self-likes.
-    if (ratingUserId !== userId) {
+    // Activity for the rating owner — skip self-likes and skip if this was
+    // a duplicate insert (race lost).
+    if (ratingUserId !== userId && wasFirstInsert) {
       // Dedup any prior 'like' activity from this actor on this rating, so
       // unlike→relike doesn't pile up entries.
       await db

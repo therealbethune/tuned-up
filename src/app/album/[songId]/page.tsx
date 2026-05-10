@@ -15,10 +15,10 @@ export const dynamic = "force-dynamic";
 // rating count, distribution histogram, and the latest reviews.
 //
 // URL: /album/<base64-songId>  (encoding lets us route ids like "yt:abc:def")
+import { decodeBase64Url } from "@/lib/encoding";
 function decodeSongId(s: string): string {
   try {
-    const padded = s.replace(/-/g, "+").replace(/_/g, "/");
-    return Buffer.from(padded, "base64").toString("utf8");
+    return decodeBase64Url(s);
   } catch {
     return decodeURIComponent(s);
   }

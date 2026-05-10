@@ -55,6 +55,9 @@ export default function SearchPage() {
     const t = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(term)}&kind=${kind}`);
+        // Bail before parsing JSON if a newer request has fired — saves
+        // wasted parse cost and prevents stale results clobbering newer ones.
+        if (id !== reqId.current) return;
         const data = await res.json();
         if (id !== reqId.current) return;
         if (!res.ok) throw new Error(data.error || "search failed");

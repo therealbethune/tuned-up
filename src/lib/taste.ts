@@ -1,5 +1,5 @@
 import { db, ratings } from "@/db";
-import { sql, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 // Compute how closely two users agree on the songs they've both rated.
@@ -26,6 +26,3 @@ export async function computeTasteAgreement(
   if (!row || row.shared < minShared) return null;
   return { shared: Number(row.shared), agreement: Number(row.agreement) };
 }
-
-// Convenience-test the alias import isn't unused if drizzle-kit shakes:
-void eq;

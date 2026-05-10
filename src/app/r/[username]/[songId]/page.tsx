@@ -16,23 +16,17 @@ export const dynamic = "force-dynamic";
 // URL: /r/<username>/<songId-base64>  (we store songId base64-encoded so
 // the `:` in `yt:<videoId>` doesn't break URL routing.)
 
+// Re-exports kept so other pages that imported these names still work.
+import { encodeBase64Url, decodeBase64Url } from "@/lib/encoding";
 function decodeSongId(s: string): string {
-  // Allow either url-safe base64 or the literal id with %3A (colon).
+  // Tolerant: either url-safe base64 or the literal id with %3A (colon).
   try {
-    const padded = s.replace(/-/g, "+").replace(/_/g, "/");
-    return Buffer.from(padded, "base64").toString("utf8");
+    return decodeBase64Url(s);
   } catch {
     return decodeURIComponent(s);
   }
 }
-
-export function encodeSongIdForUrl(songId: string): string {
-  return Buffer.from(songId, "utf8")
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
+export const encodeSongIdForUrl = encodeBase64Url;
 
 async function loadRating(username: string, encodedSongId: string) {
   const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);

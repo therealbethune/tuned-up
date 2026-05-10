@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { encodeBase64Url } from "@/lib/encoding";
 import { db, activities, users, songs } from "@/db";
 import { relativeTime } from "@/lib/songs";
 import { FollowRequestActions } from "./FollowRequestActions";
@@ -43,8 +44,7 @@ function destinationFor(a: ActivityRow): string {
     case "rec_rated":
       // Jump to the shared rating page if we have a song.
       if (a.songId) {
-        const enc = Buffer.from(a.songId).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-        return `/r/${a.actorUsername}/${enc}`;
+        return `/r/${a.actorUsername}/${encodeBase64Url(a.songId)}`;
       }
       return `/u/${a.actorUsername}`;
     case "streak_milestone":

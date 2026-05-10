@@ -1,5 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { sql as drizzleSql, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 
 export type SyncedUser = {
@@ -53,8 +53,4 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
     .limit(1);
 
   return row ?? null;
-}
-
-export async function ensureUser(userId: string) {
-  await db.execute(drizzleSql`SELECT 1 FROM users WHERE id = ${userId} LIMIT 1`);
 }

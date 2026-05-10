@@ -1,13 +1,6 @@
 "use client";
 import { useState } from "react";
-
-function encodeSongIdForUrl(songId: string): string {
-  // Browser-safe url-safe base64.
-  return btoa(unescape(encodeURIComponent(songId)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
+import { encodeBase64Url as encodeSongIdForUrl } from "@/lib/encoding";
 
 export function ShareButton({
   username,

@@ -29,10 +29,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "use a follower's username, not your own" }, { status: 400 });
     }
     if (action === "accept") {
-      await db
+      // Only update if a pending request actually exists from this user.
+      // RETURNING tells us whether anything was affected; if not, we DON'T
+      // forge a "follow" activity out of thin air.
+      const updated = await db
         .update(follows)
         .set({ status: "accepted" })
-        .where(and(eq(follows.followerId, target.id), eq(follows.followeeId, userId), eq(follows.status, "pending")));
+        .where(and(eq(follows.followerId, target.id), eq(follows.followeeId, userId), eq(follows.status, "pending")))
+        .returning({ followerId: follows.followerId });
+      if (updated.length === 0) {
+        return NextResponse.json({ error: "no pending request from this user" }, { status: 404 });
+      }
       // Convert the request activity into a regular follow notification.
       await db
         .delete(activities)

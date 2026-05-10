@@ -13,7 +13,12 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { songId, score, review } = (await req.json().catch(() => ({}))) ?? {};
-  if (!songId) return NextResponse.json({ error: "songId required" }, { status: 400 });
+  if (!songId || typeof songId !== "string" || songId.length > 256) {
+    return NextResponse.json({ error: "invalid songId" }, { status: 400 });
+  }
+  if (review != null && (typeof review !== "string" || review.length > 5000)) {
+    return NextResponse.json({ error: "review too long" }, { status: 400 });
+  }
   const s = Number(score);
   if (!Number.isFinite(s) || s < 1 || s > 100) {
     return NextResponse.json({ error: "score must be 1-100" }, { status: 400 });

@@ -29,7 +29,17 @@ export async function GET(req: Request) {
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || "";
 
   const url = new URL(req.url);
-  const returnTo = url.searchParams.get("return") || "/settings";
+  // Strict allowlist on returnTo so a malicious link can't bounce the user
+  // off-site after auth. Must be a relative path starting with "/" and not
+  // contain "://" (protocol) or "//" (protocol-relative URL).
+  const rawReturn = url.searchParams.get("return") || "/settings";
+  const returnTo =
+    rawReturn.startsWith("/") &&
+    !rawReturn.startsWith("//") &&
+    !rawReturn.includes("://") &&
+    rawReturn.length < 200
+      ? rawReturn
+      : "/settings";
   const redirectUri = `${url.origin}/api/spotify/callback`;
 
   // Stash the return-to path inside the state so the callback can use it.

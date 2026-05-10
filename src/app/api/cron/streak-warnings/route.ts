@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { db, users, ratings } from "@/db";
-import { computeStreak } from "@/lib/streak";
 import { sendPushToUser } from "@/lib/push";
 import { dateStringInTimezone, hourInTimezone, startOfDayUTC } from "@/lib/timezone";
 
@@ -37,6 +36,7 @@ export async function POST(req: Request) {
       id: users.id,
       timezone: users.timezone,
       lastStreakWarnDate: users.lastStreakWarnDate,
+      currentStreak: users.currentStreak,
     })
     .from(users)
     .where(and(isNotNull(users.timezone), isNotNull(users.onboardedAt)));
@@ -45,10 +45,23 @@ export async function POST(req: Request) {
   let warned = 0;
   const errors: string[] = [];
 
+  // First pass: filter to users whose local clock is currently in the
+  // 21:00 hour AND who haven't been warned today. Avoids paying the
+  // per-user DB query on the 23/24 fraction of users not in their warning
+  // window.
+  type CandidateUser = {
+    id: string;
+    timezone: string;
+    lastStreakWarnDate: string | null;
+    todayStr: string;
+    dayStartUTC: Date;
+    cachedStreak: number;
+  };
+  const candidates: CandidateUser[] = [];
+
   for (const u of cohort) {
     if (!u.timezone) continue;
     evaluated++;
-
     let localHour: number;
     let todayStr: string;
     let dayStartUTC: Date;
@@ -60,39 +73,70 @@ export async function POST(req: Request) {
       errors.push(`${u.id}: timezone ${u.timezone} — ${(e as Error).message}`);
       continue;
     }
-
-    // Only warn during the 21:00–21:59 hour in their local time.
     if (localHour !== 21) continue;
-
-    // Already warned today.
     if (u.lastStreakWarnDate === todayStr) continue;
+    candidates.push({
+      id: u.id,
+      timezone: u.timezone,
+      lastStreakWarnDate: u.lastStreakWarnDate,
+      todayStr,
+      dayStartUTC,
+      // Use the cached streak instead of recomputing — refreshed on every
+      // rating insert. May be stale by ≤24h but good enough to gate the
+      // "is there a streak to lose?" check; the actual ≥1 threshold is
+      // very forgiving.
+      cachedStreak: u.currentStreak ?? 0,
+    });
+  }
 
-    // Have they rated at all today (in their tz)?
-    const [existing] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(ratings)
-      .where(and(eq(ratings.userId, u.id), gte(ratings.createdAt, dayStartUTC)));
-    const ratedToday = (existing?.count ?? 0) > 0;
-    if (ratedToday) continue;
+  if (candidates.length === 0) {
+    return NextResponse.json({ ok: true, evaluated, warned: 0, errors, at: now.toISOString() });
+  }
 
-    // Compute streak — skip if they don't have one to lose.
-    const streak = await computeStreak(u.id);
-    if (streak < 1) continue;
+  // Batch: fetch "did each candidate rate since the earliest dayStartUTC"
+  // in one query. We over-include users whose dayStart is later, then
+  // filter per-user with the correct cutoff in JS. Cheap.
+  const earliestDayStart = candidates.reduce(
+    (acc, c) => (c.dayStartUTC < acc ? c.dayStartUTC : acc),
+    candidates[0].dayStartUTC,
+  );
+  const recentRatings = await db
+    .select({
+      userId: ratings.userId,
+      createdAt: ratings.createdAt,
+    })
+    .from(ratings)
+    .where(
+      and(
+        inArray(ratings.userId, candidates.map((c) => c.id)),
+        gte(ratings.createdAt, earliestDayStart),
+      ),
+    );
+  const ratedTodayBy = new Set<string>();
+  for (const r of recentRatings) {
+    const c = candidates.find((x) => x.id === r.userId);
+    if (c && r.createdAt >= c.dayStartUTC) ratedTodayBy.add(r.userId);
+  }
+
+  for (const c of candidates) {
+    if (ratedTodayBy.has(c.id)) continue;
+    // Skip if cached streak is already 0 — nothing to lose.
+    if (c.cachedStreak < 1) continue;
 
     try {
-      await sendPushToUser(u.id, {
-        title: `🔥 Your ${streak}-day streak is at risk`,
+      await sendPushToUser(c.id, {
+        title: `🔥 Your ${c.cachedStreak}-day streak is at risk`,
         body: "Rate a song before midnight to keep it going.",
         url: "/search",
-        tag: `streak-warning:${u.id}:${todayStr}`,
+        tag: `streak-warning:${c.id}:${c.todayStr}`,
       });
       await db
         .update(users)
-        .set({ lastStreakWarnDate: todayStr })
-        .where(eq(users.id, u.id));
+        .set({ lastStreakWarnDate: c.todayStr })
+        .where(eq(users.id, c.id));
       warned++;
     } catch (e) {
-      errors.push(`${u.id}: push failed — ${(e as Error).message}`);
+      errors.push(`${c.id}: push failed — ${(e as Error).message}`);
     }
   }
 

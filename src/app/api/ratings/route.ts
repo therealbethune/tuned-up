@@ -12,6 +12,7 @@ import {
   maybeAnnounceStreakMilestone,
   refreshUserStreak,
 } from "@/lib/streak-milestones";
+import { encodeBase64Url } from "@/lib/encoding";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,20 @@ export async function POST(req: Request) {
   const { song, score, review } = body ?? {};
   if (!song?.id || !song.title || !song.artist) {
     return NextResponse.json({ error: "invalid song" }, { status: 400 });
+  }
+  // Length-bound the user-supplied song metadata so a hostile client can't
+  // stuff the songs row with megabyte-sized strings.
+  if (
+    typeof song.id !== "string" || song.id.length > 256 ||
+    typeof song.title !== "string" || song.title.length > 500 ||
+    typeof song.artist !== "string" || song.artist.length > 500 ||
+    (song.album != null && (typeof song.album !== "string" || song.album.length > 500)) ||
+    (song.thumbnail != null && (typeof song.thumbnail !== "string" || song.thumbnail.length > 1024))
+  ) {
+    return NextResponse.json({ error: "song metadata too large" }, { status: 400 });
+  }
+  if (review != null && (typeof review !== "string" || review.length > 5000)) {
+    return NextResponse.json({ error: "review too long" }, { status: 400 });
   }
   const s = Number(score);
   if (!Number.isFinite(s) || s < 1 || s > 100) {
@@ -183,7 +198,7 @@ export async function POST(req: Request) {
           await sendPushToUser(r.fromUserId, {
             title: `🎯 ${myName} rated your rec`,
             body: `${song.title} — ${finalScore}/100`,
-            url: `/r/${encodeURIComponent(me?.username || "")}/${Buffer.from(song.id).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`,
+            url: `/r/${encodeURIComponent(me?.username || "")}/${encodeBase64Url(song.id)}`,
             tag: `rec_rated:${r.id}`,
           });
         }),

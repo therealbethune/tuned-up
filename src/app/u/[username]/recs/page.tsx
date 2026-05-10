@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { db, users, recommendations, songs, ratings } from "@/db";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { encodeSongIdForUrl } from "@/app/r/[username]/[songId]/page";
@@ -69,12 +69,16 @@ export default async function RecHistoryPage({
   type RatingMap = Map<string, { score: number; raterId: string }>;
   const ratingsMap: RatingMap = new Map();
   if (ratedSongIds.length) {
+    // Scope to the actual rec songs, not every rating either user has ever
+    // made — without this, a user with 5k ratings made the page fetch 10k
+    // rows just to find ~50.
     const rs = await db
       .select({ userId: ratings.userId, songId: ratings.songId, score: ratings.score })
       .from(ratings)
       .where(
         and(
           or(eq(ratings.userId, userId), eq(ratings.userId, other.id)),
+          inArray(ratings.songId, ratedSongIds),
         ),
       );
     for (const r of rs) {

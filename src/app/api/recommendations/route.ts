@@ -64,6 +64,15 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+    // Length-bound the user-supplied song metadata.
+    if (
+      typeof toUsername !== "string" || toUsername.length > 64 ||
+      typeof song.id !== "string" || song.id.length > 256 ||
+      typeof song.title !== "string" || song.title.length > 500 ||
+      typeof song.artist !== "string" || song.artist.length > 500
+    ) {
+      return NextResponse.json({ error: "fields too long" }, { status: 400 });
+    }
 
     const [target] = await db.select().from(users).where(eq(users.username, toUsername)).limit(1);
     if (!target) return NextResponse.json({ error: "user not found" }, { status: 404 });

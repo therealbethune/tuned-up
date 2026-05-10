@@ -13,8 +13,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") ?? "").trim();
   if (q.length < 2) return NextResponse.json({ results: [] });
+  if (q.length > 64) return NextResponse.json({ results: [] });
 
-  const pattern = `%${q}%`;
+  // Escape LIKE wildcards so a user typing "ab_c" doesn't match "abXc"
+  // (where X is any char). Backslash is the default escape in Postgres.
+  const safe = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const pattern = `%${safe}%`;
 
   const rows = await db
     .select({
