@@ -55,9 +55,14 @@ export async function POST(req: Request) {
     await saveTrackToLibrary(userId, trackId);
     return NextResponse.json({ ok: true, spotifyTrackId: trackId });
   } catch (e) {
+    const err = e as Error & { code?: string; status?: number };
     return NextResponse.json(
-      { error: (e as Error).message || "save_failed" },
-      { status: 502 },
+      {
+        error: err.code || "save_failed",
+        message: err.message,
+        spotifyStatus: err.status ?? null,
+      },
+      { status: err.status === 401 || err.status === 403 ? err.status : 502 },
     );
   }
 }

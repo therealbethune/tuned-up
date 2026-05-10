@@ -159,23 +159,61 @@ export async function fetchSpotifyMe(accessToken: string): Promise<{ id: string;
 
 // --- Track resolution (app-level, no user token needed) --------------------
 
+// Strip cruft that hurts search recall: parenthetical "(feat. X)" / "(Remix)",
+// trailing " - <suffix>", and noisy punctuation. Keep it conservative — we
+// only run it on the search query, not the stored title.
+function cleanForSearch(s: string): string {
+  return s
+    .replace(/\s*[\(\[][^)\]]*[\)\]]/g, " ") // remove "(...)" / "[...]"
+    .replace(/\s*[-–—]\s.*$/, "") // drop "- Single Version" etc.
+    .replace(/[^\w\s'&,.-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// First artist only — Spotify's structured query barfs on " & " / "," / "feat".
+function primaryArtist(s: string): string {
+  return cleanForSearch(s)
+    .split(/\s*(?:,|&|\bfeat\.?\b|\bft\.?\b|\bx\b|\bvs\.?\b)\s*/i)[0]
+    .trim();
+}
+
+async function spotifySearch(token: string, query: string): Promise<string | null> {
+  const res = await fetch(
+    `${API}/search?type=track&limit=5&q=${encodeURIComponent(query)}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) return null;
+  const j: { tracks?: { items?: { id: string }[] } } = await res.json();
+  return j.tracks?.items?.[0]?.id ?? null;
+}
+
 // Search Spotify for a track matching the given title + artist; return the
 // bare track id ("4cOdK2wGLETKBW3PvgPWqT") or null if nothing matches.
+// Tries progressively looser queries so featured-artist tracks still resolve.
 export async function resolveSpotifyTrackId(
   title: string,
   artist: string,
 ): Promise<string | null> {
   if (!spotifyServerConfigured()) return null;
   const token = await getAppAccessToken();
-  // "track:X artist:Y" gives much better precision than a free-text query.
-  const q = `track:${title} artist:${artist}`;
-  const res = await fetch(
-    `${API}/search?type=track&limit=1&q=${encodeURIComponent(q)}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!res.ok) return null;
-  const j: { tracks?: { items?: { id: string }[] } } = await res.json();
-  return j.tracks?.items?.[0]?.id ?? null;
+  const cleanTitle = cleanForSearch(title);
+  const cleanArtist = cleanForSearch(artist);
+  const firstArtist = primaryArtist(artist);
+
+  const queries = [
+    `track:${cleanTitle} artist:${firstArtist}`,
+    `${cleanTitle} ${firstArtist}`,
+    `${cleanTitle} ${cleanArtist}`,
+    cleanTitle, // last-ditch
+  ];
+
+  for (const q of queries) {
+    if (!q) continue;
+    const hit = await spotifySearch(token, q);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 // Cache the resolved Spotify track id on the songs row so we don't hit the
@@ -208,12 +246,28 @@ export async function ensureSpotifyTrackIdCached(
 
 export async function saveTrackToLibrary(userId: string, spotifyTrackId: string): Promise<void> {
   const token = await getUserAccessToken(userId);
-  if (!token) throw new Error("Spotify account not linked");
+  if (!token) {
+    const e = new Error("not_linked");
+    (e as Error & { code?: string }).code = "not_linked";
+    throw e;
+  }
   const res = await fetch(`${API}/me/tracks?ids=${encodeURIComponent(spotifyTrackId)}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(`Save failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    const err = new Error(`Spotify ${res.status}: ${body.slice(0, 140)}`) as Error & {
+      code?: string;
+      status?: number;
+    };
+    err.status = res.status;
+    if (res.status === 401) err.code = "token_expired";
+    else if (res.status === 403) err.code = "missing_scope";
+    else if (res.status === 429) err.code = "rate_limited";
+    else err.code = "spotify_error";
+    throw err;
+  }
 }
 
 // Returns whether the user already has each given track id saved. Useful for

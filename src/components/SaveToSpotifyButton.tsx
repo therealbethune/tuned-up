@@ -44,15 +44,17 @@ export function SaveToSpotifyButton({
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
         setState("error");
-        setErrorMsg(
-          j.error === "no_match_on_spotify"
-            ? "Not on Spotify"
-            : j.error === "spotify_not_linked"
-              ? "Not linked"
-              : "Couldn't save",
-        );
+        const errMap: Record<string, string> = {
+          no_match_on_spotify: "Not on Spotify",
+          spotify_not_linked: "Reconnect Spotify",
+          not_linked: "Reconnect Spotify",
+          token_expired: "Reconnect Spotify",
+          missing_scope: "Reconnect Spotify",
+          rate_limited: "Try again later",
+        };
+        setErrorMsg(errMap[j.error] || j.error || "Couldn't save");
         // Auto-reset so they can retry.
-        setTimeout(() => setState("idle"), 2000);
+        setTimeout(() => setState("idle"), 2500);
         return;
       }
       setState("saved");
