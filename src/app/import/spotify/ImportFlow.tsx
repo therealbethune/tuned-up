@@ -48,12 +48,14 @@ export function ImportFlow({ configured }: { configured: boolean }) {
         .catch((e) => setError(e.message));
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setToken(getStoredToken());
   }, []);
 
   // Whenever we have a token (or change time range), fetch top tracks.
   useEffect(() => {
     if (!token) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     fetchTopTracks(token, range, 50)

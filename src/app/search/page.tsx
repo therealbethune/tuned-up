@@ -39,17 +39,22 @@ export default function SearchPage() {
   const reqId = useRef(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecents(loadRecents());
   }, []);
 
+  // Reset stale results during render when the query is too short to fetch.
+  // See https://react.dev/learn/you-might-not-need-an-effect
+  const term = q.trim();
+  if (term.length < 2 && (results.length > 0 || loading || error != null)) {
+    setResults([]);
+    setLoading(false);
+    setError(null);
+  }
+
   useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) {
-      setResults([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+    if (term.length < 2) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const id = ++reqId.current;
     const t = setTimeout(async () => {
@@ -76,7 +81,7 @@ export default function SearchPage() {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [q, kind]);
+  }, [term, kind]);
 
   const top = results[0];
   const rest = results.slice(1);

@@ -27,12 +27,17 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
   const [searching, setSearching] = useState(false);
   const reqId = useRef(0);
 
+  // Reset stale results during render when the query is too short to fetch.
+  // See https://react.dev/learn/you-might-not-need-an-effect
+  const term = q.trim();
+  if (term.length < 2 && (results.length > 0 || searching)) {
+    setResults([]);
+    setSearching(false);
+  }
+
   useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) {
-      setResults([]);
-      return;
-    }
+    if (term.length < 2) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearching(true);
     const id = ++reqId.current;
     const t = setTimeout(async () => {
@@ -46,7 +51,7 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [term]);
 
   // Track when a rating is saved by listening for window events from RateButton.
   // RateButton calls router.refresh() after save — which is fine; we also

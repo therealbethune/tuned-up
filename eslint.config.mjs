@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local dev-only patcher script that rewrites source for offline runs.
+    "patch.js",
   ]),
 ]);
 

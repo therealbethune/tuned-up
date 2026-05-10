@@ -7,7 +7,11 @@ export function ThemeToggle() {
   const [mode, setMode] = useState<Mode>("dark");
   const [mounted, setMounted] = useState(false);
 
+  // SSR can't read documentElement; defer the read to mount and accept the
+  // post-hydration setState. The icon-flip is gated on `mounted` so the
+  // server and first client render still agree.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     setMode(document.documentElement.classList.contains("dark") ? "dark" : "light");
   }, []);

@@ -1,6 +1,6 @@
 /* Tuned Up service worker — handles incoming web pushes and click-throughs. */
 
-self.addEventListener("install", (event) => {
+self.addEventListener("install", () => {
   // Activate immediately on install.
   self.skipWaiting();
 });

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
 import { db, spotifyAccounts } from "@/db";
 import { exchangeCodeForUserTokens, fetchSpotifyMe } from "@/lib/spotify-server";
 

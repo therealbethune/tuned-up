@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db, songs, ratings, users } from "@/db";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";

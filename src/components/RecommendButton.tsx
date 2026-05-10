@@ -21,15 +21,18 @@ export function RecommendButton({ song }: { song: SongResult }) {
   const [done, setDone] = useState(false);
   const reqId = useRef(0);
 
+  // Reset stale results during render when the query is too short to fetch.
+  // See https://react.dev/learn/you-might-not-need-an-effect
+  const term = q.trim();
+  if (open && !picked && term.length < 2 && results.length > 0) {
+    setResults([]);
+  }
+
   // Debounced user search with AbortController so unmount + rapid retypes
   // don't dump stale data into state or warn about setState-on-unmounted.
   useEffect(() => {
     if (!open || picked) return;
-    const term = q.trim();
-    if (term.length < 2) {
-      setResults([]);
-      return;
-    }
+    if (term.length < 2) return;
     const id = ++reqId.current;
     const ctrl = new AbortController();
     const t = setTimeout(async () => {
@@ -52,7 +55,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [q, open, picked]);
+  }, [term, open, picked]);
 
   function reset() {
     setQ("");

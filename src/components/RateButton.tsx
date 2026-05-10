@@ -36,14 +36,13 @@ export function RateButton({
   const numberRef = useRef<HTMLInputElement | null>(null);
 
   // Animate in. We mount with open=true and translate-y-full, then flip to
-  // translate-y-0 on the next frame to trigger the CSS transition.
+  // translate-y-0 on the next frame to trigger the CSS transition. The
+  // open=false case is handled by close(), which sets show=false before the
+  // unmount delay.
   useEffect(() => {
-    if (open) {
-      const id = requestAnimationFrame(() => setShow(true));
-      return () => cancelAnimationFrame(id);
-    } else {
-      setShow(false);
-    }
+    if (!open) return;
+    const id = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(id);
   }, [open]);
 
   // Load friend ratings + my own when opening so the sheet has rich context.

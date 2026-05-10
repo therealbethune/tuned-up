@@ -23,7 +23,6 @@ export function SuggestedFriends({ initial }: { initial?: Suggestion[] }) {
   useEffect(() => {
     if (initial != null) return;
     let cancelled = false;
-    setLoading(true);
     fetch("/api/users/suggestions?limit=20")
       .then((r) => r.json())
       .then((data) => {

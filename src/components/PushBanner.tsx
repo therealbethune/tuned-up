@@ -53,6 +53,7 @@ export function PushBanner() {
     }
     // iOS-not-PWA path: we can still show the banner with a different CTA.
     if (isIosBrowserNotPWA()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIosHint(true);
       setShouldShow(true);
       return;

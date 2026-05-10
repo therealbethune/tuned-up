@@ -18,13 +18,18 @@ export default function PeoplePage() {
   const [loading, setLoading] = useState(false);
   const reqId = useRef(0);
 
+  // Reset stale results during render when the query is too short to fetch.
+  // (Cheaper than an effect and avoids the set-state-in-effect rule; see
+  // https://react.dev/learn/you-might-not-need-an-effect)
+  const term = q.trim();
+  if (term.length < 2 && (results.length > 0 || loading)) {
+    setResults([]);
+    setLoading(false);
+  }
+
   useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
+    if (term.length < 2) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const id = ++reqId.current;
     const t = setTimeout(async () => {
@@ -38,7 +43,7 @@ export default function PeoplePage() {
       }
     }, 200);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [term]);
 
   return (
     <div className="space-y-6">
