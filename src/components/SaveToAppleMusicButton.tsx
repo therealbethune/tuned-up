@@ -1,35 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { AppleMusicIcon } from "@/components/icons";
+import type { MusicKitInstance } from "@/lib/musickit-types";
+import "@/lib/musickit-types";
 
 const ERROR_AUTO_RESET_MS = 2500;
 const MUSICKIT_JS_URL = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
-
-// Minimal MusicKit JS types — we only touch a tiny slice.
-type MusicKitAPI = {
-  configure: (opts: {
-    developerToken: string;
-    app: { name: string; build: string };
-  }) => Promise<void>;
-  getInstance: () => MusicKitInstance;
-};
-type MusicKitInstance = {
-  isAuthorized: boolean;
-  authorize: () => Promise<string>;
-  api: {
-    music: (
-      path: string,
-      params?: Record<string, unknown> | undefined,
-      options?: { fetchOptions?: { method?: string; body?: unknown } },
-    ) => Promise<unknown>;
-  };
-};
-
-declare global {
-  interface Window {
-    MusicKit?: MusicKitAPI;
-  }
-}
 
 // One-time loader for MusicKit JS + token fetch + configure. Returns the
 // configured instance. Subsequent calls reuse the same instance.

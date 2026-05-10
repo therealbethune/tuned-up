@@ -5,7 +5,7 @@ import { and, eq, count } from "drizzle-orm";
 import { db, users, recommendations, spotifyAccounts } from "@/db";
 import UserProfile from "../u/[username]/UserProfile";
 import { PushBanner } from "@/components/PushBanner";
-import { ConnectSpotifyBanner } from "@/components/ConnectSpotifyBanner";
+import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { ProfileSpotifyPanel } from "@/components/ProfileSpotifyPanel";
 import { safeQuery } from "@/lib/safe-query";
 
@@ -40,7 +40,7 @@ export default async function MePage() {
   return (
     <div className="space-y-4">
       <PushBanner />
-      <ConnectSpotifyBanner connected={spotifyConnected} />
+      <ConnectMusicBanner spotifyConnected={spotifyConnected} />
       <div className="flex justify-end gap-4 text-sm">
         <Link
           href="/recommendations"

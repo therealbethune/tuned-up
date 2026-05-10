@@ -14,7 +14,7 @@ import { StreamingLinks } from "@/components/StreamingLinks";
 import { RecommendButton } from "@/components/RecommendButton";
 import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
-import { ConnectSpotifyBanner } from "@/components/ConnectSpotifyBanner";
+import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { SafeCardBoundary } from "@/components/SafeCardBoundary";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
@@ -178,7 +178,7 @@ export default async function FeedPage({
         <Link href="/search" className="text-sm text-neutral-400 hover:text-white">+ Rate a song</Link>
       </div>
 
-      <ConnectSpotifyBanner connected={spotifyConnected} />
+      <ConnectMusicBanner spotifyConnected={spotifyConnected} />
 
       {items.length === 0 ? (
         <EmptyFeed userId={userId} followedIds={followedIds} />
