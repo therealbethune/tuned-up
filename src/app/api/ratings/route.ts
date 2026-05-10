@@ -168,10 +168,10 @@ export async function POST(req: Request) {
               await sendPushToUser(u.id, {
                 title: `${authorName} mentioned you in a rating`,
                 body: `${song.title} — ${finalScore}/100${preview ? `: ${preview}` : ""}`,
-                // Mentioned user might not follow the author; link to the
-                // standalone rating page where the review (with the @) is
-                // guaranteed to render.
-                url: `/r/${encodeURIComponent(author?.username ?? "")}/${encodeBase64Url(song.id)}`,
+                // Feed focus URL forces the rating's card to render even
+                // if the mentioned user doesn't follow the author — the
+                // notification + activity destinations both land here.
+                url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
                 tag: `mention-rating:${userId}:${song.id}:${u.id}`,
               });
             }),
@@ -267,7 +267,8 @@ export async function POST(req: Request) {
           await sendPushToUser(r.fromUserId, {
             title: `🎯 ${myName} rated your rec`,
             body: `${song.title} — ${finalScore}/100`,
-            url: `/r/${encodeURIComponent(me?.username || "")}/${encodeBase64Url(song.id)}`,
+            // Focus-param URL — recipient may not follow the rater.
+            url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
             tag: `rec_rated:${r.id}`,
           });
         }),

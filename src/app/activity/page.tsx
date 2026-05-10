@@ -26,23 +26,36 @@ type ActivityRow = {
   // Set on comment/like/mention/reply/rating_match/rec_rated rows; null
   // for follow/recommendation/streak_milestone or pre-migration rows.
   ratingOwnerUsername: string | null;
+  // userId of the rating owner — used to build the `/feed?focus=<userId>:<songId>`
+  // anchor URL.
+  ratingOwnerId: string | null;
 };
 
-// Pick the most useful destination per activity type. For actions on the
-// viewer's OWN rating (comment / like) we deep-link straight to that
-// rating's card on the feed via a hash anchor — the rating is guaranteed
-// to be there because the feed includes self. For actions on someone
-// else's rating (mention / reply / rec_rated / rating_match) we use the
-// standalone /r/<owner>/<songId> page, since that rating may not appear
-// on the viewer's feed at all.
+// Every actionable activity type routes to the FEED with a focus-anchor
+// so the user lands on the rating's card with all the normal context
+// (comments expanded, likes tap-to-see, save buttons, etc).
+//
+// /feed?focus=<ratingUserId>:<songId>#rating-<ratingUserId>-<encodedSongId>
+//
+// The `focus` query param forces the feed page to include the specific
+// rating even if the viewer doesn't follow the rating owner — so this
+// works for mention/reply/rec_rated/rating_match where the rating is
+// on someone else's profile, not necessarily anyone the viewer follows.
+//
+// The trailing hash drives the browser scroll + CSS :target glow.
 function destinationFor(
   a: ActivityRow,
   viewerId: string,
 ): string {
-  const feedAnchor = (userId: string, songId: string) =>
-    `/feed#rating-${userId}-${encodeBase64Url(songId)}`;
-  const standaloneRating = (username: string, songId: string) =>
-    `/r/${username}/${encodeBase64Url(songId)}`;
+  function feedFocus(ratingUserId: string, songId: string): string {
+    const enc = encodeBase64Url(songId);
+    return `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${enc}`;
+  }
+
+  // For comment/like/mention/reply: the rating belongs to ratingOwnerId
+  // (joined in via activities.ratingUserId). Falls back gracefully if
+  // ratingOwnerId is null (pre-migration rows).
+  const ratingOwnerId = a.ratingOwnerId;
 
   switch (a.type) {
     case "recommendation":
@@ -52,28 +65,21 @@ function destinationFor(
       return `/u/${a.actorUsername}`;
     case "comment":
     case "like":
-      // Recipient owns the rating — anchor straight to the viewer's
-      // feed card so the comment thread is in their normal context.
-      if (a.songId) return feedAnchor(viewerId, a.songId);
+      // Recipient = rating owner = viewer. The rating is on their feed.
+      if (a.songId) return feedFocus(viewerId, a.songId);
       return `/u/${a.actorUsername}`;
     case "mention":
     case "reply":
-      // Recipient is NOT the rating owner. Use the standalone rating
-      // page so the comment thread is visible regardless of who they
-      // follow. Pre-migration rows have no ratingOwnerUsername — fall
-      // back to actor profile.
-      if (a.songId && a.ratingOwnerUsername) {
-        return standaloneRating(a.ratingOwnerUsername, a.songId);
-      }
+      // Recipient is NOT the rating owner. ratingOwnerId tells us whose
+      // rating it actually is so we can focus the feed there.
+      if (a.songId && ratingOwnerId) return feedFocus(ratingOwnerId, a.songId);
       return `/u/${a.actorUsername}`;
     case "rating_match":
     case "rec_rated":
-      // The actor's rating is the target. Use the standalone page since
-      // the viewer may not follow the actor.
-      if (a.songId && a.ratingOwnerUsername) {
-        return standaloneRating(a.ratingOwnerUsername, a.songId);
-      }
-      if (a.songId) return standaloneRating(a.actorUsername, a.songId);
+      // Actor's rating is the target. Use ratingOwnerId (which is the
+      // actorId for these types).
+      if (a.songId && ratingOwnerId) return feedFocus(ratingOwnerId, a.songId);
+      if (a.songId) return feedFocus(a.actorId, a.songId);
       return `/u/${a.actorUsername}`;
     case "streak_milestone":
       return `/u/${a.actorUsername}`;
@@ -107,6 +113,7 @@ export default async function ActivityPage() {
         actorImageUrl: users.imageUrl,
         songTitle: songs.title,
         ratingOwnerUsername: ratingOwner.username,
+        ratingOwnerId: activities.ratingUserId,
       })
       .from(activities)
       .innerJoin(users, eq(users.id, activities.actorId))

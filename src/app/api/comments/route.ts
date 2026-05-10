@@ -147,7 +147,7 @@ export async function POST(req: Request) {
       ]);
       const authorName = author?.displayName || author?.username || "Someone";
       const mentionRatingPageUrl = ratingOwnerRow
-        ? `/r/${ratingOwnerRow.username}/${encodeBase64Url(songId)}`
+        ? `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`
         : `/u/${author?.username ?? ""}`;
 
       const preview = text.length > 100 ? text.slice(0, 97) + "…" : text;
@@ -214,8 +214,12 @@ export async function POST(req: Request) {
     .from(users)
     .where(eq(users.id, ratingUserId))
     .limit(1);
-  const ratingPageUrl = ratingOwner
-    ? `/r/${ratingOwner.username}/${encodeBase64Url(songId)}`
+  // Feed-focus URL — works whether or not the recipient follows the
+  // rating owner. The ?focus=<userId>:<songId> param forces inclusion.
+  const ratingPageUrl = `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`;
+  // Keep a /u/<actor> fallback only if we couldn't even resolve the owner.
+  const fallbackUrl = ratingOwner
+    ? ratingPageUrl
     : `/u/${actor?.username ?? ""}`;
 
   if (ratingUserId !== userId) {
@@ -230,9 +234,9 @@ export async function POST(req: Request) {
     await sendPushToUser(ratingUserId, {
       title: `${actorName} commented on ${song?.title ?? "your rating"}`,
       body: preview,
-      // Rating owner = recipient: their own rating is on their feed,
-      // anchor straight to the card.
-      url: `/feed#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
+      // Rating owner = recipient: focus-param URL guarantees the card
+      // shows on the feed even if pagination would have hidden it.
+      url: `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
       tag: `comment:${userId}:${songId}`,
     });
   }
@@ -254,7 +258,7 @@ export async function POST(req: Request) {
         body: preview,
         // Parent commenter isn't necessarily the rating owner, so we
         // can't anchor to their feed — link to the rating's shared page.
-        url: ratingPageUrl,
+        url: fallbackUrl,
         tag: `reply:${userId}:${songId}`,
       });
     } catch (e) {

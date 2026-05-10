@@ -31,7 +31,7 @@ const FEED_PAGE_SIZE = 25;
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ before?: string }>;
+  searchParams: Promise<{ before?: string; focus?: string }>;
 }) {
   const { userId } = await auth();
   if (!userId) redirect("/");
@@ -41,6 +41,21 @@ export default async function FeedPage({
   const sp = await searchParams;
   const beforeIso = sp.before;
   const beforeDate = beforeIso ? new Date(beforeIso) : null;
+
+  // `?focus=<ratingUserId>:<songId>` forces inclusion of a specific
+  // rating even if the viewer doesn't follow that user. Used by
+  // /activity click-throughs so every notification reliably lands on
+  // its rating's card in the feed, with the same context (comments,
+  // likes, save buttons) the viewer already knows.
+  let focusUserId: string | null = null;
+  let focusSongId: string | null = null;
+  if (sp.focus) {
+    const idx = sp.focus.indexOf(":");
+    if (idx > 0 && idx < sp.focus.length - 1) {
+      focusUserId = sp.focus.slice(0, idx);
+      focusSongId = sp.focus.slice(idx + 1);
+    }
+  }
 
   const followedRows = await db
     .select({ id: follows.followeeId })
@@ -87,7 +102,45 @@ export default async function FeedPage({
     : [];
 
   const hasMore = itemsPlusOne.length > FEED_PAGE_SIZE;
-  const items = hasMore ? itemsPlusOne.slice(0, FEED_PAGE_SIZE) : itemsPlusOne;
+  let items = hasMore ? itemsPlusOne.slice(0, FEED_PAGE_SIZE) : itemsPlusOne;
+
+  // If the activity-link supplied a focus and that rating isn't already
+  // in the page, fetch + prepend it so the anchor scroll always finds
+  // its target. Cheap — single-row lookup.
+  if (
+    focusUserId &&
+    focusSongId &&
+    !items.some((it) => it.ratingUserId === focusUserId && it.songId === focusSongId)
+  ) {
+    const [focused] = await db
+      .select({
+        ratingUserId: ratings.userId,
+        score: ratings.score,
+        review: ratings.review,
+        createdAt: ratings.createdAt,
+        songId: ratings.songId,
+        title: songs.title,
+        artist: songs.artist,
+        album: songs.album,
+        thumbnail: songs.thumbnail,
+        appleMusicUrl: songs.appleMusicUrl,
+        spotifyTrackId: songs.spotifyTrackId,
+        username: users.username,
+        displayName: users.displayName,
+        imageUrl: users.imageUrl,
+        currentStreak: users.currentStreak,
+      })
+      .from(ratings)
+      .innerJoin(songs, eq(ratings.songId, songs.id))
+      .innerJoin(users, eq(ratings.userId, users.id))
+      .where(
+        and(eq(ratings.userId, focusUserId), eq(ratings.songId, focusSongId)),
+      )
+      .limit(1);
+    if (focused) {
+      items = [focused, ...items];
+    }
+  }
   const oldestCreatedAt = items.length > 0 ? items[items.length - 1].createdAt : null;
 
   // Viewer's own ratings on the songs visible in the feed (so we can show

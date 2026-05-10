@@ -158,8 +158,9 @@ export async function POST(req: Request) {
       await sendPushToUser(ratingUserId, {
         title: `${actorName} liked your rating`,
         body: song ? `❤️ ${song.title}` : "Open Tuned Up to see.",
-        // Rating owner = recipient: their own rating is on their feed.
-        url: `/feed#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
+        // Rating owner = recipient. Use focus-param URL so the feed
+        // page always shows the card and the in-page anchor scrolls.
+        url: `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
         tag: `like:${userId}:${songId}`,
       });
     }
