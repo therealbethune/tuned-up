@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db, users, spotifyAccounts } from "@/db";
 import { SettingsForm } from "./SettingsForm";
 import { SpotifyAccountCard } from "@/components/SpotifyAccountCard";
+import { AppleMusicAccountCard } from "@/components/AppleMusicAccountCard";
 import { SPOTIFY_LINK_SCOPES } from "@/lib/spotify-server";
 
 export const dynamic = "force-dynamic";
@@ -59,13 +60,14 @@ export default async function SettingsPage({
         displayName={me.displayName}
         isPrivate={me.isPrivate}
       />
-      <div>
+      <div className="space-y-3">
         <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-2">Connected accounts</h2>
         <SpotifyAccountCard
           connected={Boolean(link)}
           spotifyUserId={link?.spotifyUserId ?? null}
           missingScopes={missingScopes}
         />
+        <AppleMusicAccountCard />
       </div>
     </div>
   );
