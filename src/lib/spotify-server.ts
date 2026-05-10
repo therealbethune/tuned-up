@@ -12,13 +12,16 @@ const API = "https://api.spotify.com/v1";
 const CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || process.env.SPOTIFY_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 
-// Scopes needed for: importing top tracks, reading saved songs, AND saving
-// new tracks to the user's library.
+// Scopes needed for: importing top tracks, reading saved songs, saving
+// new tracks to the user's library, AND reading what's currently playing
+// for the "now listening" widget on the profile.
 export const SPOTIFY_LINK_SCOPES = [
   "user-top-read",
   "user-library-read",
   "user-library-modify",
   "user-read-email",
+  "user-read-currently-playing",
+  "user-read-playback-state",
 ].join(" ");
 
 export function spotifyServerConfigured(): boolean {
@@ -161,6 +164,132 @@ export async function fetchSpotifyMe(accessToken: string): Promise<{ id: string;
   });
   if (!res.ok) throw new Error(`Spotify /me failed: ${res.status}`);
   return res.json();
+}
+
+// --- Personal listening data (per-user) ------------------------------------
+
+export type SpotifyTopTrack = {
+  id: string;
+  name: string;
+  artists: string[];
+  album: string;
+  image: string | null;
+  previewUrl: string | null;
+  externalUrl: string;
+  durationMs: number;
+};
+
+export async function fetchUserTopTracks(
+  userId: string,
+  range: "short_term" | "medium_term" | "long_term" = "short_term",
+  limit = 10,
+): Promise<SpotifyTopTrack[]> {
+  const token = await getUserAccessToken(userId);
+  if (!token) return [];
+  const res = await fetch(
+    `${API}/me/top/tracks?limit=${limit}&time_range=${range}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
+    },
+  );
+  if (!res.ok) return [];
+  const j: {
+    items?: Array<{
+      id: string;
+      name: string;
+      artists: { name: string }[];
+      album: { name: string; images: { url: string }[] };
+      preview_url: string | null;
+      external_urls: { spotify: string };
+      duration_ms: number;
+    }>;
+  } = await res.json();
+  return (j.items ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    artists: t.artists.map((a) => a.name),
+    album: t.album.name,
+    image: t.album.images?.[0]?.url ?? null,
+    previewUrl: t.preview_url,
+    externalUrl: t.external_urls.spotify,
+    durationMs: t.duration_ms,
+  }));
+}
+
+export type SpotifyNowPlaying = {
+  isPlaying: boolean;
+  trackId: string;
+  name: string;
+  artists: string[];
+  album: string;
+  image: string | null;
+  externalUrl: string;
+  progressMs: number;
+  durationMs: number;
+};
+
+// Returns the user's currently-playing track, or null if nothing is
+// playing / scope not granted / 204 No Content. Best-effort — silently
+// returns null on any error so the profile widget gracefully hides.
+export async function fetchUserNowPlaying(
+  userId: string,
+): Promise<SpotifyNowPlaying | null> {
+  const token = await getUserAccessToken(userId);
+  if (!token) return null;
+  try {
+    const res = await fetch(`${API}/me/player/currently-playing`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    // 204 = nothing playing. 403 = scope missing (user-read-currently-playing
+    // isn't in our requested set yet — fail open).
+    if (res.status !== 200) return null;
+    const j: {
+      is_playing: boolean;
+      progress_ms: number;
+      item?: {
+        id: string;
+        name: string;
+        artists: { name: string }[];
+        album: { name: string; images: { url: string }[] };
+        external_urls: { spotify: string };
+        duration_ms: number;
+      };
+    } = await res.json();
+    if (!j.item) return null;
+    return {
+      isPlaying: j.is_playing,
+      trackId: j.item.id,
+      name: j.item.name,
+      artists: j.item.artists.map((a) => a.name),
+      album: j.item.album.name,
+      image: j.item.album.images?.[0]?.url ?? null,
+      externalUrl: j.item.external_urls.spotify,
+      progressMs: j.progress_ms,
+      durationMs: j.item.duration_ms,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Quick health check used by the profile UI to surface "Spotify connection
+// looks expired — reconnect" messages instead of a silent empty state.
+export async function pingUserSpotify(userId: string): Promise<
+  | { ok: true; spotifyUserId: string }
+  | { ok: false; reason: "not_linked" | "token_failed" | "api_failed" }
+> {
+  try {
+    const token = await getUserAccessToken(userId);
+    if (!token) return { ok: false, reason: "not_linked" };
+    const me = await fetchSpotifyMe(token);
+    return { ok: true, spotifyUserId: me.id };
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg.includes("refresh failed")) return { ok: false, reason: "token_failed" };
+    return { ok: false, reason: "api_failed" };
+  }
 }
 
 // --- Track resolution (app-level, no user token needed) --------------------

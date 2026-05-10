@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { and, desc, eq, count, inArray } from "drizzle-orm";
-import { db, ratings, songs, follows, users, comments, likes } from "@/db";
+import { db, ratings, songs, follows, users, comments, likes, spotifyAccounts } from "@/db";
+import { SpotifyIcon } from "@/components/icons";
 import { FollowButton } from "./FollowButton";
 import { ytUrlForSongId } from "@/lib/songs";
 import { OwnRatingForm } from "@/components/OwnRatingForm";
@@ -63,11 +64,24 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
 
   const followersCount = followerStat?.n ?? 0;
   const followingCount = followingStat?.n ?? 0;
-  const [taste, streak] = await Promise.all([
+  const [taste, streak, targetSpotify] = await Promise.all([
     viewerId && !isOwner
       ? safeQuery(() => computeTasteAgreement(viewerId, target.id), null, "taste")
       : Promise.resolve(null),
     safeQuery(() => computeStreak(target.id), 0, "streak"),
+    // Whether the profile owner has linked Spotify — shows a green
+    // Spotify chip in the header. Public info; doesn't expose tokens.
+    safeQuery(
+      () =>
+        db
+          .select({ spotifyUserId: spotifyAccounts.spotifyUserId })
+          .from(spotifyAccounts)
+          .where(eq(spotifyAccounts.userId, target.id))
+          .limit(1)
+          .then((r) => r[0] ?? null),
+      null,
+      "target-spotify",
+    ),
   ]);
   // Top X% percentile shown alongside the streak badge. Defensive: if the
   // streak-cache columns aren't migrated yet, fall back to "no badge".
@@ -162,6 +176,15 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           </h1>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-neutral-400 text-sm">@{target.username}</span>
+            {targetSpotify && (
+              <span
+                className="text-xs inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/30"
+                title={`Spotify connected${targetSpotify.spotifyUserId ? ` as ${targetSpotify.spotifyUserId}` : ""}`}
+              >
+                <SpotifyIcon size={12} />
+                Spotify
+              </span>
+            )}
             {streak > 0 && (
               <span
                 className="text-xs rounded-full px-2 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-300 border border-orange-500/40 tabular-nums font-medium"

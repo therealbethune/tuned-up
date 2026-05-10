@@ -69,30 +69,45 @@ export function SaveToSpotifyButton({
 
   const label =
     state === "saving"
-      ? "…"
+      ? "Saving…"
       : state === "saved"
         ? "Saved ✓"
         : state === "error"
-          ? errorMsg ?? "Error"
+          ? errorMsg ?? "Couldn't save"
           : "Save to Spotify";
 
+  // Hint when the error suggests reconnecting — links straight to /settings.
+  const showReconnect =
+    state === "error" && /reconnect/i.test(errorMsg ?? "");
+
   return (
-    <button
-      onClick={save}
-      disabled={state === "saving" || state === "saved"}
-      title={state === "saved" ? "Added to your Spotify library" : "Add to your Spotify library"}
-      className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border transition-colors ${
-        state === "saved"
-          ? "border-emerald-600/60 bg-emerald-600/10 text-emerald-300"
-          : state === "error"
-            ? "border-red-600/60 bg-red-600/10 text-red-300"
-            : "border-neutral-700 bg-neutral-900 text-neutral-300 hover:border-emerald-500/60 hover:text-emerald-300"
-      } disabled:opacity-70 active:scale-95`}
-    >
-      <span className={state === "saved" ? "text-emerald-400" : "text-emerald-500"}>
-        <SpotifyIcon size={14} />
-      </span>
-      {label}
-    </button>
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        onClick={save}
+        disabled={state === "saving" || state === "saved"}
+        title={state === "saved" ? "Added to your Spotify library" : "Add to your Spotify library"}
+        aria-label={state === "saved" ? "Saved to Spotify" : "Save to Spotify"}
+        className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border transition-colors ${
+          state === "saved"
+            ? "border-emerald-600/60 bg-emerald-600/10 text-emerald-300"
+            : state === "error"
+              ? "border-red-600/60 bg-red-600/10 text-red-300"
+              : "border-neutral-700 bg-neutral-900 text-neutral-300 hover:border-emerald-500/60 hover:text-emerald-300"
+        } disabled:opacity-70 active:scale-95`}
+      >
+        <span className={state === "saved" ? "text-emerald-400" : "text-emerald-500"}>
+          <SpotifyIcon size={14} />
+        </span>
+        {label}
+      </button>
+      {showReconnect && (
+        <a
+          href="/settings"
+          className="text-xs text-emerald-300 hover:text-emerald-200 underline"
+        >
+          settings →
+        </a>
+      )}
+    </span>
   );
 }
