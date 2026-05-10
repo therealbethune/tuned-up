@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq, count } from "drizzle-orm";
+import { and, desc, eq, count } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, likes, ratings, activities, users, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
@@ -8,6 +8,37 @@ import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
 
 export const runtime = "nodejs";
+
+// GET /api/likes?u=<ratingUserId>&s=<songId>
+// Returns: { likers: [{ id, username, displayName, imageUrl, createdAt }] }
+// Most-recent first. Anyone signed in can read; like counts are public.
+export async function GET(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const url = new URL(req.url);
+  const ratingUserId = url.searchParams.get("u");
+  const songId = url.searchParams.get("s");
+  if (!ratingUserId || !songId) {
+    return NextResponse.json({ error: "u and s required" }, { status: 400 });
+  }
+
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      displayName: users.displayName,
+      imageUrl: users.imageUrl,
+      createdAt: likes.createdAt,
+    })
+    .from(likes)
+    .innerJoin(users, eq(users.id, likes.likerId))
+    .where(and(eq(likes.ratingUserId, ratingUserId), eq(likes.songId, songId)))
+    .orderBy(desc(likes.createdAt))
+    .limit(200);
+
+  return NextResponse.json({ likers: rows });
+}
 
 // Toggle like. Body: { ratingUserId, songId }
 // Returns: { liked: boolean, count: number }

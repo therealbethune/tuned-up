@@ -1,6 +1,10 @@
 "use client";
 import { useState } from "react";
+import { LikersSheet } from "@/components/LikersSheet";
 
+// Heart toggles the viewer's own like; the count next to it opens the
+// "Liked by" sheet so anyone can see who's tapped 💗. Split into two
+// adjacent buttons so each action has a clear hit-target and aria-label.
 export function LikeButton({
   ratingUserId,
   songId,
@@ -15,6 +19,7 @@ export function LikeButton({
   const [liked, setLiked] = useState(initialLiked);
   const [count, setCount] = useState(initialCount);
   const [busy, setBusy] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   async function toggle() {
     if (busy) return;
@@ -44,30 +49,54 @@ export function LikeButton({
   }
 
   return (
-    <button
-      onClick={toggle}
-      disabled={busy}
-      aria-pressed={liked}
-      title={liked ? "Unlike" : "Like"}
-      className={`inline-flex items-center gap-1.5 text-sm transition-all -ml-1.5 -my-1 px-1.5 py-1 rounded-md ${
-        liked
-          ? "text-rose-400 hover:text-rose-300"
-          : "text-neutral-400 hover:text-white"
-      } active:scale-95 disabled:opacity-50`}
-    >
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill={liked ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth="2"
-        aria-hidden
-        className={`transition-transform ${liked ? "scale-110" : ""}`}
+    <div className="inline-flex items-center -ml-1.5 -my-1">
+      <button
+        onClick={toggle}
+        disabled={busy}
+        aria-pressed={liked}
+        aria-label={liked ? "Unlike" : "Like"}
+        title={liked ? "Unlike" : "Like"}
+        className={`inline-flex items-center text-sm transition-all px-1.5 py-1 rounded-md ${
+          liked
+            ? "text-rose-400 hover:text-rose-300"
+            : "text-neutral-400 hover:text-white"
+        } active:scale-95 disabled:opacity-50`}
       >
-        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-      </svg>
-      <span className="tabular-nums">{count}</span>
-    </button>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill={liked ? "currentColor" : "none"}
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden
+          className={`transition-transform ${liked ? "scale-110" : ""}`}
+        >
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+        </svg>
+      </button>
+      <button
+        onClick={() => count > 0 && setSheetOpen(true)}
+        disabled={count === 0}
+        aria-label={count > 0 ? `See who liked — ${count}` : "No likes yet"}
+        title={count > 0 ? "See who liked this" : undefined}
+        className={`text-sm tabular-nums pl-1 pr-1.5 py-1 rounded-md transition-colors ${
+          count > 0
+            ? liked
+              ? "text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"
+              : "text-neutral-400 hover:text-white hover:underline cursor-pointer"
+            : "text-neutral-500 cursor-default"
+        }`}
+      >
+        {count}
+      </button>
+
+      <LikersSheet
+        open={sheetOpen}
+        ratingUserId={ratingUserId}
+        songId={songId}
+        onClose={() => setSheetOpen(false)}
+      />
+    </div>
   );
 }
