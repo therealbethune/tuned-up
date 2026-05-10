@@ -17,6 +17,9 @@ type Comment = {
   imageUrl: string | null;
   score: number | null;
   review: string | null;
+  // When true, the row is an optimistic local-only stub awaiting the
+  // server response. Rendered at reduced opacity with "Posting…" label.
+  pending?: boolean;
 };
 
 export function CommentSection({
@@ -88,6 +91,28 @@ export function CommentSection({
     if (!text || busy) return;
     setBusy(true);
     setError(null);
+    // Optimistic insert: build a temp comment with the local viewer id +
+    // placeholder author fields, render it instantly at the bottom of the
+    // list, then swap in the real one on success or roll back on failure.
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const optimistic: Comment = {
+      id: tempId,
+      body: text,
+      createdAt: new Date().toISOString(),
+      commenterId: viewerId,
+      parentCommentId: null,
+      username: "you",
+      displayName: "You",
+      imageUrl: null,
+      score: null,
+      review: null,
+      pending: true,
+    };
+    setComments((prev) => [...(prev ?? []), optimistic]);
+    setBody("");
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     try {
       const res = await fetch("/api/comments", {
         method: "POST",
@@ -96,16 +121,19 @@ export function CommentSection({
       });
       const j = await res.json().catch(() => ({}));
       if (res.ok && j.comment) {
-        setComments((prev) => [...(prev ?? []), j.comment]);
-        setBody("");
-        // Dismiss the iOS keyboard once a comment is in.
-        if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
+        // Swap the temp row for the real one.
+        setComments((prev) =>
+          (prev ?? []).map((c) => (c.id === tempId ? j.comment : c)),
+        );
       } else {
+        // Roll back.
+        setComments((prev) => (prev ?? []).filter((c) => c.id !== tempId));
+        setBody(text); // restore the draft so the user doesn't lose it
         setError(j.error || `Couldn't post (HTTP ${res.status}).`);
       }
     } catch (e) {
+      setComments((prev) => (prev ?? []).filter((c) => c.id !== tempId));
+      setBody(text);
       setError((e as Error).message || "Network error — try again.");
     } finally {
       setBusy(false);
@@ -129,6 +157,26 @@ export function CommentSection({
     if (!text || replyBusy) return;
     setReplyBusy(true);
     setReplyError(null);
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const optimistic: Comment = {
+      id: tempId,
+      body: text,
+      createdAt: new Date().toISOString(),
+      commenterId: viewerId,
+      parentCommentId: parentId,
+      username: "you",
+      displayName: "You",
+      imageUrl: null,
+      score: null,
+      review: null,
+      pending: true,
+    };
+    setComments((prev) => [...(prev ?? []), optimistic]);
+    setReplyBody("");
+    setReplyTo(null);
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     try {
       const res = await fetch("/api/comments", {
         method: "POST",
@@ -142,16 +190,19 @@ export function CommentSection({
       });
       const j = await res.json().catch(() => ({}));
       if (res.ok && j.comment) {
-        setComments((prev) => [...(prev ?? []), j.comment]);
-        setReplyBody("");
-        setReplyTo(null);
-        if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
+        setComments((prev) =>
+          (prev ?? []).map((c) => (c.id === tempId ? j.comment : c)),
+        );
       } else {
+        setComments((prev) => (prev ?? []).filter((c) => c.id !== tempId));
+        setReplyBody(text);
+        setReplyTo(parentId);
         setReplyError(j.error || `Couldn't post reply (HTTP ${res.status}).`);
       }
     } catch (e) {
+      setComments((prev) => (prev ?? []).filter((c) => c.id !== tempId));
+      setReplyBody(text);
+      setReplyTo(parentId);
       setReplyError((e as Error).message || "Network error — try again.");
     } finally {
       setReplyBusy(false);
@@ -341,7 +392,9 @@ function CommentRow({
   onReply: () => void;
 }) {
   return (
-    <div className="flex gap-2 rounded-md border border-neutral-800 bg-neutral-900 p-2">
+    <div
+      className={`flex gap-2 rounded-md border border-neutral-800 bg-neutral-900 p-2 ${c.pending ? "opacity-60" : ""}`}
+    >
       {c.imageUrl ? (
         <Image
           src={c.imageUrl}
@@ -355,9 +408,18 @@ function CommentRow({
       )}
       <div className="flex-1 min-w-0">
         <div className="text-xs flex items-center gap-1.5 flex-wrap">
-          <Link href={`/u/${c.username}`} className="font-medium hover:underline">
-            @{c.username}
-          </Link>
+          {c.pending ? (
+            <span className="font-medium text-neutral-400">@you</span>
+          ) : (
+            <Link href={`/u/${c.username}`} className="font-medium hover:underline">
+              @{c.username}
+            </Link>
+          )}
+          {c.pending && (
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500">
+              Posting…
+            </span>
+          )}
           {c.score != null && (
             <span className="text-neutral-500">
               rated <span className="text-neutral-200 font-medium tabular-nums">{c.score}</span>

@@ -21,6 +21,17 @@ export function RecommendButton({ song }: { song: SongResult }) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reqId = useRef(0);
+  // Remember the trigger button so we can restore focus after the modal
+  // closes — important for keyboard + screen-reader users.
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    // When transitioning from open → closed, return focus to the trigger.
+    if (wasOpenRef.current && !open) {
+      triggerRef.current?.focus();
+    }
+    wasOpenRef.current = open;
+  }, [open]);
 
   // Debounced user search with AbortController so unmount + rapid retypes
   // don't dump stale data into state or warn about setState-on-unmounted.
@@ -110,6 +121,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
   return (
     <>
       <button
+        ref={triggerRef}
         onClick={() => setOpen(true)}
         className="text-xs text-neutral-400 hover:text-white inline-flex items-center gap-1.5"
         title="Recommend to a friend"

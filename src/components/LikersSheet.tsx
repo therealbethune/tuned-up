@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { relativeTime } from "@/lib/songs";
@@ -30,14 +30,26 @@ export function LikersSheet({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [show, setShow] = useState(false);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  // Remember what was focused before open so we can restore it on close.
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   // Slide-in animation: mount first, then translate after next frame.
+  // Also: capture the previously-focused element on open, move focus to
+  // the Close button (default a11y target), and restore focus on close.
   useEffect(() => {
     if (open) {
-      const id = requestAnimationFrame(() => setShow(true));
+      previouslyFocusedRef.current =
+        (document.activeElement as HTMLElement | null) ?? null;
+      const id = requestAnimationFrame(() => {
+        setShow(true);
+        closeBtnRef.current?.focus();
+      });
       return () => cancelAnimationFrame(id);
     } else {
       setShow(false);
+      const prev = previouslyFocusedRef.current;
+      if (prev && document.contains(prev)) prev.focus();
     }
   }, [open]);
 
@@ -101,9 +113,10 @@ export function LikersSheet({
           <div className="w-10 h-1 rounded-full bg-neutral-700 sm:hidden mx-auto absolute left-0 right-0 top-1.5" />
           <h2 className="text-base font-semibold">Liked by</h2>
           <button
+            ref={closeBtnRef}
             onClick={onClose}
             aria-label="Close"
-            className="text-neutral-500 hover:text-white inline-flex items-center justify-center h-8 w-8"
+            className="text-neutral-500 hover:text-white inline-flex items-center justify-center h-11 w-11"
           >
             ×
           </button>

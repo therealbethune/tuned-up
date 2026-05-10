@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -36,6 +36,7 @@ async function loadRating(username: string, encodedSongId: string) {
   const songId = decodeSongId(encodedSongId);
   const [row] = await db
     .select({
+      ratingUserId: ratings.userId,
       score: ratings.score,
       review: ratings.review,
       createdAt: ratings.createdAt,
@@ -103,6 +104,16 @@ export default async function SharedRatingPage({
   // For private profiles, hide review/details from non-followers. The share
   // page is itself a deliberate share, so we still show the rating; the user
   // chose to share it.
+  //
+  // Signed-in users: bounce them into the feed-focus view so we have one
+  // canonical destination + they get the full feed context (comments,
+  // likes, save buttons) inline instead of the bare share page.
+  const { userId } = await auth();
+  if (userId) {
+    redirect(
+      `/feed?focus=${r.ratingUserId}:${encodeURIComponent(r.songId)}#rating-${r.ratingUserId}-${encodeSongIdForUrl(r.songId)}`,
+    );
+  }
 
   const url = ytUrlForSongId(r.songId);
 
