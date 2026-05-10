@@ -21,11 +21,13 @@ export function highestMilestoneFor(streak: number): number {
 
 // What percentile of users have a streak strictly less than the given value?
 // Returns a number 0..100 (rounded). Considers only users with streak > 0.
+//
+// Drizzle's neon-http `db.execute` returns either an Array directly or
+// `{ rows: [...] }` depending on driver version — handle both shapes so this
+// works on the deployed Netlify functions runtime.
 export async function streakPercentile(streak: number): Promise<number> {
   if (streak <= 0) return 0;
-  const [row] = await db.execute(sql<{
-    pct: number;
-  }>`
+  const result = await db.execute(sql`
     WITH active AS (
       SELECT current_streak FROM users WHERE current_streak > 0
     )
@@ -37,8 +39,14 @@ export async function streakPercentile(streak: number): Promise<number> {
       ),
       0
     )::int AS pct
-  ` as never) as unknown as Array<{ pct: number }>;
-  return Number(row?.pct ?? 0);
+  `);
+  const raw = result as unknown;
+  const rows: Array<{ pct: number }> = Array.isArray(raw)
+    ? (raw as Array<{ pct: number }>)
+    : Array.isArray((raw as { rows?: Array<{ pct: number }> })?.rows)
+      ? ((raw as { rows: Array<{ pct: number }> }).rows)
+      : [];
+  return Number(rows[0]?.pct ?? 0);
 }
 
 // Update the cached streak on the users row. Called once per rating insert.
