@@ -64,8 +64,10 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
   const followersCount = followerStat?.n ?? 0;
   const followingCount = followingStat?.n ?? 0;
   const [taste, streak] = await Promise.all([
-    viewerId && !isOwner ? computeTasteAgreement(viewerId, target.id) : Promise.resolve(null),
-    computeStreak(target.id),
+    viewerId && !isOwner
+      ? safeQuery(() => computeTasteAgreement(viewerId, target.id), null, "taste")
+      : Promise.resolve(null),
+    safeQuery(() => computeStreak(target.id), 0, "streak"),
   ]);
   // Top X% percentile shown alongside the streak badge. Defensive: if the
   // streak-cache columns aren't migrated yet, fall back to "no badge".
