@@ -157,7 +157,13 @@ export async function getUserAccessToken(userId: string): Promise<string | null>
   return refreshed.accessToken;
 }
 
-export async function fetchSpotifyMe(accessToken: string): Promise<{ id: string; email?: string }> {
+export async function fetchSpotifyMe(accessToken: string): Promise<{
+  id: string;
+  email?: string;
+  display_name?: string;
+  country?: string;
+  product?: string;
+}> {
   const res = await fetch(`${API}/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     signal: AbortSignal.timeout(5000),

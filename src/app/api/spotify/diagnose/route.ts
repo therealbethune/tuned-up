@@ -58,10 +58,19 @@ export async function GET(req: Request) {
   const accessToken = await getUserAccessToken(userId);
   if (!accessToken) return NextResponse.json(out);
 
-  // 3) /me probe
+  // 3) /me probe — pull all the fields Spotify's User Management form
+  // wants to match against (name + email). 403s on PUT /me/tracks in
+  // dev mode are usually because the User Management entry's name
+  // doesn't match this exact display_name string.
   try {
     const me = await fetchSpotifyMe(accessToken);
-    out.spotifyMe = { id: me.id, email: me.email };
+    out.spotifyMe = {
+      id: me.id,
+      email: me.email,
+      display_name: me.display_name,
+      country: me.country,
+      product: me.product,
+    };
   } catch (e) {
     out.spotifyMeError = (e as Error).message;
   }
