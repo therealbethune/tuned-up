@@ -19,6 +19,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const reqId = useRef(0);
 
   // Debounced user search with AbortController so unmount + rapid retypes
@@ -78,6 +79,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
   async function send() {
     if (!picked || busy) return;
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch("/api/recommendations", {
         method: "POST",
@@ -96,8 +98,10 @@ export function RecommendButton({ song }: { song: SongResult }) {
         }, 1200);
       } else {
         const j = await res.json().catch(() => ({}));
-        alert(j.error || "Failed to send");
+        setError(j.error || `Couldn't send (HTTP ${res.status}).`);
       }
+    } catch (e) {
+      setError((e as Error).message || "Network error — try again.");
     } finally {
       setBusy(false);
     }
@@ -226,6 +230,9 @@ export function RecommendButton({ song }: { song: SongResult }) {
                     {busy ? "Sending…" : "Send"}
                   </button>
                 </div>
+                {error && (
+                  <p className="text-xs text-red-400">{error}</p>
+                )}
               </>
             )}
           </div>

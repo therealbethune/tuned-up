@@ -29,10 +29,6 @@ export function isAlbumId(songId: string): boolean {
   return songId.startsWith("yt-album:") || songId.startsWith("spotify-album:");
 }
 
-export function itemKindForId(songId: string): "song" | "album" {
-  return isAlbumId(songId) ? "album" : "song";
-}
-
 // Generate Spotify / Apple Music outbound search URLs. We don't have those
 // services' APIs, so we just deep-link to their search pages — clicking lands
 // the user on the matching track or album with one tap.

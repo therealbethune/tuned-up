@@ -149,6 +149,12 @@ export const activities = pgTable("activities", {
   actorId: text("actor_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   songId: text("song_id"),
+  // Who OWNS the rating this activity is about. Set for comment / like /
+  // mention / reply / rating_match / rec_rated. Lets the activity row and
+  // push notification deep-link to the right /r/<owner>/<songId> page —
+  // critical when the recipient (e.g. a mentioned user) isn't the rating
+  // owner and the rating wouldn't appear on their own feed.
+  ratingUserId: text("rating_user_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   readAt: timestamp("read_at"),
 }, (t) => [

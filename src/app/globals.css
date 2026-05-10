@@ -86,3 +86,27 @@ html:not(.dark) .text-red-400 { color: #dc2626; }
 /* Range slider track — dark default looks OK on both, but accent-white
    reads as white-on-light → invert. */
 html:not(.dark) input[type="range"].accent-white { accent-color: #171717; }
+
+/* :target highlight for deep-linked feed cards. Tailwind v4 doesn't ship
+   a `target:` variant out of the box and arbitrary-variant syntax got
+   awkward inline, so this CSS rule pairs with `data-target-highlight` on
+   the rating <li> in /feed. Fades after 3 seconds so the marker doesn't
+   stick forever — animation-fill-mode forwards locks it transparent at
+   the end. */
+@keyframes tu-target-highlight {
+  0% {
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.6), 0 0 24px rgba(16, 185, 129, 0.35);
+    border-color: rgba(16, 185, 129, 0.6);
+  }
+  80% {
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.6), 0 0 24px rgba(16, 185, 129, 0.35);
+    border-color: rgba(16, 185, 129, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    border-color: rgba(38, 38, 38, 1);
+  }
+}
+[data-target-highlight]:target {
+  animation: tu-target-highlight 3s ease-out forwards;
+}

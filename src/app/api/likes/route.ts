@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { db, likes, ratings, activities, users, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
+import { encodeBase64Url } from "@/lib/encoding";
 
 export const runtime = "nodejs";
 
@@ -103,24 +104,31 @@ export async function POST(req: Request) {
         actorId: userId,
         type: "like",
         songId,
+        ratingUserId,
       });
 
-      // Push to the rating owner.
-      const [actor] = await db
-        .select({ displayName: users.displayName, username: users.username })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1);
-      const [song] = await db
-        .select({ title: songs.title })
-        .from(songs)
-        .where(eq(songs.id, songId))
-        .limit(1);
+      // Push to the rating owner. Batch the actor + song lookups (they're
+      // independent) instead of awaiting them serially.
+      const [actor, song] = await Promise.all([
+        db
+          .select({ displayName: users.displayName, username: users.username })
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1)
+          .then((r) => r[0]),
+        db
+          .select({ title: songs.title })
+          .from(songs)
+          .where(eq(songs.id, songId))
+          .limit(1)
+          .then((r) => r[0]),
+      ]);
       const actorName = actor?.displayName || actor?.username || "Someone";
       await sendPushToUser(ratingUserId, {
         title: `${actorName} liked your rating`,
         body: song ? `❤️ ${song.title}` : "Open Tuned Up to see.",
-        url: `/u/${actor?.username ?? ""}`,
+        // Rating owner = recipient: their own rating is on their feed.
+        url: `/feed#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
         tag: `like:${userId}:${songId}`,
       });
     }

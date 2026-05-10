@@ -196,17 +196,19 @@ export default async function FeedPage({
             };
             // Stable id so /feed#rating-<userId>-<encodedSongId> from
             // activity/notification links scrolls right to the card.
-            // CSS `:target` selector highlights it briefly.
+            // `data-target-highlight` + CSS keyframes in globals.css drive
+            // the 3-second emerald glow that fades back to normal.
             const anchorId = `rating-${it.ratingUserId}-${encodeBase64Url(it.songId)}`;
             return (
               <SafeCardBoundary key={`${it.username}-${it.songId}-${it.createdAt}`}>
               <li
                 id={anchorId}
-                className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 target:ring-2 target:ring-emerald-500/60 target:border-emerald-500/40 scroll-mt-20"
+                data-target-highlight=""
+                className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 scroll-mt-20"
               >
                 <div className="flex items-center gap-3 mb-3">
                   {it.imageUrl ? (
-                    <Image src={it.imageUrl} alt="" width={28} height={28} className="rounded-full h-7 w-7" />
+                    <Image src={it.imageUrl} alt="" width={28} height={28} loading="lazy" className="rounded-full h-7 w-7" />
                   ) : (
                     <div className="h-7 w-7 rounded-full bg-neutral-700" />
                   )}
@@ -227,7 +229,7 @@ export default async function FeedPage({
                       title="Open in YouTube Music"
                     >
                       {it.thumbnail ? (
-                        <Image src={it.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover" />
+                        <Image src={it.thumbnail} alt="" width={56} height={56} loading="lazy" className="rounded h-14 w-14 object-cover" />
                       ) : (
                         <div className="h-14 w-14 rounded bg-neutral-800" />
                       )}
@@ -241,7 +243,7 @@ export default async function FeedPage({
                       </div>
                     </a>
                   ) : it.thumbnail ? (
-                    <Image src={it.thumbnail} alt="" width={56} height={56} className="rounded h-14 w-14 object-cover shrink-0" />
+                    <Image src={it.thumbnail} alt="" width={56} height={56} loading="lazy" className="rounded h-14 w-14 object-cover shrink-0" />
                   ) : (
                     <div className="h-14 w-14 rounded bg-neutral-800 shrink-0" />
                   )}
@@ -410,7 +412,7 @@ async function EmptyFeed({ userId, followedIds }: { userId: string; followedIds:
                   className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900 p-3 transition-colors"
                 >
                   {u.imageUrl ? (
-                    <Image src={u.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" />
+                    <Image src={u.imageUrl} alt="" width={40} height={40} loading="lazy" className="rounded-full h-10 w-10" />
                   ) : (
                     <div className="h-10 w-10 rounded-full bg-neutral-700" />
                   )}

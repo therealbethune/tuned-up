@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { encodeBase64Url } from "@/lib/encoding";
 import { db, activities, users, songs } from "@/db";
 import { relativeTime } from "@/lib/songs";
@@ -21,19 +22,23 @@ type ActivityRow = {
   actorDisplayName: string | null;
   actorImageUrl: string | null;
   songTitle: string | null;
+  // Username of the user who owns the rating this activity points to.
+  // Set on comment/like/mention/reply/rating_match/rec_rated rows; null
+  // for follow/recommendation/streak_milestone or pre-migration rows.
+  ratingOwnerUsername: string | null;
 };
 
 // Pick the most useful destination per activity type. For actions on the
-// viewer's OWN rating (comment / like / mention / reply) we deep-link
-// straight to that rating's card on the feed via a hash anchor, so the
-// viewer lands in their normal context with the comment thread already
-// reachable. For actions on someone else's rating we use /r/<username>/
-// (since that rating may not appear on the viewer's feed at all).
+// viewer's OWN rating (comment / like) we deep-link straight to that
+// rating's card on the feed via a hash anchor — the rating is guaranteed
+// to be there because the feed includes self. For actions on someone
+// else's rating (mention / reply / rec_rated / rating_match) we use the
+// standalone /r/<owner>/<songId> page, since that rating may not appear
+// on the viewer's feed at all.
 function destinationFor(
   a: ActivityRow,
   viewerId: string,
 ): string {
-  // The feed page renders each rating card with id="rating-<userId>-<base64SongId>".
   const feedAnchor = (userId: string, songId: string) =>
     `/feed#rating-${userId}-${encodeBase64Url(songId)}`;
   const standaloneRating = (username: string, songId: string) =>
@@ -47,22 +52,27 @@ function destinationFor(
       return `/u/${a.actorUsername}`;
     case "comment":
     case "like":
+      // Recipient owns the rating — anchor straight to the viewer's
+      // feed card so the comment thread is in their normal context.
+      if (a.songId) return feedAnchor(viewerId, a.songId);
+      return `/u/${a.actorUsername}`;
     case "mention":
     case "reply":
-      // Action happened on the VIEWER's rating — the rating IS on the
-      // viewer's own feed (the feed includes self). Anchor to that card.
-      if (a.songId) return feedAnchor(viewerId, a.songId);
+      // Recipient is NOT the rating owner. Use the standalone rating
+      // page so the comment thread is visible regardless of who they
+      // follow. Pre-migration rows have no ratingOwnerUsername — fall
+      // back to actor profile.
+      if (a.songId && a.ratingOwnerUsername) {
+        return standaloneRating(a.ratingOwnerUsername, a.songId);
+      }
       return `/u/${a.actorUsername}`;
     case "rating_match":
-      // Actor rated a song the viewer also rated. The viewer's rating is
-      // on their feed, so anchor there — they see their own score and a
-      // "X also rated" hint via the activity itself.
-      if (a.songId) return feedAnchor(viewerId, a.songId);
-      return `/u/${a.actorUsername}`;
     case "rec_rated":
-      // The actor (recipient of your recommendation) just rated it.
-      // Their rating may not be on your feed if you don't follow them, so
-      // route to the standalone rating page where it's guaranteed to load.
+      // The actor's rating is the target. Use the standalone page since
+      // the viewer may not follow the actor.
+      if (a.songId && a.ratingOwnerUsername) {
+        return standaloneRating(a.ratingOwnerUsername, a.songId);
+      }
       if (a.songId) return standaloneRating(a.actorUsername, a.songId);
       return `/u/${a.actorUsername}`;
     case "streak_milestone":
@@ -76,32 +86,40 @@ export default async function ActivityPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
+  // Second alias on users for the rating-owner LEFT JOIN (so we can
+  // build /r/<owner>/<songId> URLs without a per-row lookup).
+  const ratingOwner = alias(users, "rating_owner");
 
-  const rows: ActivityRow[] = await db
-    .select({
-      id: activities.id,
-      type: activities.type,
-      songId: activities.songId,
-      createdAt: activities.createdAt,
-      readAt: activities.readAt,
-      actorId: users.id,
-      actorUsername: users.username,
-      actorDisplayName: users.displayName,
-      actorImageUrl: users.imageUrl,
-      songTitle: songs.title,
-    })
-    .from(activities)
-    .innerJoin(users, eq(users.id, activities.actorId))
-    .leftJoin(songs, eq(songs.id, activities.songId))
-    .where(eq(activities.userId, userId))
-    .orderBy(desc(activities.createdAt))
-    .limit(50);
-
-  // Mark unread as read so the badge clears for the next page nav.
-  await db
-    .update(activities)
-    .set({ readAt: new Date() })
-    .where(and(eq(activities.userId, userId), isNull(activities.readAt)));
+  // Parallelize: fetch activities + mark unread as read at the same time.
+  // The two queries are independent; running them serially is just
+  // wasted round-trip time on every Activity page load.
+  const [rows] = await Promise.all([
+    db
+      .select({
+        id: activities.id,
+        type: activities.type,
+        songId: activities.songId,
+        createdAt: activities.createdAt,
+        readAt: activities.readAt,
+        actorId: users.id,
+        actorUsername: users.username,
+        actorDisplayName: users.displayName,
+        actorImageUrl: users.imageUrl,
+        songTitle: songs.title,
+        ratingOwnerUsername: ratingOwner.username,
+      })
+      .from(activities)
+      .innerJoin(users, eq(users.id, activities.actorId))
+      .leftJoin(songs, eq(songs.id, activities.songId))
+      .leftJoin(ratingOwner, eq(ratingOwner.id, activities.ratingUserId))
+      .where(eq(activities.userId, userId))
+      .orderBy(desc(activities.createdAt))
+      .limit(50),
+    db
+      .update(activities)
+      .set({ readAt: new Date() })
+      .where(and(eq(activities.userId, userId), isNull(activities.readAt))),
+  ]);
 
   return (
     <div className="space-y-6">

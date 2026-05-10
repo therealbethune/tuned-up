@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { db, comments, users, ratings, activities, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
+import { encodeBase64Url } from "@/lib/encoding";
 import { extractMentions } from "@/lib/mentions";
 
 export const runtime = "nodejs";
@@ -108,60 +109,82 @@ export async function POST(req: Request) {
 
   // Notify mentioned users — but skip the comment author and the rating
   // owner (who already gets the comment notification a few lines below).
-  const mentionedUsernames = extractMentions(text);
+  // Cap at MENTION_LIMIT to prevent comment-spam-as-pingflood: a hostile
+  // user can't ping 200 people just by stuffing usernames into a comment.
+  const MENTION_LIMIT = 10;
+  const mentionedUsernames = extractMentions(text).slice(0, MENTION_LIMIT);
   if (mentionedUsernames.length > 0) {
     try {
-      const mentionedUsers = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          displayName: users.displayName,
-        })
-        .from(users)
-        .where(inArray(users.username, mentionedUsernames));
-
-      const [author] = await db
-        .select({ displayName: users.displayName, username: users.username })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1);
+      // Batch the supporting queries — mentioned users, author, song,
+      // rating owner — instead of one-after-another sequential awaits.
+      const [mentionedUsers, author, songRow, ratingOwnerRow] = await Promise.all([
+        db
+          .select({
+            id: users.id,
+            username: users.username,
+            displayName: users.displayName,
+          })
+          .from(users)
+          .where(inArray(users.username, mentionedUsernames)),
+        db
+          .select({ displayName: users.displayName, username: users.username })
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1)
+          .then((r) => r[0]),
+        db
+          .select({ title: songs.title })
+          .from(songs)
+          .where(eq(songs.id, songId))
+          .limit(1)
+          .then((r) => r[0]),
+        db
+          .select({ username: users.username })
+          .from(users)
+          .where(eq(users.id, ratingUserId))
+          .limit(1)
+          .then((r) => r[0]),
+      ]);
       const authorName = author?.displayName || author?.username || "Someone";
+      const mentionRatingPageUrl = ratingOwnerRow
+        ? `/r/${ratingOwnerRow.username}/${encodeBase64Url(songId)}`
+        : `/u/${author?.username ?? ""}`;
 
-      const [songRow] = await db
-        .select({ title: songs.title })
-        .from(songs)
-        .where(eq(songs.id, songId))
-        .limit(1);
-
-      for (const u of mentionedUsers) {
-        if (u.id === userId || u.id === ratingUserId) continue;
-        // Dedupe a previous mention from the same actor on the same comment
-        // target so refreshing a comment doesn't pile up activity entries.
-        await db
-          .delete(activities)
-          .where(
-            and(
-              eq(activities.userId, u.id),
-              eq(activities.actorId, userId),
-              eq(activities.type, "mention"),
-              eq(activities.songId, songId),
-            ),
-          );
-        await db.insert(activities).values({
-          id: randomUUID(),
-          userId: u.id,
-          actorId: userId,
-          type: "mention",
-          songId,
-        });
-        const preview = text.length > 100 ? text.slice(0, 97) + "…" : text;
-        await sendPushToUser(u.id, {
-          title: `${authorName} mentioned you${songRow ? ` on ${songRow.title}` : ""}`,
-          body: preview,
-          url: `/u/${author?.username ?? ""}`,
-          tag: `mention:${userId}:${songId}:${u.id}`,
-        });
-      }
+      const preview = text.length > 100 ? text.slice(0, 97) + "…" : text;
+      // Fan out activity + push in parallel — sequential awaits were
+      // adding ~200ms × N mentions to the comment-post latency.
+      await Promise.allSettled(
+        mentionedUsers
+          .filter((u) => u.id !== userId && u.id !== ratingUserId)
+          .map(async (u) => {
+            // Dedupe a previous mention from the same actor on the same
+            // comment target so refreshing doesn't pile up entries.
+            await db
+              .delete(activities)
+              .where(
+                and(
+                  eq(activities.userId, u.id),
+                  eq(activities.actorId, userId),
+                  eq(activities.type, "mention"),
+                  eq(activities.songId, songId),
+                ),
+              );
+            await db.insert(activities).values({
+              id: randomUUID(),
+              userId: u.id,
+              actorId: userId,
+              type: "mention",
+              songId,
+              ratingUserId,
+            });
+            await sendPushToUser(u.id, {
+              title: `${authorName} mentioned you${songRow ? ` on ${songRow.title}` : ""}`,
+              body: preview,
+              url: mentionRatingPageUrl,
+              tag: `mention:${userId}:${songId}:${u.id}`,
+            });
+          }),
+      );
     } catch (e) {
       console.error("[comments POST] mention notify failed:", e);
     }
@@ -184,6 +207,17 @@ export async function POST(req: Request) {
   const actorName = actor?.displayName || actor?.username || "Someone";
   const preview = text.length > 80 ? text.slice(0, 77) + "…" : text;
 
+  // Look up the rating owner's username so push URLs can deep-link to
+  // /r/<owner>/<songId> (the shared rating page where the comment lives).
+  const [ratingOwner] = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(eq(users.id, ratingUserId))
+    .limit(1);
+  const ratingPageUrl = ratingOwner
+    ? `/r/${ratingOwner.username}/${encodeBase64Url(songId)}`
+    : `/u/${actor?.username ?? ""}`;
+
   if (ratingUserId !== userId) {
     await db.insert(activities).values({
       id: randomUUID(),
@@ -191,11 +225,14 @@ export async function POST(req: Request) {
       actorId: userId,
       type: "comment",
       songId,
+      ratingUserId,
     });
     await sendPushToUser(ratingUserId, {
       title: `${actorName} commented on ${song?.title ?? "your rating"}`,
       body: preview,
-      url: `/u/${actor?.username ?? ""}`,
+      // Rating owner = recipient: their own rating is on their feed,
+      // anchor straight to the card.
+      url: `/feed#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
       tag: `comment:${userId}:${songId}`,
     });
   }
@@ -210,11 +247,14 @@ export async function POST(req: Request) {
         actorId: userId,
         type: "reply",
         songId,
+        ratingUserId,
       });
       await sendPushToUser(parentCommenterId, {
         title: `${actorName} replied to your comment`,
         body: preview,
-        url: `/u/${actor?.username ?? ""}`,
+        // Parent commenter isn't necessarily the rating owner, so we
+        // can't anchor to their feed — link to the rating's shared page.
+        url: ratingPageUrl,
         tag: `reply:${userId}:${songId}`,
       });
     } catch (e) {

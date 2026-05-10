@@ -195,40 +195,46 @@ export async function POST(req: Request) {
     // sender (self) and the recipient (already notified above).
     if (message) {
       try {
-        const mentioned = extractMentions(message);
+        // Cap mentions at 10 to prevent one-message-pings-200-people abuse.
+        const mentioned = extractMentions(message).slice(0, 10);
         if (mentioned.length > 0) {
           const mUsers = await db
             .select({ id: users.id, username: users.username })
             .from(users)
             .where(inArray(users.username, mentioned));
-          for (const u of mUsers) {
-            if (u.id === userId || u.id === target.id) continue;
-            await db
-              .delete(activities)
-              .where(
-                and(
-                  eq(activities.userId, u.id),
-                  eq(activities.actorId, userId),
-                  eq(activities.type, "mention"),
-                  eq(activities.songId, song.id),
-                ),
-              );
-            await db.insert(activities).values({
-              id: randomUUID(),
-              userId: u.id,
-              actorId: userId,
-              type: "mention",
-              songId: song.id,
-            });
-            const preview =
-              message.length > 100 ? message.slice(0, 97) + "…" : message;
-            await sendPushToUser(u.id, {
-              title: `${actorName} mentioned you on ${song.title}`,
-              body: preview,
-              url: actorUsername ? `/u/${actorUsername}` : "/feed",
-              tag: `mention:${userId}:${song.id}:${u.id}`,
-            });
-          }
+          const preview =
+            message.length > 100 ? message.slice(0, 97) + "…" : message;
+          // Fan out activity inserts + pushes in parallel; sequential
+          // awaits were burning ~200ms per recipient.
+          await Promise.allSettled(
+            mUsers
+              .filter((u) => u.id !== userId && u.id !== target.id)
+              .map(async (u) => {
+                await db
+                  .delete(activities)
+                  .where(
+                    and(
+                      eq(activities.userId, u.id),
+                      eq(activities.actorId, userId),
+                      eq(activities.type, "mention"),
+                      eq(activities.songId, song.id),
+                    ),
+                  );
+                await db.insert(activities).values({
+                  id: randomUUID(),
+                  userId: u.id,
+                  actorId: userId,
+                  type: "mention",
+                  songId: song.id,
+                });
+                await sendPushToUser(u.id, {
+                  title: `${actorName} mentioned you on ${song.title}`,
+                  body: preview,
+                  url: actorUsername ? `/u/${actorUsername}` : "/feed",
+                  tag: `mention:${userId}:${song.id}:${u.id}`,
+                });
+              }),
+          );
         }
       } catch (e) {
         console.error("[recommendations POST] mention notify failed:", e);

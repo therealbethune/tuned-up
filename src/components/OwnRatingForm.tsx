@@ -131,6 +131,10 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
           inputMode="numeric"
           pattern="[0-9]*"
           enterKeyHint="done"
+          role="spinbutton"
+          aria-valuemin={1}
+          aria-valuemax={100}
+          aria-valuenow={clampedScore() ?? undefined}
           value={scoreText}
           onChange={(e) => changeScore(e.target.value)}
           onKeyDown={(e) => {

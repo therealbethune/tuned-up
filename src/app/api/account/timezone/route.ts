@@ -20,6 +20,15 @@ export async function POST(req: Request) {
   if (!/^[A-Za-z_/+\-0-9]+$/.test(timezone)) {
     return NextResponse.json({ error: "invalid timezone" }, { status: 400 });
   }
+  // Actually try to construct a DateTimeFormat with the value — the spec
+  // throws a RangeError on unknown IANA names so this is the canonical
+  // "is it a real timezone" check (catches things like "Foo/Bar" that
+  // pass the regex but aren't real zones).
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+  } catch {
+    return NextResponse.json({ error: "unknown timezone" }, { status: 400 });
+  }
 
   await db.update(users).set({ timezone }).where(eq(users.id, userId));
   return NextResponse.json({ ok: true });

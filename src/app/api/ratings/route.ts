@@ -132,6 +132,8 @@ export async function POST(req: Request) {
         actorId: userId,
         type: "rating_match",
         songId: song.id,
+        // Actor's rating is the one this match points to.
+        ratingUserId: userId,
       }));
       // Best-effort; don't fail the rating if activity insert fails.
       try {
@@ -194,6 +196,8 @@ export async function POST(req: Request) {
             actorId: userId,
             type: "rec_rated",
             songId: song.id,
+            // The rating that was just made — owned by the rater (actor).
+            ratingUserId: userId,
           });
           await sendPushToUser(r.fromUserId, {
             title: `🎯 ${myName} rated your rec`,

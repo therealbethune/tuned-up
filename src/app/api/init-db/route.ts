@@ -138,6 +138,12 @@ const STATEMENTS = [
   // Streak caching for milestone activities + percentile compute.
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "current_streak" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "highest_streak_milestone" integer NOT NULL DEFAULT 0`,
+  // Deep-link target for activity rows + push notifications. Set on
+  // comment/like/mention/reply/rating_match/rec_rated; lets us route to
+  // /r/<rating_owner>/<song_id> when the recipient isn't the rating owner.
+  `ALTER TABLE "activities" ADD COLUMN IF NOT EXISTS "rating_user_id" text`,
+  // follower-side index speeds up the feed's "followedIds" lookup.
+  `CREATE INDEX IF NOT EXISTS "follows_follower_idx" ON "follows" USING btree ("follower_id","status")`,
   // Removed feature: sound_bites / reels. Drop dormant table (idempotent —
   // no-op if it was never created in this environment).
   `DROP TABLE IF EXISTS "sound_bites" CASCADE`,

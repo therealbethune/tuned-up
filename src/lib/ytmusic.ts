@@ -53,6 +53,8 @@ async function rawSearch(query: string, params: string): Promise<unknown> {
       "YT_MUSIC_KEY env var is not set. Add it to your Netlify project env vars.",
     );
   }
+  // 8s timeout: YT Music's InnerTube occasionally hangs; we'd rather
+  // surface "no results" than freeze a serverless function for 10+ seconds.
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: {
@@ -61,6 +63,7 @@ async function rawSearch(query: string, params: string): Promise<unknown> {
       origin: "https://music.youtube.com",
     },
     body: JSON.stringify({ context: CTX, query, params }),
+    signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`yt music search failed: ${res.status}`);
   return res.json();

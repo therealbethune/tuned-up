@@ -45,6 +45,7 @@ export async function getAppAccessToken(): Promise<string> {
       "content-type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify app-token failed: ${res.status} ${await res.text()}`);
   const data: { access_token: string; expires_in: number } = await res.json();
@@ -85,6 +86,7 @@ export async function exchangeCodeForUserTokens(
       "content-type": "application/x-www-form-urlencoded",
     },
     body,
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify code-exchange failed: ${res.status} ${await res.text()}`);
   const j: {
@@ -115,6 +117,7 @@ async function refreshUserAccessToken(refreshToken: string): Promise<{
       "content-type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify refresh failed: ${res.status} ${await res.text()}`);
   const j: { access_token: string; expires_in: number; refresh_token?: string } = await res.json();
@@ -152,7 +155,10 @@ export async function getUserAccessToken(userId: string): Promise<string | null>
 }
 
 export async function fetchSpotifyMe(accessToken: string): Promise<{ id: string; email?: string }> {
-  const res = await fetch(`${API}/me`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const res = await fetch(`${API}/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(5000),
+  });
   if (!res.ok) throw new Error(`Spotify /me failed: ${res.status}`);
   return res.json();
 }
@@ -179,13 +185,22 @@ function primaryArtist(s: string): string {
 }
 
 async function spotifySearch(token: string, query: string): Promise<string | null> {
-  const res = await fetch(
-    `${API}/search?type=track&limit=5&q=${encodeURIComponent(query)}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!res.ok) return null;
-  const j: { tracks?: { items?: { id: string }[] } } = await res.json();
-  return j.tracks?.items?.[0]?.id ?? null;
+  try {
+    const res = await fetch(
+      `${API}/search?type=track&limit=5&q=${encodeURIComponent(query)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (!res.ok) return null;
+    const j: { tracks?: { items?: { id: string }[] } } = await res.json();
+    return j.tracks?.items?.[0]?.id ?? null;
+  } catch {
+    // Network errors / timeouts — gracefully return null so the resolver
+    // tries the next progressively-looser query.
+    return null;
+  }
 }
 
 // Search Spotify for a track matching the given title + artist; return the
@@ -254,6 +269,7 @@ export async function saveTrackToLibrary(userId: string, spotifyTrackId: string)
   const res = await fetch(`${API}/me/tracks?ids=${encodeURIComponent(spotifyTrackId)}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -281,7 +297,10 @@ export async function checkTracksSaved(
   if (!token) return {};
   const res = await fetch(
     `${API}/me/tracks/contains?ids=${spotifyTrackIds.map(encodeURIComponent).join(",")}`,
-    { headers: { Authorization: `Bearer ${token}` } },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
+    },
   );
   if (!res.ok) return {};
   const arr: boolean[] = await res.json();
