@@ -55,7 +55,17 @@ export function SaveToSpotifyButton({
           missing_scope: "Reconnect Spotify",
           rate_limited: "Try again later",
         };
-        setErrorMsg(errMap[j.error] || j.error || "Couldn't save");
+        // Spotify dev-mode 403: the rejection is signaled via spotify_error
+        // with status 403 even when the scope/ACL are correct. Diagnose
+        // endpoint helps users figure out why.
+        const looksLikeDevMode403 =
+          j.error === "spotify_error" && j.spotifyStatus === 403;
+        setErrorMsg(
+          errMap[j.error] ||
+            (looksLikeDevMode403 ? "Spotify rejected (403)" : null) ||
+            j.error ||
+            "Couldn't save",
+        );
         scheduleReset();
         return;
       }

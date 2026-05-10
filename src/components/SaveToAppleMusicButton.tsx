@@ -1,57 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { AppleMusicIcon } from "@/components/icons";
-import type { MusicKitInstance } from "@/lib/musickit-types";
-import "@/lib/musickit-types";
+import {
+  setupMusicKit,
+  markAppleMusicAuthorized,
+  musicKitErrorMessage,
+} from "@/lib/musickit-client";
 
 const ERROR_AUTO_RESET_MS = 2500;
-const MUSICKIT_JS_URL = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
-
-// One-time loader for MusicKit JS + token fetch + configure. Returns the
-// configured instance. Subsequent calls reuse the same instance.
-let setupPromise: Promise<MusicKitInstance> | null = null;
-async function setupMusicKit(): Promise<MusicKitInstance> {
-  if (setupPromise) return setupPromise;
-  setupPromise = (async () => {
-    // Inject script if needed.
-    if (!window.MusicKit) {
-      await new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector(`script[src="${MUSICKIT_JS_URL}"]`);
-        if (existing) {
-          existing.addEventListener("load", () => resolve(), { once: true });
-          existing.addEventListener("error", () => reject(new Error("musickit load failed")), { once: true });
-          return;
-        }
-        const s = document.createElement("script");
-        s.src = MUSICKIT_JS_URL;
-        s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error("musickit load failed"));
-        document.head.appendChild(s);
-      });
-      // MusicKit fires its own "musickitloaded" event after init. We can
-      // safely wait one tick after the script-load fires.
-      await new Promise<void>((resolve) => {
-        if (window.MusicKit) return resolve();
-        document.addEventListener("musickitloaded", () => resolve(), { once: true });
-      });
-    }
-    if (!window.MusicKit) throw new Error("MusicKit global missing");
-    // Fetch our developer token.
-    const tokRes = await fetch("/api/musickit/token", { cache: "no-store" });
-    if (!tokRes.ok) {
-      const j = await tokRes.json().catch(() => ({}));
-      throw new Error(j.error || `developer token ${tokRes.status}`);
-    }
-    const { token } = await tokRes.json();
-    await window.MusicKit.configure({
-      developerToken: token,
-      app: { name: "Tuned Up", build: "1.0" },
-    });
-    return window.MusicKit.getInstance();
-  })();
-  return setupPromise;
-}
 
 // Adds a song to the viewer's Apple Music library. Lazy-loads MusicKit JS
 // on first click; user authorizes Apple Music in a popup; we look up the
@@ -94,12 +50,12 @@ export function SaveToAppleMusicButton({ songId }: { songId: string }) {
       const trackId: string = resolveJ.trackId;
 
       // 2. Client: ensure MusicKit JS is loaded + configured.
-      let music: MusicKitInstance;
+      let music;
       try {
         music = await setupMusicKit();
       } catch (e) {
         setState("error");
-        setErrorMsg((e as Error).message.includes("token") ? "Token error" : "MusicKit load failed");
+        setErrorMsg(musicKitErrorMessage(e));
         scheduleReset();
         return;
       }
@@ -108,9 +64,10 @@ export function SaveToAppleMusicButton({ songId }: { songId: string }) {
       if (!music.isAuthorized) {
         try {
           await music.authorize();
-        } catch {
+          markAppleMusicAuthorized(true);
+        } catch (e) {
           setState("error");
-          setErrorMsg("Sign-in cancelled");
+          setErrorMsg(musicKitErrorMessage(e));
           scheduleReset();
           return;
         }

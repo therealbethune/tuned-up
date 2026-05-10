@@ -6,12 +6,18 @@ import { db, likes, ratings, activities, users, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
+import { canViewRatingsFrom } from "@/lib/visibility";
 
 export const runtime = "nodejs";
 
 // GET /api/likes?u=<ratingUserId>&s=<songId>
 // Returns: { likers: [{ id, username, displayName, imageUrl, createdAt }] }
-// Most-recent first. Anyone signed in can read; like counts are public.
+// Most-recent first.
+//
+// Privacy: if the rating owner is private and the viewer doesn't follow
+// them, return 403 — like-count is still derivable from the public POST
+// response, but who liked is a personal detail of the private owner's
+// social graph.
 export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -21,6 +27,9 @@ export async function GET(req: Request) {
   const songId = url.searchParams.get("s");
   if (!ratingUserId || !songId) {
     return NextResponse.json({ error: "u and s required" }, { status: 400 });
+  }
+  if (!(await canViewRatingsFrom(userId, ratingUserId))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const rows = await db

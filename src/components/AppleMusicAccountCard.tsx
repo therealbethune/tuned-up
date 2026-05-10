@@ -2,45 +2,13 @@
 import { useEffect, useState } from "react";
 import { AppleMusicIcon } from "@/components/icons";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  setupMusicKit,
+  markAppleMusicAuthorized,
+  isAppleMusicAuthorized,
+  musicKitErrorMessage,
+} from "@/lib/musickit-client";
 import type { MusicKitInstance } from "@/lib/musickit-types";
-import "@/lib/musickit-types";
-
-const APPLE_AUTHORIZED_KEY = "tu_apple_music_authorized";
-const MUSICKIT_JS_URL = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
-
-// Shared with ConnectMusicBanner + SaveToAppleMusicButton — each loads its
-// own promise but the script + token requests are de-duped by the browser.
-async function setupMusicKit(): Promise<MusicKitInstance> {
-  if (!window.MusicKit) {
-    await new Promise<void>((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${MUSICKIT_JS_URL}"]`);
-      if (existing) {
-        existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error("load")), { once: true });
-        return;
-      }
-      const s = document.createElement("script");
-      s.src = MUSICKIT_JS_URL;
-      s.async = true;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error("load"));
-      document.head.appendChild(s);
-    });
-    await new Promise<void>((resolve) => {
-      if (window.MusicKit) return resolve();
-      document.addEventListener("musickitloaded", () => resolve(), { once: true });
-    });
-  }
-  if (!window.MusicKit) throw new Error("MusicKit global missing");
-  const tokRes = await fetch("/api/musickit/token", { cache: "no-store" });
-  if (!tokRes.ok) throw new Error("token");
-  const { token } = await tokRes.json();
-  await window.MusicKit.configure({
-    developerToken: token,
-    app: { name: "Tuned Up", build: "1.0" },
-  });
-  return window.MusicKit.getInstance();
-}
 
 // Connect / disconnect Apple Music. Lives on /settings alongside the
 // Spotify card. MusicKit JS owns the user-token state in-browser, so the
@@ -49,17 +17,18 @@ async function setupMusicKit(): Promise<MusicKitInstance> {
 export function AppleMusicAccountCard() {
   // null while we check localStorage (avoids SSR hydration mismatch by
   // rendering a neutral state on first paint).
-  const [connected, setConnected] = useState<boolean | null>(null);
+  // Start with `false` (the safer default) instead of `null` so the card
+  // renders its full "Connect Apple Music" CTA on first paint instead of
+  // a momentary "Checking…" flash. On mount we read localStorage and flip
+  // to `true` if the flag is set — at worst the connect CTA shows for one
+  // frame on a connected user, which is invisible.
+  const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
-    try {
-      setConnected(window.localStorage.getItem(APPLE_AUTHORIZED_KEY) === "1");
-    } catch {
-      setConnected(false);
-    }
+    if (isAppleMusicAuthorized()) setConnected(true);
   }, []);
 
   async function connect() {
@@ -71,19 +40,10 @@ export function AppleMusicAccountCard() {
       if (!music.isAuthorized) {
         await music.authorize();
       }
-      try {
-        window.localStorage.setItem(APPLE_AUTHORIZED_KEY, "1");
-      } catch {}
+      markAppleMusicAuthorized(true);
       setConnected(true);
     } catch (e) {
-      const msg = (e as Error).message;
-      setError(
-        msg === "token"
-          ? "Developer token error"
-          : msg === "load"
-            ? "MusicKit failed to load"
-            : "Sign-in cancelled",
-      );
+      setError(musicKitErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -102,9 +62,7 @@ export function AppleMusicAccountCard() {
       } catch {
         /* ignore */
       }
-      try {
-        window.localStorage.removeItem(APPLE_AUTHORIZED_KEY);
-      } catch {}
+      markAppleMusicAuthorized(false);
       setConnected(false);
     } finally {
       setBusy(false);
@@ -120,9 +78,7 @@ export function AppleMusicAccountCard() {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold">Apple Music</h3>
-          {connected === null ? (
-            <p className="text-xs text-neutral-400 mt-0.5">Checking…</p>
-          ) : connected ? (
+          {connected ? (
             <>
               <p className="text-xs text-neutral-400 mt-0.5">
                 Connected. You can save rated songs straight to your Apple Music library.

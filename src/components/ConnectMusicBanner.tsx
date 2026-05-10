@@ -1,47 +1,14 @@
 "use client";
 import { useState } from "react";
 import { SpotifyIconOnGreen, AppleMusicIcon } from "@/components/icons";
-import type { MusicKitInstance } from "@/lib/musickit-types";
-import "@/lib/musickit-types";
+import {
+  setupMusicKit,
+  markAppleMusicAuthorized,
+  isAppleMusicAuthorized,
+  musicKitErrorMessage,
+} from "@/lib/musickit-client";
 
 const DISMISS_KEY = "tu_music_banner_dismissed";
-const APPLE_AUTHORIZED_KEY = "tu_apple_music_authorized";
-
-const MUSICKIT_JS_URL = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
-
-// Reusable MusicKit setup — shared with SaveToAppleMusicButton via separate
-// loads (each component caches its own promise). Cheap to dupe.
-async function setupMusicKit(): Promise<MusicKitInstance> {
-  if (!window.MusicKit) {
-    await new Promise<void>((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${MUSICKIT_JS_URL}"]`);
-      if (existing) {
-        existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error("load")), { once: true });
-        return;
-      }
-      const s = document.createElement("script");
-      s.src = MUSICKIT_JS_URL;
-      s.async = true;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error("load"));
-      document.head.appendChild(s);
-    });
-    await new Promise<void>((resolve) => {
-      if (window.MusicKit) return resolve();
-      document.addEventListener("musickitloaded", () => resolve(), { once: true });
-    });
-  }
-  if (!window.MusicKit) throw new Error("MusicKit global missing");
-  const tokRes = await fetch("/api/musickit/token", { cache: "no-store" });
-  if (!tokRes.ok) throw new Error("token");
-  const { token } = await tokRes.json();
-  await window.MusicKit.configure({
-    developerToken: token,
-    app: { name: "Tuned Up", build: "1.0" },
-  });
-  return window.MusicKit.getInstance();
-}
 
 // Banner that nudges the viewer to connect a music service so they can
 // save songs as they rate them. Shows when both Spotify is unconnected
@@ -60,10 +27,9 @@ export function ConnectMusicBanner({
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(DISMISS_KEY) === "1";
   });
-  const [appleConnected, setAppleConnected] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(APPLE_AUTHORIZED_KEY) === "1";
-  });
+  const [appleConnected, setAppleConnected] = useState(() =>
+    isAppleMusicAuthorized(),
+  );
   const [appleBusy, setAppleBusy] = useState(false);
   const [appleError, setAppleError] = useState<string | null>(null);
 
@@ -86,19 +52,10 @@ export function ConnectMusicBanner({
       if (!music.isAuthorized) {
         await music.authorize();
       }
-      try {
-        window.localStorage.setItem(APPLE_AUTHORIZED_KEY, "1");
-      } catch {}
+      markAppleMusicAuthorized(true);
       setAppleConnected(true);
     } catch (e) {
-      const msg = (e as Error).message;
-      setAppleError(
-        msg === "token"
-          ? "Token error"
-          : msg === "load"
-            ? "MusicKit failed to load"
-            : "Sign-in cancelled",
-      );
+      setAppleError(musicKitErrorMessage(e));
     } finally {
       setAppleBusy(false);
     }

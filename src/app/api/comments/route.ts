@@ -7,6 +7,7 @@ import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
 import { extractMentions } from "@/lib/mentions";
+import { canViewRatingsFrom } from "@/lib/visibility";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,9 @@ export async function GET(req: Request) {
   const songId = url.searchParams.get("s");
   if (!ratingUserId || !songId) {
     return NextResponse.json({ error: "u and s required" }, { status: 400 });
+  }
+  if (!(await canViewRatingsFrom(userId, ratingUserId))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const rows = await db
@@ -73,6 +77,13 @@ export async function POST(req: Request) {
     .where(and(eq(ratings.userId, ratingUserId), eq(ratings.songId, songId)))
     .limit(1);
   if (!r) return NextResponse.json({ error: "rating not found" }, { status: 404 });
+
+  // Privacy gate: can the commenter even see this rating? If the owner
+  // is private and the commenter doesn't follow, block the comment so we
+  // don't let strangers post on private ratings.
+  if (!(await canViewRatingsFrom(userId, ratingUserId))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   // If this is a reply, validate the parent and flatten any reply-to-reply
   // chain (so replies are always at depth 1).

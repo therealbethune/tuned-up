@@ -25,12 +25,13 @@ export async function GET() {
 
   try {
     const token = await getAppleMusicDeveloperToken();
-    // Browser cache 1h. The token is good for ~5 months; we sign a fresh
-    // one in module memory if the cache misses. This response cache is
-    // just to spare round-trips during a heavy listening session.
+    // Do NOT cache on the browser. The token itself lasts months and is
+    // signed in-memory on the server, but we want the auth gate on this
+    // route to run on every request — caching meant a logged-out user
+    // could keep using the cached token for an hour after sign-out.
     return NextResponse.json(
       { token },
-      { headers: { "cache-control": "private, max-age=3600" } },
+      { headers: { "cache-control": "private, no-store" } },
     );
   } catch (e) {
     return NextResponse.json(

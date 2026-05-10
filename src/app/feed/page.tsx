@@ -107,6 +107,10 @@ export default async function FeedPage({
   // If the activity-link supplied a focus and that rating isn't already
   // in the page, fetch + prepend it so the anchor scroll always finds
   // its target. Cheap — single-row lookup.
+  //
+  // Privacy: a rating from a private user is only visible to the viewer
+  // if they own it OR they follow the user (accepted). Otherwise we
+  // silently drop the focus so they can't bypass privacy via URL.
   if (
     focusUserId &&
     focusSongId &&
@@ -129,6 +133,7 @@ export default async function FeedPage({
         displayName: users.displayName,
         imageUrl: users.imageUrl,
         currentStreak: users.currentStreak,
+        ratingOwnerIsPrivate: users.isPrivate,
       })
       .from(ratings)
       .innerJoin(songs, eq(ratings.songId, songs.id))
@@ -138,7 +143,20 @@ export default async function FeedPage({
       )
       .limit(1);
     if (focused) {
-      items = [focused, ...items];
+      const ownerIsPrivate = focused.ratingOwnerIsPrivate;
+      const viewerOwnsIt = focused.ratingUserId === userId;
+      const viewerFollows = followedIds.includes(focused.ratingUserId);
+      const allowed = !ownerIsPrivate || viewerOwnsIt || viewerFollows;
+      if (allowed) {
+        // Strip the privacy-only field before merging into the items list
+        // (the visible row type doesn't include it).
+        const {
+          ratingOwnerIsPrivate: _drop,
+          ...rest
+        } = focused;
+        void _drop;
+        items = [rest, ...items];
+      }
     }
   }
   const oldestCreatedAt = items.length > 0 ? items[items.length - 1].createdAt : null;
