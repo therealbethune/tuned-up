@@ -36,23 +36,6 @@ export const songs = pgTable("songs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// A short voice/audio snippet a user records when rating a song. Plays
-// over the song preview in the /reels swipeable feed. Stored in Netlify
-// Blobs; we keep only the URL + duration here.
-export const soundBites = pgTable("sound_bites", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  songId: text("song_id").notNull().references(() => songs.id, { onDelete: "cascade" }),
-  audioUrl: text("audio_url").notNull(),
-  durationMs: integer("duration_ms").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (t) => [
-  index("sound_bites_song_idx").on(t.songId),
-  index("sound_bites_user_idx").on(t.userId, t.createdAt),
-  // One bite per (user, song) — re-recording overwrites.
-  uniqueIndex("sound_bites_unique").on(t.userId, t.songId),
-]);
-
 // One row per user who has linked their Spotify account. Stores the
 // long-lived refresh token plus a cached access token; helpers in
 // `lib/spotify-server.ts` auto-refresh expired tokens.

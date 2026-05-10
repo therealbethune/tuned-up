@@ -45,22 +45,13 @@ const TAB_ICON = {
       <circle cx="12" cy="7" r="4" />
     </svg>
   ),
-  reels: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="9" y="2" width="6" height="12" rx="3" />
-      <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="22" />
-    </svg>
-  ),
 };
 
-// 6 tabs — replaced "People" (low-traffic, reachable via Search) with Reels
-// to give the music-bite feed a primary entry point on mobile.
 const TABS = [
   { href: "/feed", label: "Feed", icon: TAB_ICON.feed },
-  { href: "/reels", label: "Reels", icon: TAB_ICON.reels },
   { href: "/discover", label: "Discover", icon: TAB_ICON.discover },
   { href: "/search", label: "Search", icon: TAB_ICON.search },
+  { href: "/people", label: "People", icon: TAB_ICON.people },
   { href: "/activity", label: "Activity", icon: TAB_ICON.activity, hasUnread: true },
   { href: "/me", label: "Me", icon: TAB_ICON.me },
 ];

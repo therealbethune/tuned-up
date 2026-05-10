@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { and, desc, eq, inArray, notInArray, sql, count } from "drizzle-orm";
-import { db, ratings, songs, users, follows, comments, likes, spotifyAccounts, soundBites } from "@/db";
+import { db, ratings, songs, users, follows, comments, likes, spotifyAccounts } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
@@ -14,7 +14,6 @@ import { StreamingLinks } from "@/components/StreamingLinks";
 import { RecommendButton } from "@/components/RecommendButton";
 import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { ConnectSpotifyBanner } from "@/components/ConnectSpotifyBanner";
-import { SoundBiteRecorder } from "@/components/SoundBiteRecorder";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 
@@ -77,32 +76,6 @@ export default async function FeedPage() {
     .from(spotifyAccounts)
     .where(eq(spotifyAccounts.userId, userId));
   const spotifyConnected = Boolean(spotifyLink);
-
-  // Which of *my* visible ratings already have a sound bite? Drives the
-  // "re-record" vs "record" state in the SoundBiteRecorder.
-  const myBiteSongIds = songIds.length
-    ? new Set(
-        (await db
-          .select({ s: soundBites.songId })
-          .from(soundBites)
-          .where(
-            and(eq(soundBites.userId, userId), inArray(soundBites.songId, songIds)),
-          )).map((r) => r.s),
-      )
-    : new Set<string>();
-
-  // Which of OTHER users' visible cards have a bite? Used to render a
-  // "🎙️ Sound bite" indicator + tap-to-play link on those cards.
-  const otherBiteKeys = items.length
-    ? new Set(
-        (await db
-          .select({ u: soundBites.userId, s: soundBites.songId })
-          .from(soundBites)
-          .where(inArray(soundBites.songId, songIds)))
-          .filter((b) => b.u !== userId)
-          .map((b) => `${b.u}::${b.s}`),
-      )
-    : new Set<string>();
 
   // Comment counts per (ratingUserId, songId) grouped by both.
   let commentCounts: Map<string, number> = new Map();
@@ -289,27 +262,11 @@ export default async function FeedPage() {
                   />
                 </div>
 
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {!isAlbumId(it.songId) && spotifyConnected && (
+                {!isAlbumId(it.songId) && spotifyConnected && (
+                  <div className="mt-2">
                     <SaveToSpotifyButton songId={it.songId} connected={spotifyConnected} />
-                  )}
-                  {!isAlbumId(it.songId) && it.ratingUserId === userId && (
-                    <SoundBiteRecorder
-                      songId={it.songId}
-                      hasExisting={myBiteSongIds.has(it.songId)}
-                    />
-                  )}
-                  {!isAlbumId(it.songId) && it.ratingUserId !== userId &&
-                    otherBiteKeys.has(`${it.ratingUserId}::${it.songId}`) && (
-                      <Link
-                        href="/reels"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 text-xs font-medium px-2.5 py-1 hover:bg-fuchsia-500/20"
-                        title="Open in reels"
-                      >
-                        🎙️ Sound bite
-                      </Link>
-                    )}
-                </div>
+                  </div>
+                )}
 
                 <CommentSection
                   ratingUserId={it.ratingUserId}
