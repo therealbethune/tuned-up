@@ -18,6 +18,7 @@ import { SafeCardBoundary } from "@/components/SafeCardBoundary";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
+import { encodeBase64Url } from "@/lib/encoding";
 
 export const dynamic = "force-dynamic";
 
@@ -193,9 +194,16 @@ export default async function FeedPage({
               thumbnail: it.thumbnail,
               durationSeconds: null,
             };
+            // Stable id so /feed#rating-<userId>-<encodedSongId> from
+            // activity/notification links scrolls right to the card.
+            // CSS `:target` selector highlights it briefly.
+            const anchorId = `rating-${it.ratingUserId}-${encodeBase64Url(it.songId)}`;
             return (
               <SafeCardBoundary key={`${it.username}-${it.songId}-${it.createdAt}`}>
-              <li className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
+              <li
+                id={anchorId}
+                className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 target:ring-2 target:ring-emerald-500/60 target:border-emerald-500/40 scroll-mt-20"
+              >
                 <div className="flex items-center gap-3 mb-3">
                   {it.imageUrl ? (
                     <Image src={it.imageUrl} alt="" width={28} height={28} className="rounded-full h-7 w-7" />

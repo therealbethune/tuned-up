@@ -23,12 +23,20 @@ type ActivityRow = {
   songTitle: string | null;
 };
 
-// Pick the most useful destination per activity type. Tapping the row
-// jumps the user to wherever they're most likely to want to go — typically
-// the rating page where the action happened, not the actor's profile.
-function destinationFor(a: ActivityRow, viewerUsername: string | null): string {
-  // Helper: rating page for a given username + song.
-  const ratingPage = (username: string, songId: string) =>
+// Pick the most useful destination per activity type. For actions on the
+// viewer's OWN rating (comment / like / mention / reply) we deep-link
+// straight to that rating's card on the feed via a hash anchor, so the
+// viewer lands in their normal context with the comment thread already
+// reachable. For actions on someone else's rating we use /r/<username>/
+// (since that rating may not appear on the viewer's feed at all).
+function destinationFor(
+  a: ActivityRow,
+  viewerId: string,
+): string {
+  // The feed page renders each rating card with id="rating-<userId>-<base64SongId>".
+  const feedAnchor = (userId: string, songId: string) =>
+    `/feed#rating-${userId}-${encodeBase64Url(songId)}`;
+  const standaloneRating = (username: string, songId: string) =>
     `/r/${username}/${encodeBase64Url(songId)}`;
 
   switch (a.type) {
@@ -41,26 +49,21 @@ function destinationFor(a: ActivityRow, viewerUsername: string | null): string {
     case "like":
     case "mention":
     case "reply":
-      // The action was on the VIEWER's rating; show that rating with the
-      // comment/like attached. Falls back to actor profile if we don't
-      // have the data we need.
-      if (a.songId && viewerUsername) {
-        return ratingPage(viewerUsername, a.songId);
-      }
+      // Action happened on the VIEWER's rating — the rating IS on the
+      // viewer's own feed (the feed includes self). Anchor to that card.
+      if (a.songId) return feedAnchor(viewerId, a.songId);
       return `/u/${a.actorUsername}`;
     case "rating_match":
-      // Actor rated a song the viewer also rated — show the actor's rating
-      // (the new one) so the viewer sees what number they slapped on it.
-      if (a.songId) {
-        return ratingPage(a.actorUsername, a.songId);
-      }
+      // Actor rated a song the viewer also rated. The viewer's rating is
+      // on their feed, so anchor there — they see their own score and a
+      // "X also rated" hint via the activity itself.
+      if (a.songId) return feedAnchor(viewerId, a.songId);
       return `/u/${a.actorUsername}`;
     case "rec_rated":
-      // The actor (recipient of your recommendation) just rated it. Take
-      // them to the actor's rating page so they see the score.
-      if (a.songId) {
-        return ratingPage(a.actorUsername, a.songId);
-      }
+      // The actor (recipient of your recommendation) just rated it.
+      // Their rating may not be on your feed if you don't follow them, so
+      // route to the standalone rating page where it's guaranteed to load.
+      if (a.songId) return standaloneRating(a.actorUsername, a.songId);
       return `/u/${a.actorUsername}`;
     case "streak_milestone":
       return `/u/${a.actorUsername}`;
@@ -73,14 +76,6 @@ export default async function ActivityPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  // Viewer's username — needed so comment/like/mention/reply rows can
-  // deep-link to the viewer's rating page (where the action happened).
-  const [viewer] = await db
-    .select({ username: users.username })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  const viewerUsername = viewer?.username ?? null;
 
   const rows: ActivityRow[] = await db
     .select({
@@ -127,7 +122,7 @@ export default async function ActivityPage() {
       ) : (
         <ul className="space-y-2">
           {rows.map((a) => (
-            <ActivityRowItem key={a.id} a={a} viewerUsername={viewerUsername} />
+            <ActivityRowItem key={a.id} a={a} viewerId={userId} />
           ))}
         </ul>
       )}
@@ -137,16 +132,16 @@ export default async function ActivityPage() {
 
 function ActivityRowItem({
   a,
-  viewerUsername,
+  viewerId,
 }: {
   a: ActivityRow;
-  viewerUsername: string | null;
+  viewerId: string;
 }) {
   const unread = !a.readAt;
   // follow_request rows have inline action buttons and shouldn't be tappable
   // as a whole — clicks could conflict with the Accept/Decline buttons.
   const wholeRowTappable = a.type !== "follow_request";
-  const dest = destinationFor(a, viewerUsername);
+  const dest = destinationFor(a, viewerId);
 
   const Inner = (
     <>
