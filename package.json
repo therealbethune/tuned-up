@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.3.0",
+    "@netlify/blobs": "^10.7.4",
     "@netlify/neon": "^0.1.2",
     "@types/web-push": "^3.6.4",
     "dotenv": "^17.4.2",

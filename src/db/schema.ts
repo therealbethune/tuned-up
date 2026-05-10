@@ -10,6 +10,13 @@ export const users = pgTable("users", {
   isPrivate: boolean("is_private").notNull().default(false),
   timezone: text("timezone"),
   lastStreakWarnDate: text("last_streak_warn_date"),
+  // Cached current streak length, refreshed on every new rating. Lets us
+  // compute "top X% of users" without recomputing every streak on each load.
+  currentStreak: integer("current_streak").notNull().default(0),
+  // Highest milestone (in days) we've already announced for this user. Used
+  // to make the milestone-activity insert idempotent — only fire when the
+  // streak crosses a NEW threshold (7/14/30/60/100/365).
+  highestStreakMilestone: integer("highest_streak_milestone").notNull().default(0),
 }, (t) => [uniqueIndex("users_username_idx").on(t.username)]);
 
 // 'song' | 'album'. The table name is historical — these are really
@@ -28,6 +35,23 @@ export const songs = pgTable("songs", {
   spotifyTrackId: text("spotify_track_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// A short voice/audio snippet a user records when rating a song. Plays
+// over the song preview in the /reels swipeable feed. Stored in Netlify
+// Blobs; we keep only the URL + duration here.
+export const soundBites = pgTable("sound_bites", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  songId: text("song_id").notNull().references(() => songs.id, { onDelete: "cascade" }),
+  audioUrl: text("audio_url").notNull(),
+  durationMs: integer("duration_ms").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("sound_bites_song_idx").on(t.songId),
+  index("sound_bites_user_idx").on(t.userId, t.createdAt),
+  // One bite per (user, song) — re-recording overwrites.
+  uniqueIndex("sound_bites_unique").on(t.userId, t.songId),
+]);
 
 // One row per user who has linked their Spotify account. Stores the
 // long-lived refresh token plus a cached access token; helpers in

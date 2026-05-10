@@ -2,10 +2,16 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, eq, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, songs, ratings, activities, recommendations } from "@/db";
+import { db, songs, ratings, activities, recommendations, users } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
 import { ensureSpotifyTrackIdCached } from "@/lib/spotify-server";
+import { sendPushToUser } from "@/lib/push";
+import { computeStreak } from "@/lib/streak";
+import {
+  maybeAnnounceStreakMilestone,
+  refreshUserStreak,
+} from "@/lib/streak-milestones";
 
 export const runtime = "nodejs";
 
@@ -121,9 +127,27 @@ export async function POST(req: Request) {
     }
   }
 
+  // Recompute the cached streak now that a new rating landed, and fire a
+  // milestone celebration if they crossed 7 / 14 / 30 / 60 / 100 / etc.
+  // Best-effort — never block the rating save on this.
+  if (isNewRating) {
+    try {
+      const streak = await computeStreak(userId);
+      const refreshed = await refreshUserStreak(userId, streak);
+      await maybeAnnounceStreakMilestone(
+        userId,
+        refreshed.after,
+        refreshed.previousMilestone,
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
   // Mark any pending recommendations of this song to this user as 'rated' —
-  // they've now done what was suggested.
-  await db
+  // they've now done what was suggested. Capture WHO recommended it so we
+  // can notify them.
+  const ratedRecs = await db
     .update(recommendations)
     .set({ status: "rated" })
     .where(
@@ -132,7 +156,42 @@ export async function POST(req: Request) {
         eq(recommendations.songId, song.id),
         eq(recommendations.status, "pending"),
       ),
-    );
+    )
+    .returning({ id: recommendations.id, fromUserId: recommendations.fromUserId });
+
+  // For each rec we just resolved, send the recommender a push + drop an
+  // activity row. Best-effort: failures don't roll back the rating.
+  if (ratedRecs.length > 0) {
+    try {
+      const [me] = await db
+        .select({ username: users.username, displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const myName = me?.displayName || me?.username || "Someone";
+      const finalScore = Math.round(s);
+
+      await Promise.allSettled(
+        ratedRecs.map(async (r) => {
+          await db.insert(activities).values({
+            id: randomUUID(),
+            userId: r.fromUserId,
+            actorId: userId,
+            type: "rec_rated",
+            songId: song.id,
+          });
+          await sendPushToUser(r.fromUserId, {
+            title: `🎯 ${myName} rated your rec`,
+            body: `${song.title} — ${finalScore}/100`,
+            url: `/r/${encodeURIComponent(me?.username || "")}/${Buffer.from(song.id).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`,
+            tag: `rec_rated:${r.id}`,
+          });
+        }),
+      );
+    } catch {
+      /* swallow */
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

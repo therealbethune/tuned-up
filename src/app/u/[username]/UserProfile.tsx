@@ -12,6 +12,7 @@ import { StreamingLinks } from "@/components/StreamingLinks";
 import { isAlbumId } from "@/lib/songs";
 import { computeTasteAgreement } from "@/lib/taste";
 import { computeStreak } from "@/lib/streak";
+import { streakPercentile } from "@/lib/streak-milestones";
 
 type User = typeof users.$inferSelect;
 
@@ -42,6 +43,8 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     viewerId && !isOwner ? computeTasteAgreement(viewerId, target.id) : Promise.resolve(null),
     computeStreak(target.id),
   ]);
+  // Top X% percentile shown alongside the streak badge.
+  const streakPct = streak > 0 ? Math.max(1, 100 - (await streakPercentile(streak))) : 0;
   const followRow = followingViewer[0];
   const followState: "none" | "pending" | "accepted" = !followRow
     ? "none"
@@ -133,16 +136,29 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
             {streak > 0 && (
               <span
                 className="text-xs rounded-full px-2 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-300 border border-orange-500/40 tabular-nums font-medium"
-                title={`${streak}-day rating streak`}
+                title={`${streak}-day rating streak — top ${streakPct}% of streak holders`}
               >
                 🔥 {streak}-day streak
+                {streakPct > 0 && streakPct <= 50 && (
+                  <span className="ml-1 text-amber-200/80">· top {streakPct}%</span>
+                )}
               </span>
             )}
           </div>
         </div>
         {viewerId && viewerId !== target.id && (
-          <div className="pt-1 shrink-0">
+          <div className="pt-1 shrink-0 flex flex-col items-end gap-1.5">
             <FollowButton username={target.username} initialState={followState} />
+            <Link
+              href={`/u/${target.username}/recs`}
+              className="text-xs text-neutral-400 hover:text-white inline-flex items-center gap-1"
+              title="Rec history with this user"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M3 11l18-8-8 18-2-8-8-2z" />
+              </svg>
+              Recs
+            </Link>
           </div>
         )}
       </div>

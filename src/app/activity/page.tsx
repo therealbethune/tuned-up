@@ -40,6 +40,15 @@ function destinationFor(a: ActivityRow): string {
       return `/u/${a.actorUsername}`;
     case "rating_match":
       return `/u/${a.actorUsername}`;
+    case "rec_rated":
+      // Jump to the shared rating page if we have a song.
+      if (a.songId) {
+        const enc = Buffer.from(a.songId).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        return `/r/${a.actorUsername}/${enc}`;
+      }
+      return `/u/${a.actorUsername}`;
+    case "streak_milestone":
+      return `/u/${a.actorUsername}`;
     default:
       return `/u/${a.actorUsername}`;
   }
@@ -189,6 +198,33 @@ function ActivityVerb({ a }: { a: ActivityRow }) {
         )}
       </>
     );
+  }
+  if (a.type === "rec_rated") {
+    return (
+      <>
+        rated your rec
+        {a.songTitle ? (
+          <>
+            {" "}<span className="text-neutral-200">{a.songTitle}</span>
+          </>
+        ) : null}
+      </>
+    );
+  }
+  if (a.type === "streak_milestone") {
+    // songId is overloaded for this type: "streak:<days>:<topPct>"
+    const m = (a.songId || "").match(/^streak:(\d+):(\d+)$/);
+    if (m) {
+      const days = m[1];
+      const topPct = m[2];
+      return (
+        <>
+          hit a <span className="text-neutral-200">{days}-day streak</span>
+          <span className="text-neutral-500"> · top {topPct}%</span>
+        </>
+      );
+    }
+    return <>hit a <span className="text-neutral-200">streak milestone</span></>;
   }
   if (a.type === "recommendation") {
     return (

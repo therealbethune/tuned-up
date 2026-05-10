@@ -135,6 +135,23 @@ const STATEMENTS = [
     "connected_at" timestamp DEFAULT now() NOT NULL
   )`,
   `ALTER TABLE "spotify_accounts" ADD CONSTRAINT "spotify_accounts_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  // Streak caching for milestone activities + percentile compute.
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "current_streak" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "highest_streak_milestone" integer NOT NULL DEFAULT 0`,
+  // Sound bites — short voice clips attached to ratings, surfaced in /reels.
+  `CREATE TABLE IF NOT EXISTS "sound_bites" (
+    "id" text PRIMARY KEY NOT NULL,
+    "user_id" text NOT NULL,
+    "song_id" text NOT NULL,
+    "audio_url" text NOT NULL,
+    "duration_ms" integer NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `ALTER TABLE "sound_bites" ADD CONSTRAINT "sound_bites_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `ALTER TABLE "sound_bites" ADD CONSTRAINT "sound_bites_song_fk" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE INDEX IF NOT EXISTS "sound_bites_song_idx" ON "sound_bites" USING btree ("song_id")`,
+  `CREATE INDEX IF NOT EXISTS "sound_bites_user_idx" ON "sound_bites" USING btree ("user_id","created_at")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "sound_bites_unique" ON "sound_bites" USING btree ("user_id","song_id")`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).
