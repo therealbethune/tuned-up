@@ -123,7 +123,7 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
             <div className="flex items-center gap-3">
               <a
                 href="/api/spotify/connect?return=/welcome"
-                className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-4 py-1.5 text-sm whitespace-nowrap"
+                className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-4 py-1.5 text-sm whitespace-nowrap active:scale-95 transition-transform"
               >
                 Connect Spotify
               </a>
@@ -174,7 +174,7 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
             <button
               onClick={() => setStep(2)}
               disabled={ratingsDone === 0}
-              className="rounded-full bg-white text-black px-4 py-1.5 font-medium disabled:opacity-50"
+              className="rounded-full bg-white text-black px-4 py-1.5 font-medium disabled:opacity-50 active:scale-95 transition-transform"
             >
               Next →
             </button>
@@ -235,7 +235,7 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
               <button
                 onClick={finish}
                 disabled={finishing}
-                className="rounded-full bg-white text-black px-5 py-2 font-medium disabled:opacity-50"
+                className="rounded-full bg-white text-black px-5 py-2 font-medium disabled:opacity-50 active:scale-95 transition-transform"
               >
                 {finishing ? "…" : "Finish"}
               </button>

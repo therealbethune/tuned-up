@@ -339,7 +339,7 @@ export default async function FeedPage({
               <li
                 id={anchorId}
                 data-target-highlight=""
-                className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 scroll-mt-[calc(env(safe-area-inset-top)+5rem)]"
+                className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4 scroll-mt-[calc(env(safe-area-inset-top)+5rem)] hover:border-neutral-700 hover:bg-neutral-900/80 transition-colors"
               >
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Avatar
@@ -360,7 +360,7 @@ export default async function FeedPage({
                       🔥 {it.currentStreak}
                     </span>
                   )}
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-neutral-400">
                     {relativeTime(it.createdAt)}
                   </span>
                 </div>
@@ -427,9 +427,15 @@ export default async function FeedPage({
                     </div>
                     <div className="text-sm text-neutral-400 truncate">{it.artist}{it.album ? ` · ${it.album}` : ""}</div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold tabular-nums">{it.score}</div>
-                    <div className={`text-[11px] font-medium ${scoreLabel(it.score).color}`}>
+                  <div className="text-right shrink-0 leading-tight">
+                    {/* Score is the punchline of the card — give it
+                        hero weight and color (the tier color, not just
+                        plain white) so it reads as the card's verdict
+                        at a glance. */}
+                    <div className={`text-4xl font-bold tabular-nums ${scoreLabel(it.score).color}`}>
+                      {it.score}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-neutral-400 mt-0.5">
                       {scoreLabel(it.score).label}
                     </div>
                   </div>
@@ -474,7 +480,7 @@ export default async function FeedPage({
                           : shown.length === 2
                             ? `${shown[0].displayName || shown[0].username} + 1`
                             : `${shown[0].displayName || shown[0].username} + ${others.length - 1}`}
-                        <span className="text-neutral-500"> also rated</span>
+                        <span className="text-neutral-400"> also rated</span>
                       </span>
                     </Link>
                   );
@@ -482,7 +488,7 @@ export default async function FeedPage({
 
                 {it.ratingUserId !== userId && (
                   <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-                    <span className="text-xs text-neutral-500">
+                    <span className="text-xs text-neutral-400">
                       {myScore != null ? "You also rated this" : "What do you think?"}
                     </span>
                     <div className="flex items-center gap-3">
@@ -555,7 +561,7 @@ export default async function FeedPage({
         <div className="pt-2 flex justify-center">
           <Link
             href="/feed"
-            className="text-xs text-neutral-500 hover:text-white"
+            className="text-xs text-neutral-400 hover:text-white"
           >
             ↑ Back to top
           </Link>
@@ -638,7 +644,7 @@ async function EmptyFeed({ userId, followedIds }: { userId: string; followedIds:
                     <div className="font-medium truncate">{u.displayName || u.username}</div>
                     <div className="text-sm text-neutral-400 truncate">@{u.username}</div>
                   </div>
-                  <div className="text-sm text-neutral-500 tabular-nums">
+                  <div className="text-sm text-neutral-400 tabular-nums">
                     {u.ratingsCount} {u.ratingsCount === 1 ? "rating" : "ratings"}
                   </div>
                 </Link>

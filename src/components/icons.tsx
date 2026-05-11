@@ -239,3 +239,29 @@ export function ChevronDownIcon({ size = 10, className, ...rest }: IconProps) {
     </svg>
   );
 }
+
+// --- Brand mark ---------------------------------------------------------
+
+// Tuned Up logomark. Two ascending bars + a tuning dot — reads as a
+// stylized equalizer + the "tuned" pitch reference. Designed to sit
+// inside an emerald-on-black rounded square at the page-header size
+// (h-7 w-7) and scale cleanly down to a 16×16 favicon and up to a
+// 128×128 app icon. Pure SVG, no gradients, no external fonts.
+export function TunedUpMark({ size = 20, className, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-label="Tuned Up"
+      className={className}
+      {...rest}
+    >
+      {/* Three bars climbing, rightmost tallest, lowest baseline aligned. */}
+      <rect x="4"  y="13" width="3.5" height="7"  rx="1.5" />
+      <rect x="10.25" y="9"  width="3.5" height="11" rx="1.5" />
+      <rect x="16.5" y="4"  width="3.5" height="16" rx="1.5" />
+    </svg>
+  );
+}

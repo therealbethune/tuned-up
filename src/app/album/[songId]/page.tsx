@@ -243,7 +243,7 @@ export default async function AlbumPage({
       {/* Aggregate stats */}
       <section className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 space-y-4">
         {total === 0 ? (
-          <p className="text-center text-neutral-500 text-sm py-2">
+          <p className="text-center text-neutral-400 text-sm py-2">
             Be the first to rate {isAlbum ? "this album" : "this song"}.
           </p>
         ) : (
@@ -264,14 +264,14 @@ export default async function AlbumPage({
                   <span className="font-bold tabular-nums">{friendAvg}</span>
                 </span>
               )}
-              <span className="text-sm text-neutral-500 ml-auto">
+              <span className="text-sm text-neutral-400 ml-auto">
                 {total} {total === 1 ? "rating" : "ratings"}
               </span>
             </div>
             <div className="space-y-1.5">
               {buckets.map((b, i) => (
                 <div key={b.label} className="flex items-center gap-2 text-xs">
-                  <span className="w-12 text-neutral-500 tabular-nums">{b.label}</span>
+                  <span className="w-12 text-neutral-400 tabular-nums">{b.label}</span>
                   <div className="flex-1 h-2 rounded-full bg-neutral-800 overflow-hidden">
                     <div
                       className={`h-full ${b.color}`}
@@ -343,7 +343,7 @@ function RatingCard({ r }: { r: RatingRow }) {
         <Link href={`/u/${r.username}`} className="text-sm font-medium hover:underline truncate">
           {r.displayName || r.username}
         </Link>
-        <span className="text-xs text-neutral-500">{relativeTime(r.createdAt)}</span>
+        <span className="text-xs text-neutral-400">{relativeTime(r.createdAt)}</span>
         <div className="ml-auto text-right">
           <div className="text-xl font-bold tabular-nums leading-none">{r.score}</div>
           <div className={`text-[10px] font-medium ${scoreLabel(r.score).color}`}>

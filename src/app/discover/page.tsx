@@ -191,7 +191,7 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
             {r.artist}
           </div>
         </div>
-        <div className="text-[10px] text-neutral-500 tabular-nums">
+        <div className="text-[10px] text-neutral-400 tabular-nums">
           {r.ratingCount} {r.ratingCount === 1 ? "rating" : "ratings"}
           <span className={`ml-1.5 font-medium ${scoreLabel(r.avgScore).color}`}>
             {scoreLabel(r.avgScore).label}
@@ -206,7 +206,7 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
 function DiscoverGrid({ rows }: { rows: DiscoverRow[] }) {
   if (rows.length === 0) {
     return (
-      <p className="text-neutral-500 text-sm">
+      <p className="text-neutral-400 text-sm">
         Not enough ratings yet. Be the first — head to{" "}
         <Link href="/search" className="underline">Search</Link>.
       </p>
@@ -254,7 +254,7 @@ function HeroSpotlight({
     durationSeconds,
   };
   return (
-    <section className="relative rounded-2xl overflow-hidden border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-neutral-950 to-neutral-950">
+    <section className="relative rounded-2xl overflow-hidden border border-emerald-500/40 bg-[radial-gradient(circle_at_top_left,theme(colors.emerald.500/0.25),theme(colors.neutral.950)_65%)] shadow-[0_0_60px_-20px_theme(colors.emerald.500/0.35)]">
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-6">
         <div className="relative shrink-0 mx-auto sm:mx-0">
           <Link href={`/album/${encodeBase64Url(songId)}`} className="block">
@@ -298,7 +298,7 @@ function HeroSpotlight({
             <span className={`text-sm font-semibold ${scoreLabel(avgScore).color}`}>
               {scoreLabel(avgScore).label}
             </span>
-            <span className="text-xs text-neutral-500 ml-auto">
+            <span className="text-xs text-neutral-400 ml-auto">
               {ratingCount} {ratingCount === 1 ? "rating" : "ratings"}
             </span>
           </div>
@@ -318,7 +318,7 @@ function TopReviewersSection({ reviewers }: { reviewers: TopReviewer[] }) {
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-base font-semibold tracking-tight">People to follow</h2>
-          <p className="text-xs text-neutral-500 mt-0.5">
+          <p className="text-xs text-neutral-400 mt-0.5">
             Most active raters in the last 30 days
           </p>
         </div>
@@ -349,7 +349,7 @@ function TopReviewersSection({ reviewers }: { reviewers: TopReviewer[] }) {
                 @{u.username}
               </div>
             </div>
-            <div className="text-[10px] text-neutral-500 tabular-nums">
+            <div className="text-[10px] text-neutral-400 tabular-nums">
               {u.ratingsCount} {u.ratingsCount === 1 ? "rating" : "ratings"} this month
             </div>
             <div className="w-full">
@@ -435,7 +435,7 @@ export default async function DiscoverPage() {
         <div className="flex items-end justify-between">
           <div>
             <h2 className="text-base font-semibold tracking-tight">Trending this week</h2>
-            <p className="text-xs text-neutral-500 mt-0.5">Most rated over the last 7 days</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Most rated over the last 7 days</p>
           </div>
         </div>
         <DiscoverGrid rows={trending} />
@@ -445,7 +445,7 @@ export default async function DiscoverPage() {
         <div className="flex items-end justify-between">
           <div>
             <h2 className="text-base font-semibold tracking-tight">Top rated</h2>
-            <p className="text-xs text-neutral-500 mt-0.5">Highest average · 2+ ratings</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Highest average · 2+ ratings</p>
           </div>
         </div>
         <DiscoverGrid rows={top} />

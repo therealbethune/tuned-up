@@ -7,6 +7,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { db, activities } from "@/db";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { TunedUpMark } from "@/components/icons";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { TimezoneSync } from "@/components/TimezoneSync";
 import "./globals.css";
@@ -221,7 +222,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
             <nav className="mx-auto max-w-3xl flex items-center justify-between px-3 py-3 gap-2">
-              <Link href="/" className="font-bold text-lg tracking-tight whitespace-nowrap">🎵 <span className="hidden sm:inline">Tuned Up</span></Link>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 font-bold text-lg tracking-tight whitespace-nowrap group"
+                aria-label="Tuned Up — home"
+              >
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500 text-black group-hover:bg-emerald-400 transition-colors">
+                  <TunedUpMark size={16} />
+                </span>
+                <span className="hidden sm:inline">Tuned Up</span>
+              </Link>
               <div className="flex items-center gap-2 sm:gap-4 text-sm">
                 {userId ? <SignedInNav userId={userId} /> : <SignedOutNav />}
               </div>

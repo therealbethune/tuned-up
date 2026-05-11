@@ -207,7 +207,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
               </span>
             )}
             {target.createdAt && (
-              <span className="text-xs text-neutral-500" title={new Date(target.createdAt).toLocaleString()}>
+              <span className="text-xs text-neutral-400" title={new Date(target.createdAt).toLocaleString()}>
                 Joined {joinedAgo(target.createdAt)}
               </span>
             )}
@@ -286,7 +286,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         <>
           <h2 className="text-lg font-semibold pt-2">Ratings</h2>
           {rows.length === 0 ? (
-            <p className="text-neutral-500 text-sm">
+            <p className="text-neutral-400 text-sm">
               No ratings yet. <Link href="/search" className="underline">Rate something.</Link>
             </p>
           ) : (

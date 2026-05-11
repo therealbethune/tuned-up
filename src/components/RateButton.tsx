@@ -157,7 +157,7 @@ export function RateButton({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-full bg-white text-black px-4 py-1.5 text-sm font-medium hover:bg-neutral-200 shrink-0"
+        className="rounded-full bg-white text-black px-4 py-1.5 text-sm font-medium hover:bg-neutral-200 shrink-0 active:scale-95 transition-transform"
       >
         {initialScore ? `Rated ${initialScore}` : "Rate"}
       </button>
@@ -361,7 +361,7 @@ export function RateButton({
             <button
               onClick={submit}
               disabled={busy || score == null}
-              className="rounded-full bg-white text-black px-5 py-2 font-medium disabled:opacity-50"
+              className="rounded-full bg-white text-black px-5 py-2 font-medium disabled:opacity-50 active:scale-95 transition-transform"
             >
               {busy ? "Saving…" : "Save rating"}
             </button>
