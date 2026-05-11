@@ -6,6 +6,7 @@ import { db, users, spotifyAccounts } from "@/db";
 import { SettingsForm } from "./SettingsForm";
 import { SpotifyAccountCard } from "@/components/SpotifyAccountCard";
 import { AppleMusicAccountCard } from "@/components/AppleMusicAccountCard";
+import { ProfilePictureSection } from "@/components/ProfilePictureSection";
 import { SPOTIFY_LINK_SCOPES } from "@/lib/spotify-server";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,11 @@ export default async function SettingsPage({
           Spotify connection failed{sp.reason ? ` (${sp.reason})` : ""}.
         </p>
       )}
+      <ProfilePictureSection
+        userId={me.id}
+        initialUsername={me.username}
+        initialDisplayName={me.displayName}
+      />
       <SettingsForm
         username={me.username}
         displayName={me.displayName}
