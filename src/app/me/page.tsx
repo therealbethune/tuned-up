@@ -8,6 +8,7 @@ import { PushBanner } from "@/components/PushBanner";
 import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { ProfileSpotifyPanel } from "@/components/ProfileSpotifyPanel";
 import { ProfileAppleMusicPanel } from "@/components/ProfileAppleMusicPanel";
+import { SettingsIcon, PaperPlaneIcon } from "@/components/icons";
 import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
@@ -39,17 +40,18 @@ export default async function MePage() {
   )).length > 0;
 
   return (
-    <div className="space-y-4">
-      <PushBanner />
-      <ConnectMusicBanner spotifyConnected={spotifyConnected} />
-      <div className="flex justify-end gap-4 text-sm">
+    <div className="space-y-6">
+      {/* Toolbar lives at the very top — small, icon-led links to
+          /recommendations and /settings. The pending-recs badge sits
+          on the Recs link. Keep the link weights low so they don't
+          compete with the profile header below. */}
+      <div className="flex justify-end gap-2 text-sm">
         <Link
           href="/recommendations"
-          className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5"
+          aria-label="Recommendations"
+          className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M3 11l18-8-8 18-2-8-8-2z" />
-          </svg>
+          <PaperPlaneIcon size={14} />
           Recs
           {pendingRecs > 0 && (
             <span className="ml-1 inline-flex items-center justify-center rounded-full bg-emerald-500 text-black text-[10px] font-bold tabular-nums px-1.5 h-4 min-w-4">
@@ -59,16 +61,22 @@ export default async function MePage() {
         </Link>
         <Link
           href="/settings"
-          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5"
+          aria-label="Settings"
+          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
+          <SettingsIcon size={14} />
           Settings
         </Link>
       </div>
+
+      {/* Profile is the actual content. Render before any banners so
+          users see THEIR face before any interruption nag-cards. */}
       <UserProfile target={me} viewerId={userId} />
+
+      {/* Banners + integration panels live below — they're contextual
+          additions, not the page's primary purpose. */}
+      <PushBanner />
+      <ConnectMusicBanner spotifyConnected={spotifyConnected} />
       <ProfileSpotifyPanel connected={spotifyConnected} />
       <ProfileAppleMusicPanel />
     </div>

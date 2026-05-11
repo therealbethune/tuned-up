@@ -354,10 +354,11 @@ export default async function FeedPage({
                   </Link>
                   {(it.currentStreak ?? 0) >= 3 && (
                     <span
-                      className="text-[10px] rounded-full px-1.5 py-0.5 bg-orange-500/15 text-orange-300 border border-orange-500/30 tabular-nums leading-none inline-flex items-center gap-0.5"
+                      className="text-[10px] rounded-full px-1.5 py-0.5 bg-orange-500/15 text-orange-300 border border-orange-500/30 leading-none inline-flex items-center gap-0.5"
                       title={`${it.currentStreak}-day rating streak`}
                     >
-                      🔥 {it.currentStreak}
+                      <span aria-hidden>🔥</span>
+                      <span className="tabular-nums">{it.currentStreak}</span>
                     </span>
                   )}
                   <span className="text-xs text-neutral-400">
@@ -595,31 +596,41 @@ async function EmptyFeed({ userId, followedIds }: { userId: string; followedIds:
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-8 text-center space-y-3">
-        <div className="text-4xl">🎧</div>
-        <h2 className="text-lg font-semibold">Your feed is quiet</h2>
-        <p className="text-sm text-neutral-400 max-w-sm mx-auto">
-          Follow some people or rate a few songs and this turns into your friends&apos; track-by-track music diary.
-        </p>
-        <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
-          <Link
-            href="/search"
-            className="rounded-full bg-white text-black text-sm font-semibold px-4 py-2"
-          >
-            + Rate a song
-          </Link>
-          <Link
-            href="/discover"
-            className="rounded-full border border-neutral-700 hover:bg-neutral-900 text-sm px-4 py-2"
-          >
-            Discover
-          </Link>
-          <Link
-            href="/people"
-            className="rounded-full border border-neutral-700 hover:bg-neutral-900 text-sm px-4 py-2"
-          >
-            Find people
-          </Link>
+      <div className="relative rounded-2xl border border-emerald-500/30 bg-[radial-gradient(circle_at_top,theme(colors.emerald.500/0.18),theme(colors.neutral.950)_70%)] p-8 sm:p-10 text-center space-y-4 overflow-hidden">
+        {/* Decorative stack: three rotated card silhouettes behind the
+            copy, hinting at "your feed will look like this". Pure
+            visual — no real data, just enough geometry to suggest
+            momentum before the user has any. */}
+        <div aria-hidden className="absolute inset-x-0 top-3 h-20 pointer-events-none flex justify-center">
+          <div className="absolute -rotate-6 -translate-x-10 sm:-translate-x-16 w-44 h-16 rounded-xl border border-neutral-800 bg-neutral-900/80 opacity-50" />
+          <div className="absolute rotate-3 translate-x-2 w-48 h-16 rounded-xl border border-neutral-800 bg-neutral-900/80 opacity-60" />
+          <div className="absolute rotate-6 translate-x-12 sm:translate-x-20 w-44 h-16 rounded-xl border border-neutral-800 bg-neutral-900/80 opacity-50" />
+        </div>
+        <div className="relative pt-16">
+          <h2 className="text-2xl font-bold tracking-tight">Your feed is quiet</h2>
+          <p className="text-sm text-neutral-300 max-w-sm mx-auto mt-2">
+            Follow people or rate a few songs and this turns into your friends&apos; track-by-track music diary.
+          </p>
+          <div className="flex items-center justify-center gap-2 pt-4 flex-wrap">
+            <Link
+              href="/search"
+              className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-semibold px-5 py-2 active:scale-95 transition-transform shadow-lg shadow-emerald-500/20"
+            >
+              + Rate a song
+            </Link>
+            <Link
+              href="/people"
+              className="rounded-full border border-neutral-700 hover:bg-neutral-900 text-sm px-5 py-2 active:scale-95 transition-transform"
+            >
+              Find people
+            </Link>
+            <Link
+              href="/discover"
+              className="rounded-full border border-neutral-700 hover:bg-neutral-900 text-sm px-5 py-2 active:scale-95 transition-transform"
+            >
+              Discover
+            </Link>
+          </div>
         </div>
       </div>
 

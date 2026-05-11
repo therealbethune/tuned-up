@@ -18,6 +18,7 @@ import { streakPercentile } from "@/lib/streak-milestones";
 import { safeQuery } from "@/lib/safe-query";
 import { TasteComparePanel } from "@/components/TasteComparePanel";
 import { Avatar } from "@/components/Avatar";
+import { PaperPlaneIcon } from "@/components/icons";
 
 type User = typeof users.$inferSelect;
 
@@ -197,12 +198,13 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
             )}
             {streak > 0 && (
               <span
-                className="text-xs rounded-full px-2 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-300 border border-orange-500/40 tabular-nums font-medium"
+                className="text-xs rounded-full px-2 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-300 border border-orange-500/40 font-medium inline-flex items-center gap-1"
                 title={`${streak}-day rating streak — top ${streakPct}% of streak holders`}
               >
-                {streakTierEmoji(streak)} {streak}-day streak
+                <span aria-hidden>{streakTierEmoji(streak)}</span>
+                <span className="tabular-nums">{streak}</span>-day streak
                 {streakPct > 0 && streakPct <= 50 && (
-                  <span className="ml-1 text-amber-200/80">· top {streakPct}%</span>
+                  <span className="ml-1 text-amber-200/80">· top <span className="tabular-nums">{streakPct}</span>%</span>
                 )}
               </span>
             )}
@@ -221,9 +223,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
               className="text-xs text-neutral-400 hover:text-white inline-flex items-center gap-1"
               title="Rec history with this user"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M3 11l18-8-8 18-2-8-8-2z" />
-              </svg>
+              <PaperPlaneIcon size={12} />
               Recs
             </Link>
           </div>
