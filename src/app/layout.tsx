@@ -7,6 +7,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { db, activities } from "@/db";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { Toaster } from "@/components/Toaster";
 import { TunedUpMark } from "@/components/icons";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { TimezoneSync } from "@/components/TimezoneSync";
@@ -240,6 +241,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8">{children}</main>
           {userId && <MobileTabBar unread={unread} />}
           {userId && <TimezoneSync serverTimezone={synced?.timezone ?? null} />}
+          <Toaster />
         </body>
       </html>
     </ClerkProvider>

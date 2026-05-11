@@ -5,6 +5,7 @@ import { renderWithMentions } from "@/lib/mentions";
 import { MentionInput, type MentionInputHandle } from "@/components/MentionInput";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
+import { toast } from "@/lib/toast";
 
 type Comment = {
   id: string;
@@ -74,8 +75,21 @@ export function CommentSection({
       const res = await fetch(
         `/api/comments?u=${encodeURIComponent(ratingUserId)}&s=${encodeURIComponent(songId)}`,
       );
+      if (!res.ok) {
+        // Distinguish "no comments" (empty array, ok=true) from
+        // "couldn't load" (4xx/5xx). Without this, a 403 from the
+        // privacy gate looked like "no comments yet" to the viewer.
+        setComments([]);
+        setError(
+          res.status === 403
+            ? "You don't have access to comments on this rating."
+            : "Couldn't load comments.",
+        );
+        return;
+      }
       const j = await res.json();
       setComments(j.comments ?? []);
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -130,6 +144,7 @@ export function CommentSection({
         setComments((prev) => (prev ?? []).filter((c) => c.id !== tempId));
         setBody(text); // restore the draft so the user doesn't lose it
         setError(j.error || `Couldn't post (HTTP ${res.status}).`);
+        await toast.fromResponse(res, "Couldn't post comment");
       }
     } catch (e) {
       setComments((prev) => (prev ?? []).filter((c) => c.id !== tempId));

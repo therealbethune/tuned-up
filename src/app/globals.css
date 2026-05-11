@@ -116,3 +116,11 @@ html:not(.dark) input[type="range"].accent-white { accent-color: #171717; }
   0%, 100% { transform: scaleY(0.3); }
   50% { transform: scaleY(1); }
 }
+
+/* Toast slide-in. Used by <Toaster /> — translate up + fade in for
+   the entry animation. Auto-dismiss uses the same fade in reverse via
+   the JS-driven unmount; no exit keyframe needed. */
+@keyframes toast-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}

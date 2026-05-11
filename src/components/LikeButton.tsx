@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { LikersSheet } from "@/components/LikersSheet";
+import { toast } from "@/lib/toast";
 
 // Heart toggles the viewer's own like; the count next to it opens the
 // "Liked by" sheet so anyone can see who's tapped 💗. Split into two
@@ -35,7 +36,12 @@ export function LikeButton({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ratingUserId, songId }),
       });
-      if (!res.ok) throw new Error("toggle failed");
+      if (!res.ok) {
+        // Surface rate-limit + other errors so the user understands
+        // why the heart flickered. fromResponse handles 429 / 403 / etc.
+        await toast.fromResponse(res, "Couldn't update like");
+        throw new Error("toggle failed");
+      }
       const j = await res.json();
       setLiked(j.liked);
       setCount(j.count);

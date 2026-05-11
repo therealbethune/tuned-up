@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import Link from "next/link";
+import { toast } from "@/lib/toast";
 
 type Suggestion = {
   id: string;
@@ -46,11 +47,24 @@ export function SuggestedFriends({ initial }: { initial?: Suggestion[] }) {
   async function follow(s: Suggestion) {
     setActingId(s.id);
     try {
-      await fetch("/api/follows", {
+      const res = await fetch("/api/follows", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username: s.username, action: "follow" }),
       });
+      if (!res.ok) {
+        // Don't remove the card on failure — the user can see it's
+        // still there and try again. Toast surfaces the reason (incl.
+        // 429 rate-limit) so the no-op isn't confusing.
+        await toast.fromResponse(res, "Couldn't follow");
+        return;
+      }
+      const j = await res.json().catch(() => ({}));
+      toast.success(
+        j.status === "pending"
+          ? `Follow request sent to @${s.username}`
+          : `Now following @${s.username}`,
+      );
       removeOne(s.id);
     } finally {
       setActingId(null);
@@ -60,11 +74,15 @@ export function SuggestedFriends({ initial }: { initial?: Suggestion[] }) {
   async function dismiss(s: Suggestion) {
     setActingId(s.id);
     try {
-      await fetch("/api/users/suggestions/dismiss", {
+      const res = await fetch("/api/users/suggestions/dismiss", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username: s.username }),
       });
+      if (!res.ok) {
+        await toast.fromResponse(res, "Couldn't dismiss");
+        return;
+      }
       removeOne(s.id);
     } finally {
       setActingId(null);

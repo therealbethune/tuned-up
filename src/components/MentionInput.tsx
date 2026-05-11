@@ -102,10 +102,16 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
       return;
     }
     const id = ++reqId.current;
+    // AbortController so a fast typist's stale request is actually
+    // cancelled at the network layer, not just dropped by the reqId
+    // guard after the bytes already came back. Cleaner and lets the
+    // browser cancel inflight bytes when the user erases the partial.
+    const ac = new AbortController();
     const t = setTimeout(async () => {
       try {
         const res = await fetch(
           `/api/users/search?q=${encodeURIComponent(mentionPartial)}`,
+          { signal: ac.signal },
         );
         const data = await res.json();
         if (id !== reqId.current) return;
@@ -114,7 +120,10 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
         if (id === reqId.current) setCandidates([]);
       }
     }, 100);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [mentionAt, mentionPartial]);
 
   function pick(c: Candidate) {
@@ -224,6 +233,26 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
     };
     // We intentionally key off the joined list so we re-resolve only when
     // the *set* of mentions changes, not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mentionsInValue.join("|")]);
+
+  // Prune the resolved map when mentions are removed from the value.
+  // Otherwise it grows unbounded over a long editing session — a user
+  // who types @alice, @bob, @carol, then deletes all three, leaves
+  // three dead entries forever. Cheap to do once whenever the set of
+  // mentions changes.
+  useEffect(() => {
+    const current = new Set(mentionsInValue);
+    setResolved((prev) => {
+      let mutated = false;
+      const next = new Map<string, boolean>();
+      for (const [k, v] of prev) {
+        if (current.has(k)) next.set(k, v);
+        else mutated = true;
+      }
+      return mutated ? next : prev;
+    });
+    // Same dep style as above — key on the *set*, not every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mentionsInValue.join("|")]);
 

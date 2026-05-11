@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Avatar } from "@/components/Avatar";
 import { useScrollLock } from "@/lib/use-scroll-lock";
+import { toast } from "@/lib/toast";
 import Link from "next/link";
 import type { SongResult } from "@/lib/ytmusic";
 import { scoreLabel } from "@/lib/score-labels";
@@ -137,6 +138,7 @@ export function RateButton({
       if (res.ok) {
         close();
         router.refresh();
+        toast.success(`Rated ${song.title} — ${score}/100`);
         if (typeof window !== "undefined") {
           window.dispatchEvent(
             new CustomEvent("song-rated", { detail: { songId: song.id } }),
@@ -145,6 +147,7 @@ export function RateButton({
       } else {
         const j = await res.json().catch(() => ({}));
         setError(j.error || `Failed to save (HTTP ${res.status}).`);
+        await toast.fromResponse(res, "Couldn't save rating");
       }
     } catch (e) {
       setError((e as Error).message || "Network error — try again.");

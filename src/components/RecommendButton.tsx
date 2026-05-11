@@ -4,6 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import type { SongResult } from "@/lib/ytmusic";
 import { MentionInput } from "@/components/MentionInput";
 import { useScrollLock } from "@/lib/use-scroll-lock";
+import { toast } from "@/lib/toast";
 
 type FoundUser = {
   id: string;
@@ -107,13 +108,18 @@ export function RecommendButton({ song }: { song: SongResult }) {
       });
       if (res.ok) {
         setDone(true);
+        toast.success(`Recommendation sent to @${picked.username}`);
         setTimeout(() => {
           setOpen(false);
           reset();
         }, 1200);
       } else {
         const j = await res.json().catch(() => ({}));
+        // Show inline AND toast — inline so the modal context stays
+        // useful, toast so 429s and similar are visible even after
+        // the modal auto-closes on success.
         setError(j.error || `Couldn't send (HTTP ${res.status}).`);
+        await toast.fromResponse(res, "Couldn't send recommendation");
       }
     } catch (e) {
       setError((e as Error).message || "Network error — try again.");

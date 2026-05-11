@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { encodeBase64Url as encodeSongIdForUrl } from "@/lib/encoding";
+import { toast } from "@/lib/toast";
 
 export function ShareButton({
   username,
@@ -26,7 +27,10 @@ export function ShareButton({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      window.prompt("Copy this link:", url);
+      // Clipboard can fail inside an iOS PWA without prompt permission.
+      // window.prompt looks like a system breakage there, so just surface
+      // a toast with the URL — the user can long-press to copy.
+      toast.info(`Copy this link: ${url}`);
     }
   }
 
