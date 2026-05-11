@@ -2,12 +2,13 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { and, desc, eq } from "drizzle-orm";
-import { db, songs, ratings, users } from "@/db";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { db, songs, ratings, users, follows } from "@/db";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { scoreLabel } from "@/lib/score-labels";
 import { RateButton } from "@/components/RateButton";
+import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,45 @@ export default async function AlbumPage({
     ? Math.round(allRatings.reduce((s, r) => s + r.score, 0) / total)
     : null;
   const myRow = userId ? allRatings.find((r) => r.raterId === userId) : null;
+
+  // If the viewer is signed in, partition the recent ratings into
+  // "people you follow" + "everyone else" so friends bubble to the top.
+  // This is the big UX shift on the album page revamp: most users care
+  // FAR more about how their friends rated a song than how random
+  // strangers rated it, and the original render was strict reverse
+  // chronological with no signal.
+  let followedSet: Set<string> = new Set();
+  if (userId) {
+    const rows = await db
+      .select({ followeeId: follows.followeeId })
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, userId),
+          eq(follows.status, "accepted"),
+          inArray(
+            follows.followeeId,
+            allRatings.map((r) => r.raterId).concat([userId]),
+          ),
+        ),
+      );
+    followedSet = new Set(rows.map((r) => r.followeeId));
+  }
+  const friendRatings = allRatings.filter(
+    (r) => r.raterId !== userId && followedSet.has(r.raterId),
+  );
+  const otherRatings = allRatings.filter(
+    (r) => r.raterId !== userId && !followedSet.has(r.raterId),
+  );
+
+  // Average computed over friends only — gives the viewer a personalized
+  // signal alongside the global average. Null if no friend ratings.
+  const friendAvg =
+    friendRatings.length > 0
+      ? Math.round(
+          friendRatings.reduce((s, r) => s + r.score, 0) / friendRatings.length,
+        )
+      : null;
 
   // Histogram buckets: 1-19 / 20-39 / 40-59 / 60-79 / 80-100. Rough enough
   // to show distribution shape at a glance.
@@ -135,16 +175,28 @@ export default async function AlbumPage({
             {song.artist}
             {song.album && !isAlbum ? ` · ${song.album}` : ""}
           </p>
-          <StreamingLinks
-            songId={song.id}
-            title={song.title}
-            artist={song.artist}
-            appleMusicUrl={song.appleMusicUrl}
-            spotifyTrackId={song.spotifyTrackId}
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <StreamingLinks
+              songId={song.id}
+              title={song.title}
+              artist={song.artist}
+              appleMusicUrl={song.appleMusicUrl}
+              spotifyTrackId={song.spotifyTrackId}
+            />
+            {!isAlbum && <AudioPreviewButton songId={song.id} />}
+          </div>
           {userId && (
-            <div className="pt-1">
+            <div className="pt-1 flex items-center gap-3 flex-wrap">
               <RateButton song={songForRate} initialScore={myRow?.score ?? null} />
+              {myRow != null && (
+                <span
+                  className="inline-flex items-baseline gap-1.5 rounded-full bg-neutral-800/80 border border-neutral-700 px-2.5 py-1 text-xs"
+                  title="Your rating"
+                >
+                  <span className="text-neutral-400">You:</span>
+                  <span className="font-bold tabular-nums text-emerald-400">{myRow.score}</span>
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -158,11 +210,20 @@ export default async function AlbumPage({
           </p>
         ) : (
           <>
-            <div className="flex items-baseline gap-3">
+            <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-5xl font-bold tabular-nums text-emerald-400">{avg}</span>
               {avg != null && (
                 <span className={`text-base font-semibold ${scoreLabel(avg).color}`}>
                   {scoreLabel(avg).label}
+                </span>
+              )}
+              {friendAvg != null && (
+                <span
+                  className="inline-flex items-baseline gap-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2.5 py-1 text-xs"
+                  title={`Average across the ${friendRatings.length} ${friendRatings.length === 1 ? "person" : "people"} you follow who rated this`}
+                >
+                  <span>Friends:</span>
+                  <span className="font-bold tabular-nums">{friendAvg}</span>
                 </span>
               )}
               <span className="text-sm text-neutral-500 ml-auto">
@@ -187,51 +248,80 @@ export default async function AlbumPage({
         )}
       </section>
 
-      {/* Latest reviews */}
-      {allRatings.length > 0 && (
+      {/* Friend ratings — shown first because what your network thinks
+          matters more than anonymous reviewers. Only renders when the
+          viewer is signed in and at least one followed user has rated. */}
+      {friendRatings.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-2">
-            Recent ratings
+          <h2 className="text-sm font-semibold text-sky-300 uppercase tracking-wide mb-2">
+            From people you follow
           </h2>
           <ul className="space-y-2">
-            {allRatings.map((r, i) => (
-              <li
-                key={`${r.raterId}-${i}`}
-                className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3"
-              >
-                <div className="flex items-center gap-2.5">
-                  {r.imageUrl ? (
-                    <Image
-                      src={r.imageUrl}
-                      alt=""
-                      width={28}
-                      height={28}
-                      className="rounded-full h-7 w-7 shrink-0"
-                    />
-                  ) : (
-                    <div className="h-7 w-7 rounded-full bg-neutral-700 shrink-0" />
-                  )}
-                  <Link href={`/u/${r.username}`} className="text-sm font-medium hover:underline truncate">
-                    {r.displayName || r.username}
-                  </Link>
-                  <span className="text-xs text-neutral-500">{relativeTime(r.createdAt)}</span>
-                  <div className="ml-auto text-right">
-                    <div className="text-xl font-bold tabular-nums leading-none">{r.score}</div>
-                    <div className={`text-[10px] font-medium ${scoreLabel(r.score).color}`}>
-                      {scoreLabel(r.score).label}
-                    </div>
-                  </div>
-                </div>
-                {r.review && (
-                  <p className="mt-2 text-sm text-neutral-300 whitespace-pre-wrap break-words">
-                    {renderWithMentions(r.review)}
-                  </p>
-                )}
-              </li>
+            {friendRatings.map((r, i) => (
+              <RatingCard key={`f-${r.raterId}-${i}`} r={r} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Everyone else's ratings, reverse-chronological. */}
+      {otherRatings.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-2">
+            {friendRatings.length > 0 ? "Other ratings" : "Recent ratings"}
+          </h2>
+          <ul className="space-y-2">
+            {otherRatings.map((r, i) => (
+              <RatingCard key={`o-${r.raterId}-${i}`} r={r} />
             ))}
           </ul>
         </section>
       )}
     </div>
+  );
+}
+
+type RatingRow = {
+  score: number;
+  review: string | null;
+  createdAt: Date;
+  raterId: string;
+  username: string;
+  displayName: string | null;
+  imageUrl: string | null;
+};
+
+function RatingCard({ r }: { r: RatingRow }) {
+  return (
+    <li className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
+      <div className="flex items-center gap-2.5">
+        {r.imageUrl ? (
+          <Image
+            src={r.imageUrl}
+            alt=""
+            width={28}
+            height={28}
+            className="rounded-full h-7 w-7 shrink-0"
+          />
+        ) : (
+          <div className="h-7 w-7 rounded-full bg-neutral-700 shrink-0" />
+        )}
+        <Link href={`/u/${r.username}`} className="text-sm font-medium hover:underline truncate">
+          {r.displayName || r.username}
+        </Link>
+        <span className="text-xs text-neutral-500">{relativeTime(r.createdAt)}</span>
+        <div className="ml-auto text-right">
+          <div className="text-xl font-bold tabular-nums leading-none">{r.score}</div>
+          <div className={`text-[10px] font-medium ${scoreLabel(r.score).color}`}>
+            {scoreLabel(r.score).label}
+          </div>
+        </div>
+      </div>
+      {r.review && (
+        <p className="mt-2 text-sm text-neutral-300 whitespace-pre-wrap break-words">
+          {renderWithMentions(r.review)}
+        </p>
+      )}
+    </li>
   );
 }

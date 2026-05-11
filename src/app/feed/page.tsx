@@ -17,6 +17,8 @@ import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
 import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { SafeCardBoundary } from "@/components/SafeCardBoundary";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
+import { FriendRecsRail } from "@/components/FriendRecsRail";
+import { recommendedFromFriends, type FriendRec } from "@/lib/recs";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
@@ -225,6 +227,20 @@ export default async function FeedPage({
   );
   const spotifyConnected = spotifyLinkRows.length > 0;
 
+  // "Friends loved" rail — only render on the first page (no `before`
+  // cursor) so we don't disrupt the scroll position when paginating
+  // through older feed items. Skipped entirely for users who follow
+  // nobody (the SQL would just return zero rows anyway, but we save the
+  // roundtrip).
+  let friendRecs: FriendRec[] = [];
+  if (followedIds.length > 0 && !sp.before) {
+    friendRecs = await safeQuery(
+      () => recommendedFromFriends(userId, 8),
+      [] as FriendRec[],
+      "feed-friend-recs",
+    );
+  }
+
   // Comment counts per (ratingUserId, songId) grouped by both.
   let commentCounts: Map<string, number> = new Map();
   let likeCounts: Map<string, number> = new Map();
@@ -289,6 +305,8 @@ export default async function FeedPage({
       </div>
 
       <ConnectMusicBanner spotifyConnected={spotifyConnected} />
+
+      <FriendRecsRail recs={friendRecs} />
 
       {items.length === 0 ? (
         <EmptyFeed userId={userId} followedIds={followedIds} />

@@ -12,10 +12,11 @@ import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { isAlbumId } from "@/lib/songs";
-import { computeTasteAgreement } from "@/lib/taste";
+import { computeTasteDetails } from "@/lib/taste";
 import { computeStreak } from "@/lib/streak";
 import { streakPercentile } from "@/lib/streak-milestones";
 import { safeQuery } from "@/lib/safe-query";
+import { TasteComparePanel } from "@/components/TasteComparePanel";
 
 type User = typeof users.$inferSelect;
 
@@ -65,9 +66,9 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
 
   const followersCount = followerStat?.n ?? 0;
   const followingCount = followingStat?.n ?? 0;
-  const [taste, streak, targetSpotify] = await Promise.all([
+  const [taste, streak, targetSpotify, viewer] = await Promise.all([
     viewerId && !isOwner
-      ? safeQuery(() => computeTasteAgreement(viewerId, target.id), null, "taste")
+      ? safeQuery(() => computeTasteDetails(viewerId, target.id), null, "taste")
       : Promise.resolve(null),
     safeQuery(() => computeStreak(target.id), 0, "streak"),
     // Whether the profile owner has linked Spotify — shows a green
@@ -83,6 +84,21 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
       null,
       "target-spotify",
     ),
+    // Viewer's own display name for the compare panel labels — falls
+    // back to "You" if the lookup fails or the user isn't signed in.
+    viewerId
+      ? safeQuery(
+          () =>
+            db
+              .select({ username: users.username, displayName: users.displayName })
+              .from(users)
+              .where(eq(users.id, viewerId))
+              .limit(1)
+              .then((r) => r[0] ?? null),
+          null,
+          "viewer-name",
+        )
+      : Promise.resolve(null),
   ]);
   // Top X% percentile shown alongside the streak badge. Defensive: if the
   // streak-cache columns aren't migrated yet, fall back to "no badge".
@@ -263,15 +279,14 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
       )}
 
       {taste && (
-        <div className="rounded-lg border border-emerald-700/40 bg-emerald-500/5 p-4 flex items-center gap-4">
-          <div className="text-3xl font-bold tabular-nums text-emerald-400">{taste.agreement}%</div>
-          <div className="flex-1">
-            <div className="font-medium">Taste agreement</div>
-            <div className="text-sm text-neutral-400">
-              Across {taste.shared} {taste.shared === 1 ? "song" : "songs"} you&apos;ve both rated.
-            </div>
-          </div>
-        </div>
+        <TasteComparePanel
+          agreement={taste.agreement}
+          shared={taste.shared}
+          agree={taste.agree}
+          disagree={taste.disagree}
+          viewerName={viewer?.displayName || viewer?.username || "You"}
+          targetName={target.displayName || target.username}
+        />
       )}
 
       {canSeeRatings && (
