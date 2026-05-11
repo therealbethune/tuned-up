@@ -124,3 +124,49 @@ html:not(.dark) input[type="range"].accent-white { accent-color: #171717; }
   from { transform: translateY(8px); opacity: 0; }
   to   { transform: translateY(0);   opacity: 1; }
 }
+
+/* Clerk-rendered Sign-in / Sign-up buttons in the top nav. We can't
+   pass our own <button> as a child to <SignInButton> any more (Clerk
+   6's React.Children.only trips on JSX whitespace under React 19), so
+   we let Clerk wrap text in its default button and style here. */
+.clerk-nav button {
+  font-size: 14px;
+}
+.clerk-nav > button:first-of-type,
+.clerk-nav .cl-rootBox > button:first-of-type {
+  /* "Sign in" — text link style */
+  color: rgb(212 212 212);
+  background: transparent;
+  padding: 0;
+}
+.clerk-nav > button:first-of-type:hover,
+.clerk-nav .cl-rootBox > button:first-of-type:hover {
+  color: rgb(255 255 255);
+}
+.clerk-nav > button:last-of-type,
+.clerk-nav .cl-rootBox > button:last-of-type {
+  /* "Sign up" — primary pill */
+  background: #ffffff;
+  color: #000000;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 9999px;
+}
+
+/* Landing-page primary CTA from Clerk's wrapped button (same reason
+   as .clerk-nav). Big emerald-shadow pill matching the hero
+   treatment. Scoped to anything inside a .clerk-landing-primary
+   container so it stays opt-in. */
+.clerk-landing-primary button {
+  background: #ffffff;
+  color: #000000;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: 9999px;
+  font-size: 16px;
+  box-shadow: 0 10px 25px -10px rgb(16 185 129 / 0.25);
+  transition: transform 80ms ease;
+}
+.clerk-landing-primary button:active {
+  transform: scale(0.95);
+}

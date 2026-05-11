@@ -162,16 +162,18 @@ async function getUnreadForTabBar(userId: string | null): Promise<number> {
 }
 
 function SignedOutNav() {
+  // Clerk 6.x's SignInButton/SignUpButton enforce React.Children.only
+  // on their child. Wrapping with our own <button> got rejected as
+  // "multiple children" under Turbopack/React 19 — likely a JSX
+  // whitespace-handling quirk. Passing a plain string lets Clerk
+  // wrap it in its default <button>, then we use a global CSS rule
+  // (see globals.css) to style any button rendered inside .clerk-nav.
   return (
-    <>
+    <span className="clerk-nav inline-flex items-center gap-2 sm:gap-4">
       <ThemeToggle />
-      <SignInButton>
-        <button className="text-neutral-300 hover:text-white">Sign in</button>
-      </SignInButton>
-      <SignUpButton forceRedirectUrl="/welcome">
-        <button className="rounded-full bg-white text-black px-3 py-1 font-medium">Sign up</button>
-      </SignUpButton>
-    </>
+      <SignInButton>Sign in</SignInButton>
+      <SignUpButton forceRedirectUrl="/welcome">Sign up</SignUpButton>
+    </span>
   );
 }
 

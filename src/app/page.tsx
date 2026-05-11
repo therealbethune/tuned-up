@@ -34,11 +34,12 @@ export default function Home() {
           </p>
           <div className="flex gap-3 flex-wrap">
             <Show when="signed-out">
-              <SignUpButton forceRedirectUrl="/welcome">
-                <button className="rounded-full bg-white text-black px-5 py-2.5 font-medium active:scale-95 transition-transform shadow-lg shadow-emerald-500/10">
-                  Get started
-                </button>
-              </SignUpButton>
+              {/* Plain string child — see comment in layout.tsx
+                  SignedOutNav. Clerk wraps it in a default button;
+                  the `.clerk-landing-primary` CSS rule styles it. */}
+              <span className="clerk-landing-primary inline-flex">
+                <SignUpButton forceRedirectUrl="/welcome">Get started</SignUpButton>
+              </span>
               <Link
                 href="/discover"
                 className="rounded-full border border-neutral-700 px-5 py-2.5 font-medium hover:bg-neutral-900 active:scale-95 transition-transform"

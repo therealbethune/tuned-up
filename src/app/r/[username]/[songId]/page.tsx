@@ -224,12 +224,8 @@ async function SignedOutSharePromo({ username }: { username: string }) {
       <p className="text-sm text-neutral-300">
         Rate songs 1–100, follow your friends, and see who agrees with you.
       </p>
-      <div className="flex items-center justify-center gap-2">
-        <SignUpButton forceRedirectUrl="/welcome">
-          <button className="rounded-full bg-white text-black px-5 py-2 font-medium">
-            Get started
-          </button>
-        </SignUpButton>
+      <div className="flex items-center justify-center gap-2 clerk-landing-primary">
+        <SignUpButton forceRedirectUrl="/welcome">Get started</SignUpButton>
         <Link
           href={`/u/${username}`}
           className="rounded-full border border-neutral-700 hover:bg-neutral-900 px-5 py-2 font-medium text-sm"
