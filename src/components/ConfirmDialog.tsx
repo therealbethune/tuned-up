@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 // Replacement for `window.confirm` that's actually consistent with the
 // app's visual style, supports Escape-to-cancel, traps initial focus on
@@ -40,6 +41,8 @@ export function ConfirmDialog({
   onClose: () => void;
 }) {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
+
+  useScrollLock(open);
 
   // Escape key + initial focus.
   useEffect(() => {

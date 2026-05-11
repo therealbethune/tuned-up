@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Avatar } from "@/components/Avatar";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 import Link from "next/link";
 import type { SongResult } from "@/lib/ytmusic";
 import { scoreLabel } from "@/lib/score-labels";
@@ -78,15 +79,7 @@ export function RateButton({
     };
   }, [open, song.id, initialScore, initialReview]);
 
-  // Lock body scroll while the sheet is up.
-  useEffect(() => {
-    if (!open) return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = original;
-    };
-  }, [open]);
+  useScrollLock(open);
 
   // Auto-focus + select the number on open (after animation begins).
   useEffect(() => {
@@ -204,7 +197,7 @@ export function RateButton({
             <button
               onClick={close}
               aria-label="Close"
-              className="text-neutral-500 hover:text-white inline-flex items-center justify-center h-8 w-8"
+              className="text-neutral-500 hover:text-white inline-flex items-center justify-center h-11 w-11"
             >
               ×
             </button>

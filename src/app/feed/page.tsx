@@ -313,7 +313,7 @@ export default async function FeedPage({
         <EmptyFeed userId={userId} followedIds={followedIds} />
       ) : (
         <ul className="space-y-3">
-          {items.map((it) => {
+          {items.map((it, idx) => {
             const url = ytUrlForSongId(it.songId);
             const myScore = myRatingsMap.get(it.songId) ?? null;
             const cKey = `${it.ratingUserId}::${it.songId}`;
@@ -339,7 +339,7 @@ export default async function FeedPage({
               <li
                 id={anchorId}
                 data-target-highlight=""
-                className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 scroll-mt-20"
+                className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 scroll-mt-[calc(env(safe-area-inset-top)+5rem)]"
               >
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Avatar
@@ -374,11 +374,29 @@ export default async function FeedPage({
                       title="Open in YouTube Music"
                     >
                       {it.thumbnail ? (
-                        <Image src={it.thumbnail} alt="" width={56} height={56} loading="lazy" className="rounded h-14 w-14 object-cover" />
+                        <Image
+                          src={it.thumbnail}
+                          alt=""
+                          width={56}
+                          height={56}
+                          // First card is the LCP candidate; everything
+                          // below the fold stays lazy.
+                          {...(idx === 0 ? { priority: true } : { loading: "lazy" })}
+                          className="rounded h-14 w-14 object-cover"
+                        />
                       ) : (
                         <div className="h-14 w-14 rounded bg-neutral-800" />
                       )}
-                      <div className="absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+                      {/* Play affordance. On mobile: a small badge in
+                          the corner shows the thumbnail is tappable
+                          (no hover state exists). On desktop: a full
+                          dark overlay reveals on hover. */}
+                      <span className="sm:hidden absolute bottom-1 right-1 h-5 w-5 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="white" aria-hidden>
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </span>
+                      <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors">
                         <svg
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
                           width="20" height="20" viewBox="0 0 24 24" fill="white" aria-hidden

@@ -54,7 +54,12 @@ export function SongRow({
           ) : (
             <div className="h-14 w-14 rounded bg-neutral-800" />
           )}
-          <div className="absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+          <span className="sm:hidden absolute bottom-1 right-1 h-5 w-5 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="white" aria-hidden>
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+          <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors">
             <svg
               className="opacity-0 group-hover:opacity-100 transition-opacity"
               width="20"

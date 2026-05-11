@@ -126,6 +126,10 @@ export function SettingsForm({
                 onChange={(e) => setUsername(e.target.value)}
                 maxLength={24}
                 pattern="[a-z0-9_]{3,24}"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="text"
                 className="flex-1 bg-transparent py-2 placeholder:text-neutral-500 focus:outline-none"
                 placeholder="your_handle"
               />

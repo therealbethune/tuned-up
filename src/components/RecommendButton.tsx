@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import type { SongResult } from "@/lib/ytmusic";
 import { MentionInput } from "@/components/MentionInput";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 type FoundUser = {
   id: string;
@@ -25,6 +26,9 @@ export function RecommendButton({ song }: { song: SongResult }) {
   // closes — important for keyboard + screen-reader users.
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const wasOpenRef = useRef(false);
+
+  useScrollLock(open);
+
   useEffect(() => {
     // When transitioning from open → closed, return focus to the trigger.
     if (wasOpenRef.current && !open) {
@@ -159,7 +163,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
                   reset();
                 }}
                 aria-label="Close"
-                className="text-neutral-500 hover:text-white p-1"
+                className="text-neutral-500 hover:text-white inline-flex items-center justify-center h-11 w-11"
               >
                 ×
               </button>
@@ -176,6 +180,9 @@ export function RecommendButton({ song }: { song: SongResult }) {
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Search a friend by name or @handle…"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   className="w-full rounded-full bg-neutral-950 border border-neutral-800 px-4 py-2 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
                 />
                 {q.trim().length >= 2 && (

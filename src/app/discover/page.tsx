@@ -264,6 +264,7 @@ function HeroSpotlight({
                 alt=""
                 width={200}
                 height={200}
+                priority
                 className="rounded-lg w-40 h-40 sm:w-48 sm:h-48 object-cover ring-2 ring-neutral-800 shadow-xl"
                 unoptimized
               />

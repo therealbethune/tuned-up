@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { relativeTime } from "@/lib/songs";
 import { Avatar } from "@/components/Avatar";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 type Liker = {
   id: string;
@@ -33,6 +34,8 @@ export function LikersSheet({
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   // Remember what was focused before open so we can restore it on close.
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useScrollLock(open);
 
   // Slide-in animation: mount first, then translate after next frame.
   // Also: capture the previously-focused element on open, move focus to

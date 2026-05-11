@@ -309,7 +309,12 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                           ) : (
                             <div className="h-12 w-12 rounded bg-neutral-800" />
                           )}
-                          <div className="absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+                          <span className="sm:hidden absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center">
+                            <svg width="8" height="8" viewBox="0 0 24 24" fill="white" aria-hidden>
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </span>
+                          <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors">
                             <svg
                               className="opacity-0 group-hover:opacity-100 transition-opacity"
                               width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden

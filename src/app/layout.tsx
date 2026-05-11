@@ -209,7 +209,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {themeBootstrapScript}
           </Script>
         </head>
-        <body className="min-h-screen bg-neutral-950 text-neutral-100 antialiased pb-20 sm:pb-0">
+        <body
+          className="min-h-screen bg-neutral-950 text-neutral-100 antialiased sm:pb-0"
+          // Tab bar is ~56px + the iPhone home-indicator safe-area. The
+          // previous pb-20 (80px) wasn't enough on iPhone 15 to keep
+          // the last item in a long thread visible above the bar.
+          style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}
+        >
           <header
             className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur sticky top-0 z-10"
             style={{ paddingTop: "env(safe-area-inset-top)" }}

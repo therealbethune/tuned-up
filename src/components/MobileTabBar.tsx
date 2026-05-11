@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -58,12 +59,20 @@ const TABS = [
 
 export function MobileTabBar({ unread }: { unread: number }) {
   const pathname = usePathname() ?? "";
+  // Hide the tab bar when the iOS software keyboard is up — otherwise
+  // it floats on top of inputs (comment composer, search box, etc.).
+  // visualViewport.height shrinks when the keyboard slides in; we
+  // detect any meaningful gap vs the layout viewport and hide.
+  const kbOpen = useKeyboardOpen();
 
   return (
     <nav
-      className="sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-neutral-800 bg-neutral-950/95 backdrop-blur"
+      className={`sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-neutral-800 bg-neutral-950/95 backdrop-blur transition-transform duration-150 ${
+        kbOpen ? "translate-y-full pointer-events-none" : "translate-y-0"
+      }`}
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Primary"
+      aria-hidden={kbOpen}
     >
       <ul className="flex items-stretch justify-around">
         {TABS.map((t) => {
@@ -73,10 +82,19 @@ export function MobileTabBar({ unread }: { unread: number }) {
               <Link
                 href={t.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center justify-center py-2 gap-0.5 min-h-[56px] relative ${
-                  active ? "text-white" : "text-neutral-400 active:text-white"
+                className={`flex flex-col items-center justify-center py-2 gap-0.5 min-h-[56px] relative transition-colors ${
+                  active ? "text-emerald-400" : "text-neutral-400 active:text-white"
                 }`}
               >
+                {/* Active-tab indicator: 2px emerald top stripe. Subtle
+                    but gives a clear "you are here" cue beyond color
+                    alone (helps when icons are similar at a glance). */}
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-emerald-400"
+                  />
+                )}
                 <span className="relative">
                   {t.icon}
                   {t.hasUnread && unread > 0 && (
@@ -93,4 +111,32 @@ export function MobileTabBar({ unread }: { unread: number }) {
       </ul>
     </nav>
   );
+}
+
+// Detect whether the iOS software keyboard is currently up by comparing
+// visualViewport.height to the layout viewport. The visualViewport API
+// is the only reliable way to know — `resize` on window doesn't fire
+// for keyboard transitions on iOS Safari.
+function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const vv = (typeof window !== "undefined"
+      ? window.visualViewport
+      : null);
+    if (!vv) return;
+    function check() {
+      // Keyboard is considered "up" if the visual viewport is meaningfully
+      // shorter than the layout viewport. 150px threshold avoids false
+      // positives from URL-bar collapse.
+      setOpen(window.innerHeight - vv!.height > 150);
+    }
+    check();
+    vv.addEventListener("resize", check);
+    vv.addEventListener("scroll", check);
+    return () => {
+      vv.removeEventListener("resize", check);
+      vv.removeEventListener("scroll", check);
+    };
+  }, []);
+  return open;
 }

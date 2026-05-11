@@ -424,7 +424,7 @@ function CommentRow({
           {c.commenterId === viewerId && (
             <button
               onClick={onDelete}
-              className="ml-auto -mr-1 -mt-1 -mb-1 text-neutral-500 hover:text-red-400 inline-flex items-center justify-center h-7 w-7"
+              className="ml-auto -mr-1 -mt-1 -mb-1 text-neutral-500 hover:text-red-400 inline-flex items-center justify-center h-10 w-10"
               title="Delete"
               aria-label="Delete comment"
             >
