@@ -19,6 +19,7 @@ import { SafeCardBoundary } from "@/components/SafeCardBoundary";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { FriendRecsRail } from "@/components/FriendRecsRail";
 import { recommendedFromFriends, type FriendRec } from "@/lib/recs";
+import { Avatar } from "@/components/Avatar";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
@@ -341,11 +342,13 @@ export default async function FeedPage({
                 className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 scroll-mt-20"
               >
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
-                  {it.imageUrl ? (
-                    <Image src={it.imageUrl} alt="" width={28} height={28} loading="lazy" className="rounded-full h-7 w-7" />
-                  ) : (
-                    <div className="h-7 w-7 rounded-full bg-neutral-700" />
-                  )}
+                  <Avatar
+                    imageUrl={it.imageUrl}
+                    name={it.displayName || it.username}
+                    seed={it.ratingUserId}
+                    size={28}
+                    ring={false}
+                  />
                   <Link href={`/u/${it.username}`} className="text-sm font-medium hover:underline">
                     {it.displayName || it.username}
                   </Link>
@@ -437,26 +440,15 @@ export default async function FeedPage({
                       title="See all ratings of this song"
                     >
                       <span className="inline-flex -space-x-1.5">
-                        {shown.map((o) =>
-                          o.imageUrl ? (
-                            <Image
-                              key={o.raterId}
-                              src={o.imageUrl}
-                              alt=""
-                              width={22}
-                              height={22}
-                              loading="lazy"
-                              className="h-[22px] w-[22px] rounded-full ring-2 ring-neutral-900 object-cover"
-                            />
-                          ) : (
-                            <span
-                              key={o.raterId}
-                              className="h-[22px] w-[22px] rounded-full bg-neutral-700 ring-2 ring-neutral-900 inline-flex items-center justify-center text-[10px] font-medium text-neutral-300"
-                            >
-                              {(o.displayName || o.username).charAt(0).toUpperCase()}
-                            </span>
-                          ),
-                        )}
+                        {shown.map((o) => (
+                          <Avatar
+                            key={o.raterId}
+                            imageUrl={o.imageUrl}
+                            name={o.displayName || o.username}
+                            seed={o.raterId}
+                            size={22}
+                          />
+                        ))}
                       </span>
                       <span className="text-neutral-300">
                         {shown.length === 1
@@ -614,11 +606,13 @@ async function EmptyFeed({ userId, followedIds }: { userId: string; followedIds:
                   href={`/u/${u.username}`}
                   className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900 p-3 transition-colors"
                 >
-                  {u.imageUrl ? (
-                    <Image src={u.imageUrl} alt="" width={40} height={40} loading="lazy" className="rounded-full h-10 w-10" />
-                  ) : (
-                    <div className="h-10 w-10 rounded-full bg-neutral-700" />
-                  )}
+                  <Avatar
+                    imageUrl={u.imageUrl}
+                    name={u.displayName || u.username}
+                    seed={u.id}
+                    size={40}
+                    ring={false}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{u.displayName || u.username}</div>
                     <div className="text-sm text-neutral-400 truncate">@{u.username}</div>

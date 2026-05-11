@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { SuggestedFriends } from "@/components/SuggestedFriends";
+import { Avatar } from "@/components/Avatar";
 
 type UserResult = {
   id: string;
@@ -89,11 +89,13 @@ export default function PeoplePage() {
                 href={`/u/${u.username}`}
                 className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900 p-3 transition-colors"
               >
-                {u.imageUrl ? (
-                  <Image src={u.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" />
-                ) : (
-                  <div className="h-10 w-10 rounded-full bg-neutral-700" />
-                )}
+                <Avatar
+                  imageUrl={u.imageUrl}
+                  name={u.displayName || u.username}
+                  seed={u.id}
+                  size={40}
+                  ring={false}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{u.displayName || u.username}</div>
                   <div className="text-sm text-neutral-400 truncate">@{u.username}</div>

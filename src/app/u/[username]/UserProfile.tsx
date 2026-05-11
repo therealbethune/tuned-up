@@ -17,6 +17,7 @@ import { computeStreak } from "@/lib/streak";
 import { streakPercentile } from "@/lib/streak-milestones";
 import { safeQuery } from "@/lib/safe-query";
 import { TasteComparePanel } from "@/components/TasteComparePanel";
+import { Avatar } from "@/components/Avatar";
 
 type User = typeof users.$inferSelect;
 
@@ -173,20 +174,12 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     <div className="space-y-6">
       {/* Header: avatar + name + streak + follow */}
       <div className="flex items-start gap-4">
-        {target.imageUrl ? (
-          <Image
-            src={target.imageUrl}
-            alt=""
-            width={80}
-            height={80}
-            className="rounded-full h-20 w-20 ring-2 ring-neutral-800 shrink-0"
-
-          />
-        ) : (
-          <div className="h-20 w-20 rounded-full bg-gradient-to-br from-neutral-700 to-neutral-800 ring-2 ring-neutral-800 shrink-0 flex items-center justify-center text-2xl font-bold text-neutral-300">
-            {(target.displayName || target.username).charAt(0).toUpperCase()}
-          </div>
-        )}
+        <Avatar
+          imageUrl={target.imageUrl}
+          name={target.displayName || target.username}
+          seed={target.id}
+          size={80}
+        />
         <div className="flex-1 min-w-0 pt-1 space-y-1.5">
           <h1 className="text-3xl font-bold tracking-tight truncate leading-tight">
             {target.displayName || target.username}

@@ -11,6 +11,7 @@ import { RateButton } from "@/components/RateButton";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
+import { Avatar } from "@/components/Avatar";
 import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
@@ -325,17 +326,13 @@ function RatingCard({ r }: { r: RatingRow }) {
   return (
     <li className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
       <div className="flex items-center gap-2.5">
-        {r.imageUrl ? (
-          <Image
-            src={r.imageUrl}
-            alt=""
-            width={28}
-            height={28}
-            className="rounded-full h-7 w-7 shrink-0"
-          />
-        ) : (
-          <div className="h-7 w-7 rounded-full bg-neutral-700 shrink-0" />
-        )}
+        <Avatar
+          imageUrl={r.imageUrl}
+          name={r.displayName || r.username}
+          seed={r.raterId}
+          size={28}
+          ring={false}
+        />
         <Link href={`/u/${r.username}`} className="text-sm font-medium hover:underline truncate">
           {r.displayName || r.username}
         </Link>

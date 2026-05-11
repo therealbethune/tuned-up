@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { SongResult } from "@/lib/ytmusic";
 import { SongRow } from "@/components/SongRow";
+import { Avatar } from "@/components/Avatar";
 import { SpotifyIconOnGreen } from "@/components/icons";
 
 type SuggestedUser = {
@@ -195,11 +195,13 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
                     key={u.id}
                     className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-3"
                   >
-                    {u.imageUrl ? (
-                      <Image src={u.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" />
-                    ) : (
-                      <div className="h-10 w-10 rounded-full bg-neutral-700" />
-                    )}
+                    <Avatar
+                      imageUrl={u.imageUrl}
+                      name={u.displayName || u.username}
+                      seed={u.id}
+                      size={40}
+                      ring={false}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{u.displayName || u.username}</div>
                       <div className="text-sm text-neutral-400 truncate">

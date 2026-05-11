@@ -1,10 +1,10 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { renderWithMentions } from "@/lib/mentions";
 import { MentionInput, type MentionInputHandle } from "@/components/MentionInput";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Avatar } from "@/components/Avatar";
 
 type Comment = {
   id: string;
@@ -395,17 +395,13 @@ function CommentRow({
     <div
       className={`flex gap-2 rounded-md border border-neutral-800 bg-neutral-900 p-2 ${c.pending ? "opacity-60" : ""}`}
     >
-      {c.imageUrl ? (
-        <Image
-          src={c.imageUrl}
-          alt=""
-          width={24}
-          height={24}
-          className="rounded-full h-6 w-6 shrink-0"
-        />
-      ) : (
-        <div className="h-6 w-6 rounded-full bg-neutral-700 shrink-0" />
-      )}
+      <Avatar
+        imageUrl={c.imageUrl}
+        name={c.displayName || c.username || "?"}
+        seed={c.commenterId}
+        size={24}
+        ring={false}
+      />
       <div className="flex-1 min-w-0">
         <div className="text-xs flex items-center gap-1.5 flex-wrap">
           {c.pending ? (

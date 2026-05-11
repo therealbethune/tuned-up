@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { relativeTime } from "@/lib/songs";
+import { Avatar } from "@/components/Avatar";
 
 type Liker = {
   id: string;
@@ -150,17 +150,13 @@ export function LikersSheet({
                     onClick={onClose}
                     className="flex items-center gap-3 rounded-md hover:bg-neutral-900/60 px-2 py-2 transition-colors"
                   >
-                    {l.imageUrl ? (
-                      <Image
-                        src={l.imageUrl}
-                        alt=""
-                        width={36}
-                        height={36}
-                        className="h-9 w-9 rounded-full shrink-0"
-                      />
-                    ) : (
-                      <div className="h-9 w-9 rounded-full bg-neutral-700 shrink-0" />
-                    )}
+                    <Avatar
+                      imageUrl={l.imageUrl}
+                      name={l.displayName || l.username}
+                      seed={l.id}
+                      size={36}
+                      ring={false}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">
                         {l.displayName || l.username}

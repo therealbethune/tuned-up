@@ -7,8 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
-import Image from "next/image";
 import { extractMentions } from "@/lib/mentions";
+import { Avatar } from "@/components/Avatar";
 
 type Candidate = {
   id: string;
@@ -265,17 +265,13 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
                   i === activeIdx ? "bg-neutral-800" : "hover:bg-neutral-800/60"
                 }`}
               >
-                {c.imageUrl ? (
-                  <Image
-                    src={c.imageUrl}
-                    alt=""
-                    width={24}
-                    height={24}
-                    className="rounded-full h-6 w-6"
-                  />
-                ) : (
-                  <div className="h-6 w-6 rounded-full bg-neutral-700" />
-                )}
+                <Avatar
+                  imageUrl={c.imageUrl}
+                  name={c.displayName || c.username}
+                  seed={c.id}
+                  size={24}
+                  ring={false}
+                />
                 <span className="font-medium truncate">
                   {c.displayName || c.username}
                 </span>

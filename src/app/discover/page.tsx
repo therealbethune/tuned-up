@@ -1,13 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
-import { encodeBase64Url as encodeAlbumIdForUrl } from "@/lib/encoding";
+import { encodeBase64Url } from "@/lib/encoding";
 import { auth } from "@clerk/nextjs/server";
-import { desc, sql, gte } from "drizzle-orm";
-import { db, ratings, songs } from "@/db";
-import { isAlbumId, ytUrlForSongId } from "@/lib/songs";
-import { StreamingLinks } from "@/components/StreamingLinks";
+import { desc, sql, gte, eq, ne, and } from "drizzle-orm";
+import { db, ratings, songs, users, follows } from "@/db";
+import { isAlbumId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
+import { AudioPreviewButton } from "@/components/AudioPreviewButton";
+import { Avatar } from "@/components/Avatar";
 import { scoreLabel } from "@/lib/score-labels";
+import { recommendedFromFriends } from "@/lib/recs";
+import { FriendRecsRail } from "@/components/FriendRecsRail";
+import { safeQuery } from "@/lib/safe-query";
+import { FollowButton } from "@/app/u/[username]/FollowButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +24,9 @@ type DiscoverRow = {
   thumbnail: string | null;
   appleMusicUrl: string | null;
   spotifyTrackId: string | null;
+  durationSeconds: number | null;
   ratingCount: number;
   avgScore: number;
-};
-
-type RecRow = DiscoverRow & {
-  reason: string;
-  durationSeconds: number | null;
 };
 
 async function trendingThisWeek(): Promise<DiscoverRow[]> {
@@ -39,6 +40,7 @@ async function trendingThisWeek(): Promise<DiscoverRow[]> {
       thumbnail: songs.thumbnail,
       appleMusicUrl: songs.appleMusicUrl,
       spotifyTrackId: songs.spotifyTrackId,
+      durationSeconds: songs.durationSeconds,
       ratingCount: sql<number>`count(${ratings.songId})::int`,
       avgScore: sql<number>`round(avg(${ratings.score}))::int`,
     })
@@ -47,7 +49,7 @@ async function trendingThisWeek(): Promise<DiscoverRow[]> {
     .where(gte(ratings.createdAt, sevenDaysAgo))
     .groupBy(songs.id)
     .orderBy(desc(sql`count(${ratings.songId})`))
-    .limit(15);
+    .limit(12);
   return rows;
 }
 
@@ -61,6 +63,7 @@ async function topRated(): Promise<DiscoverRow[]> {
       thumbnail: songs.thumbnail,
       appleMusicUrl: songs.appleMusicUrl,
       spotifyTrackId: songs.spotifyTrackId,
+      durationSeconds: songs.durationSeconds,
       ratingCount: sql<number>`count(${ratings.songId})::int`,
       avgScore: sql<number>`round(avg(${ratings.score}))::int`,
     })
@@ -69,126 +72,134 @@ async function topRated(): Promise<DiscoverRow[]> {
     .groupBy(songs.id)
     .having(sql`count(${ratings.songId}) >= 2`)
     .orderBy(desc(sql`avg(${ratings.score})`), desc(sql`count(${ratings.songId})`))
-    .limit(15);
+    .limit(12);
   return rows;
 }
 
-// Personal "Recommended for you" — songs the viewer hasn't rated, ranked by
-// signal-strength of what we know about their network. Two-tier:
-//   1. Songs rated by people the viewer follows (shown as "X friends · avg")
-//   2. Falls back to globally popular highly-rated tracks
-//
-// The "reason" string is the small subtext under each card.
-async function recommendedForViewer(viewerId: string | null): Promise<RecRow[]> {
-  type Row = {
-    song_id: string;
-    title: string;
-    artist: string;
-    album: string | null;
-    thumbnail: string | null;
-    apple_music_url: string | null;
-    spotify_track_id: string | null;
-    duration_seconds: number | null;
-    rating_count: number;
-    avg_score: number;
-    friend_count: number;
-    friend_avg: number | null;
-  };
+type TopReviewer = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  imageUrl: string | null;
+  ratingsCount: number;
+};
 
-  const result = await db.execute(
-    viewerId
-      ? sql`
-          WITH my_follows AS (
-            SELECT followee_id AS id
-            FROM follows
-            WHERE follower_id = ${viewerId} AND status = 'accepted'
-          ),
-          my_rated AS (
-            SELECT song_id FROM ratings WHERE user_id = ${viewerId}
-          ),
-          friend_stats AS (
-            SELECT
-              r.song_id,
-              COUNT(DISTINCT r.user_id)::int AS friend_count,
-              ROUND(AVG(r.score))::int AS friend_avg
-            FROM ratings r
-            WHERE r.user_id IN (SELECT id FROM my_follows)
-              AND r.song_id NOT IN (SELECT song_id FROM my_rated)
-            GROUP BY r.song_id
-          ),
-          global_stats AS (
-            SELECT
-              r.song_id,
-              COUNT(*)::int AS rating_count,
-              ROUND(AVG(r.score))::int AS avg_score
-            FROM ratings r
-            WHERE r.song_id NOT IN (SELECT song_id FROM my_rated)
-            GROUP BY r.song_id
-          )
-          SELECT
-            s.id AS song_id, s.title, s.artist, s.album, s.thumbnail,
-            s.apple_music_url, s.spotify_track_id, s.duration_seconds,
-            g.rating_count, g.avg_score,
-            COALESCE(f.friend_count, 0) AS friend_count,
-            f.friend_avg
-          FROM songs s
-          JOIN global_stats g ON g.song_id = s.id
-          LEFT JOIN friend_stats f ON f.song_id = s.id
-          ORDER BY
-            COALESCE(f.friend_count, 0) DESC,
-            COALESCE(f.friend_avg, 0) DESC,
-            g.avg_score DESC,
-            g.rating_count DESC
-          LIMIT 15
-        `
-      : sql`
-          SELECT
-            s.id AS song_id, s.title, s.artist, s.album, s.thumbnail,
-            s.apple_music_url, s.spotify_track_id, s.duration_seconds,
-            COUNT(*)::int AS rating_count,
-            ROUND(AVG(r.score))::int AS avg_score,
-            0 AS friend_count,
-            NULL::int AS friend_avg
-          FROM ratings r
-          JOIN songs s ON s.id = r.song_id
-          GROUP BY s.id
-          HAVING COUNT(*) >= 2
-          ORDER BY ROUND(AVG(r.score)) DESC, COUNT(*) DESC
-          LIMIT 15
-        `,
-  );
-  const raw = result as unknown;
-  const rows: Row[] = Array.isArray(raw)
-    ? (raw as Row[])
-    : Array.isArray((raw as { rows?: Row[] })?.rows)
-    ? ((raw as { rows: Row[] }).rows)
-    : [];
+// People with the most ratings in the last 30 days who the viewer
+// isn't already following. Good "who to follow" signal — they're
+// active and have rated enough that following them populates the feed.
+async function topReviewers(viewerId: string | null): Promise<TopReviewer[]> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  return rows.map((r) => {
-    const friendCount = Number(r.friend_count ?? 0);
-    let reason: string;
-    if (friendCount > 0) {
-      reason = `${friendCount} friend${friendCount === 1 ? "" : "s"} · avg ${r.friend_avg ?? r.avg_score}`;
-    } else {
-      reason = `${r.rating_count} ${r.rating_count === 1 ? "rating" : "ratings"} · avg ${r.avg_score}`;
-    }
-    return {
-      songId: r.song_id,
-      title: r.title,
-      artist: r.artist,
-      album: r.album,
-      thumbnail: r.thumbnail,
-      appleMusicUrl: r.apple_music_url,
-      spotifyTrackId: r.spotify_track_id,
-      ratingCount: Number(r.rating_count),
-      avgScore: Number(r.avg_score),
-      reason,
-      durationSeconds: r.duration_seconds == null ? null : Number(r.duration_seconds),
-    };
-  });
+  // Two-step: get top reviewer ids first, then exclude the viewer's
+  // existing follows. Doing it in SQL with a sub-select would be tidier
+  // but Drizzle's group-by + having + sub-select gets gnarly fast.
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      displayName: users.displayName,
+      imageUrl: users.imageUrl,
+      ratingsCount: sql<number>`count(${ratings.userId})::int`,
+    })
+    .from(users)
+    .innerJoin(ratings, eq(ratings.userId, users.id))
+    .where(
+      and(
+        gte(ratings.createdAt, thirtyDaysAgo),
+        viewerId ? ne(users.id, viewerId) : sql`true`,
+      ),
+    )
+    .groupBy(users.id)
+    .having(sql`count(${ratings.userId}) >= 3`)
+    .orderBy(desc(sql`count(${ratings.userId})`))
+    .limit(20);
+
+  if (!viewerId || rows.length === 0) return rows.slice(0, 8);
+
+  // Filter out users the viewer already follows (any status). One small
+  // IN-list query, then JS filter — cheaper than joining in SQL.
+  const followRows = await db
+    .select({ followeeId: follows.followeeId })
+    .from(follows)
+    .where(eq(follows.followerId, viewerId));
+  const followingIds = new Set(followRows.map((r) => r.followeeId));
+  return rows.filter((r) => !followingIds.has(r.id)).slice(0, 8);
 }
 
-function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
+// Reusable square-art card for songs/albums on /discover. Used by
+// both Trending and Top Rated grids. Audio preview button overlays
+// the artwork bottom-right (for songs only).
+function DiscoverCard({ r }: { r: DiscoverRow }) {
+  const isAlbum = isAlbumId(r.songId);
+  const songLike = {
+    id: r.songId,
+    kind: (isAlbum ? "album" : "song") as "song" | "album",
+    title: r.title,
+    artist: r.artist,
+    album: r.album,
+    thumbnail: r.thumbnail,
+    durationSeconds: r.durationSeconds,
+  };
+  return (
+    <div className="rounded-xl border border-neutral-800 bg-gradient-to-b from-neutral-900 to-neutral-950 overflow-hidden hover:border-neutral-700 transition-colors flex flex-col">
+      <div className="relative">
+        <Link href={`/album/${encodeBase64Url(r.songId)}`} className="block">
+          {r.thumbnail ? (
+            <Image
+              src={r.thumbnail}
+              alt=""
+              width={240}
+              height={240}
+              className="w-full aspect-square object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="w-full aspect-square bg-neutral-800" />
+          )}
+          <span className="absolute top-2 right-2 rounded-md bg-black/80 backdrop-blur-sm px-2 py-0.5 text-sm font-bold tabular-nums text-emerald-400 shadow-md">
+            {r.avgScore}
+          </span>
+          {isAlbum && (
+            <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/30 text-sky-100 border border-sky-400/40">
+              Album
+            </span>
+          )}
+        </Link>
+        {!isAlbum && (
+          <div className="absolute bottom-2 right-2 z-10">
+            <AudioPreviewButton songId={r.songId} />
+          </div>
+        )}
+      </div>
+      <div className="p-3 flex flex-col gap-2 flex-1">
+        <div className="min-h-[40px]">
+          <Link
+            href={`/album/${encodeBase64Url(r.songId)}`}
+            className="font-semibold text-[13px] leading-tight line-clamp-1 hover:underline"
+            title={r.title}
+          >
+            {r.title}
+          </Link>
+          <div
+            className="text-[12px] text-neutral-400 truncate mt-0.5"
+            title={r.artist}
+          >
+            {r.artist}
+          </div>
+        </div>
+        <div className="text-[10px] text-neutral-500 tabular-nums">
+          {r.ratingCount} {r.ratingCount === 1 ? "rating" : "ratings"}
+          <span className={`ml-1.5 font-medium ${scoreLabel(r.avgScore).color}`}>
+            {scoreLabel(r.avgScore).label}
+          </span>
+        </div>
+        <RateButton song={songLike} />
+      </div>
+    </div>
+  );
+}
+
+function DiscoverGrid({ rows }: { rows: DiscoverRow[] }) {
   if (rows.length === 0) {
     return (
       <p className="text-neutral-500 text-sm">
@@ -198,132 +209,149 @@ function DiscoverList({ rows }: { rows: DiscoverRow[] }) {
     );
   }
   return (
-    <ul className="space-y-2">
-      {rows.map((r) => {
-        const url = ytUrlForSongId(r.songId);
-        return (
-          <li
-            key={r.songId}
-            className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-3"
-          >
-            {url ? (
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="relative shrink-0 group"
-                title="Open in YouTube Music"
-              >
-                {r.thumbnail ? (
-                  <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover" />
-                ) : (
-                  <div className="h-12 w-12 rounded bg-neutral-800" />
-                )}
-                <div className="absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
-                  <svg
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden
-                  >
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </a>
-            ) : r.thumbnail ? (
-              <Image src={r.thumbnail} alt="" width={48} height={48} className="rounded h-12 w-12 object-cover shrink-0" />
-            ) : (
-              <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <Link
-                href={`/album/${encodeAlbumIdForUrl(r.songId)}`}
-                className="font-medium truncate block hover:underline"
-              >
-                {r.title}
-              </Link>
-              <div className="text-sm text-neutral-400 truncate">
-                {r.artist}{r.album ? ` · ${r.album}` : ""}
-              </div>
-              <StreamingLinks
-                songId={r.songId}
-                title={r.title}
-                artist={r.artist}
-                appleMusicUrl={r.appleMusicUrl}
-                spotifyTrackId={r.spotifyTrackId}
-                className="mt-1"
-              />
-            </div>
-            <div className="text-right shrink-0">
-              <div className="text-xl font-bold tabular-nums">{r.avgScore}</div>
-              <div className={`text-[10px] font-medium ${scoreLabel(r.avgScore).color}`}>
-                {scoreLabel(r.avgScore).label}
-              </div>
-              <div className="text-[10px] text-neutral-500">
-                {r.ratingCount} {r.ratingCount === 1 ? "rating" : "ratings"}
-              </div>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {rows.map((r) => (
+        <DiscoverCard key={r.songId} r={r} />
+      ))}
+    </div>
   );
 }
 
-function RecommendedRow({ rows }: { rows: RecRow[] }) {
-  if (rows.length === 0) return null;
+// Hero spotlight: the single hottest pick for this viewer. Picks the
+// top friend-rec when available, falls back to the #1 trending. Big
+// art on the left, blurb + score on the right. Mobile stacks them.
+function HeroSpotlight({
+  songId,
+  title,
+  artist,
+  thumbnail,
+  durationSeconds,
+  ratingCount,
+  avgScore,
+  badge,
+}: {
+  songId: string;
+  title: string;
+  artist: string;
+  thumbnail: string | null;
+  durationSeconds: number | null;
+  ratingCount: number;
+  avgScore: number;
+  badge: string;
+}) {
+  const isAlbum = isAlbumId(songId);
+  const songLike = {
+    id: songId,
+    kind: (isAlbum ? "album" : "song") as "song" | "album",
+    title,
+    artist,
+    album: null,
+    thumbnail,
+    durationSeconds,
+  };
+  return (
+    <section className="relative rounded-2xl overflow-hidden border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-neutral-950 to-neutral-950">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-6">
+        <div className="relative shrink-0 mx-auto sm:mx-0">
+          <Link href={`/album/${encodeBase64Url(songId)}`} className="block">
+            {thumbnail ? (
+              <Image
+                src={thumbnail}
+                alt=""
+                width={200}
+                height={200}
+                className="rounded-lg w-40 h-40 sm:w-48 sm:h-48 object-cover ring-2 ring-neutral-800 shadow-xl"
+                unoptimized
+              />
+            ) : (
+              <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-lg bg-neutral-800 ring-2 ring-neutral-800" />
+            )}
+          </Link>
+          {!isAlbum && (
+            <div className="absolute bottom-2 right-2">
+              <AudioPreviewButton songId={songId} />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col gap-2 justify-center">
+          <span className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold">
+            {badge}
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+            <Link
+              href={`/album/${encodeBase64Url(songId)}`}
+              className="hover:underline"
+            >
+              {title}
+            </Link>
+          </h2>
+          <p className="text-neutral-400">{artist}</p>
+          <div className="flex items-baseline gap-3 pt-1 flex-wrap">
+            <span className="text-5xl font-bold tabular-nums text-emerald-400 leading-none">
+              {avgScore}
+            </span>
+            <span className={`text-sm font-semibold ${scoreLabel(avgScore).color}`}>
+              {scoreLabel(avgScore).label}
+            </span>
+            <span className="text-xs text-neutral-500 ml-auto">
+              {ratingCount} {ratingCount === 1 ? "rating" : "ratings"}
+            </span>
+          </div>
+          <div className="pt-2">
+            <RateButton song={songLike} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TopReviewersSection({ reviewers }: { reviewers: TopReviewer[] }) {
+  if (reviewers.length === 0) return null;
   return (
     <section className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">Recommended for you</h2>
-        <span className="text-xs text-neutral-500">Based on your friends and overall taste</span>
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight">People to follow</h2>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            Most active raters in the last 30 days
+          </p>
+        </div>
       </div>
-      <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-2 snap-x snap-mandatory">
-        {rows.map((r) => {
-          const url = ytUrlForSongId(r.songId);
-          const songLike = {
-            id: r.songId,
-            kind: (isAlbumId(r.songId) ? "album" : "song") as "song" | "album",
-            title: r.title,
-            artist: r.artist,
-            album: r.album,
-            thumbnail: r.thumbnail,
-            durationSeconds: r.durationSeconds,
-          };
-          return (
-            <div
-              key={r.songId}
-              className="shrink-0 w-44 rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 snap-start flex flex-col"
-            >
-              {url ? (
-                <a href={url} target="_blank" rel="noreferrer" className="relative block">
-                  {r.thumbnail ? (
-                    <Image
-                      src={r.thumbnail}
-                      alt=""
-                      width={160}
-                      height={160}
-                      className="rounded w-full aspect-square object-cover"
-
-                    />
-                  ) : (
-                    <div className="rounded w-full aspect-square bg-neutral-800" />
-                  )}
-                </a>
-              ) : r.thumbnail ? (
-                <Image src={r.thumbnail} alt="" width={160} height={160} className="rounded w-full aspect-square object-cover" />
-              ) : (
-                <div className="rounded w-full aspect-square bg-neutral-800" />
-              )}
-              <div className="mt-2 min-h-[40px]">
-                <div className="font-medium text-sm truncate" title={r.title}>{r.title}</div>
-                <div className="text-xs text-neutral-400 truncate" title={r.artist}>{r.artist}</div>
-              </div>
-              <div className="text-[11px] text-neutral-500 mt-1 truncate">{r.reason}</div>
-              <div className="mt-2">
-                <RateButton song={songLike} />
+      <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-3 snap-x snap-mandatory">
+        {reviewers.map((u) => (
+          <div
+            key={u.id}
+            className="shrink-0 w-40 rounded-xl border border-neutral-800 bg-gradient-to-b from-neutral-900 to-neutral-950 p-3 snap-start flex flex-col items-center text-center gap-2 hover:border-neutral-700 transition-colors"
+          >
+            <Link href={`/u/${u.username}`} className="block">
+              <Avatar
+                imageUrl={u.imageUrl}
+                name={u.displayName || u.username}
+                seed={u.id}
+                size={56}
+                ring={false}
+              />
+            </Link>
+            <div className="min-h-[36px] w-full">
+              <Link
+                href={`/u/${u.username}`}
+                className="font-semibold text-sm truncate block hover:underline"
+              >
+                {u.displayName || u.username}
+              </Link>
+              <div className="text-[11px] text-neutral-400 truncate">
+                @{u.username}
               </div>
             </div>
-          );
-        })}
+            <div className="text-[10px] text-neutral-500 tabular-nums">
+              {u.ratingsCount} {u.ratingsCount === 1 ? "rating" : "ratings"} this month
+            </div>
+            <div className="w-full">
+              <FollowButton username={u.username} initialState="none" />
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -331,38 +359,94 @@ function RecommendedRow({ rows }: { rows: RecRow[] }) {
 
 export default async function DiscoverPage() {
   const { userId } = await auth();
-  const [recs, trending, top] = await Promise.all([
-    recommendedForViewer(userId),
+
+  const [friendRecs, trending, top, reviewers] = await Promise.all([
+    userId
+      ? safeQuery(() => recommendedFromFriends(userId, 12), [], "discover-friend-recs")
+      : Promise.resolve([]),
     trendingThisWeek(),
     topRated(),
+    topReviewers(userId),
   ]);
 
+  // Pick a hero. Prefer the top friend-rec since it's the most
+  // personalized signal; fall back to trending, then top rated. Both
+  // fall-through cases use the global signal as the badge label.
+  let hero:
+    | (DiscoverRow & { badge: string })
+    | null = null;
+  if (friendRecs.length > 0) {
+    const t = friendRecs[0];
+    hero = {
+      songId: t.songId,
+      title: t.title,
+      artist: t.artist,
+      album: t.album,
+      thumbnail: t.thumbnail,
+      appleMusicUrl: t.appleMusicUrl,
+      spotifyTrackId: t.spotifyTrackId,
+      durationSeconds: t.durationSeconds,
+      ratingCount: t.friendCount,
+      avgScore: t.friendAvg,
+      badge:
+        t.friendCount === 1
+          ? "1 friend loved this"
+          : `${t.friendCount} friends loved this`,
+    };
+  } else if (trending.length > 0) {
+    hero = { ...trending[0], badge: "Trending now" };
+  } else if (top.length > 0) {
+    hero = { ...top[0], badge: "Top rated" };
+  }
+
   return (
-    <div className="space-y-10">
-      <div className="space-y-2">
+    <div className="space-y-8">
+      <div className="space-y-1">
         <h1 className="text-2xl font-bold">Discover</h1>
         <p className="text-neutral-400 text-sm">
-          What everyone&apos;s rating right now and what&apos;s scored highest overall.
+          What everyone&apos;s rating, who&apos;s rating it, and what your network loved.
         </p>
       </div>
 
-      <RecommendedRow rows={recs} />
+      {hero && (
+        <HeroSpotlight
+          songId={hero.songId}
+          title={hero.title}
+          artist={hero.artist}
+          thumbnail={hero.thumbnail}
+          durationSeconds={hero.durationSeconds}
+          ratingCount={hero.ratingCount}
+          avgScore={hero.avgScore}
+          badge={hero.badge}
+        />
+      )}
+
+      {/* Reuse the same rail design as /feed for friend recs — visual
+          consistency across the app, and you get the same audio
+          preview + avatar stack pattern for free. */}
+      <FriendRecsRail recs={friendRecs} />
 
       <section className="space-y-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold">Trending this week</h2>
-          <span className="text-xs text-neutral-500">most rated · last 7 days</span>
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">Trending this week</h2>
+            <p className="text-xs text-neutral-500 mt-0.5">Most rated over the last 7 days</p>
+          </div>
         </div>
-        <DiscoverList rows={trending} />
+        <DiscoverGrid rows={trending} />
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold">Top rated</h2>
-          <span className="text-xs text-neutral-500">highest avg · 2+ ratings</span>
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">Top rated</h2>
+            <p className="text-xs text-neutral-500 mt-0.5">Highest average · 2+ ratings</p>
+          </div>
         </div>
-        <DiscoverList rows={top} />
+        <DiscoverGrid rows={top} />
       </section>
+
+      {userId && <TopReviewersSection reviewers={reviewers} />}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { renderWithMentions } from "@/lib/mentions";
 import { ytUrlForSongId } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { scoreLabel } from "@/lib/score-labels";
+import { Avatar } from "@/components/Avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -122,11 +123,13 @@ export default async function SharedRatingPage({
       <Link href="/" className="text-sm text-neutral-400 hover:text-white">← Tuned Up</Link>
 
       <div className="flex items-center gap-3">
-        {r.imageUrl ? (
-          <Image src={r.imageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10" />
-        ) : (
-          <div className="h-10 w-10 rounded-full bg-neutral-700" />
-        )}
+        <Avatar
+          imageUrl={r.imageUrl}
+          name={r.displayName || r.username}
+          seed={r.ratingUserId}
+          size={40}
+          ring={false}
+        />
         <Link href={`/u/${r.username}`} className="font-medium hover:underline">
           {r.displayName || r.username}
         </Link>

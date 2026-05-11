@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { Avatar } from "@/components/Avatar";
 import type { SongResult } from "@/lib/ytmusic";
 import { MentionInput } from "@/components/MentionInput";
 
@@ -186,11 +186,13 @@ export function RecommendButton({ song }: { song: SongResult }) {
                           onClick={() => setPicked(u)}
                           className="w-full flex items-center gap-3 rounded-md p-2 hover:bg-neutral-800 text-left"
                         >
-                          {u.imageUrl ? (
-                            <Image src={u.imageUrl} alt="" width={36} height={36} className="rounded-full h-9 w-9" />
-                          ) : (
-                            <div className="h-9 w-9 rounded-full bg-neutral-700" />
-                          )}
+                          <Avatar
+                            imageUrl={u.imageUrl}
+                            name={u.displayName || u.username}
+                            seed={u.id}
+                            size={36}
+                            ring={false}
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium truncate">{u.displayName || u.username}</div>
                             <div className="text-xs text-neutral-400 truncate">@{u.username}</div>
@@ -207,11 +209,13 @@ export function RecommendButton({ song }: { song: SongResult }) {
             ) : (
               <>
                 <div className="flex items-center gap-3 rounded-md bg-neutral-950 border border-neutral-800 p-2">
-                  {picked.imageUrl ? (
-                    <Image src={picked.imageUrl} alt="" width={32} height={32} className="rounded-full h-8 w-8" />
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-neutral-700" />
-                  )}
+                  <Avatar
+                    imageUrl={picked.imageUrl}
+                    name={picked.displayName || picked.username}
+                    seed={picked.id}
+                    size={32}
+                    ring={false}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{picked.displayName || picked.username}</div>
                     <div className="text-xs text-neutral-400 truncate">@{picked.username}</div>

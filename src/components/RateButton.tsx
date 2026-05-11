@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Avatar } from "@/components/Avatar";
 import Link from "next/link";
 import type { SongResult } from "@/lib/ytmusic";
 import { scoreLabel } from "@/lib/score-labels";
@@ -324,17 +325,13 @@ export function RateButton({
                       className="flex items-center gap-2.5 rounded-md bg-neutral-900/60 p-2"
                     >
                       <Link href={`/u/${f.username}`} className="shrink-0" onClick={close}>
-                        {f.imageUrl ? (
-                          <Image
-                            src={f.imageUrl}
-                            alt=""
-                            width={28}
-                            height={28}
-                            className="rounded-full h-7 w-7"
-                          />
-                        ) : (
-                          <div className="h-7 w-7 rounded-full bg-neutral-700" />
-                        )}
+                        <Avatar
+                          imageUrl={f.imageUrl}
+                          name={f.displayName || f.username}
+                          seed={f.userId}
+                          size={28}
+                          ring={false}
+                        />
                       </Link>
                       <Link
                         href={`/u/${f.username}`}

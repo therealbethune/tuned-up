@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import Image from "next/image";
+import { Avatar } from "@/components/Avatar";
 import Link from "next/link";
 
 type Suggestion = {
@@ -117,20 +117,12 @@ export function SuggestedFriends({ initial }: { initial?: Suggestion[] }) {
               </button>
               <Link href={`/u/${s.username}`} className="block">
                 <div className="flex justify-center">
-                  {s.imageUrl ? (
-                    <Image
-                      src={s.imageUrl}
-                      alt=""
-                      width={64}
-                      height={64}
-                      className="rounded-full h-16 w-16 ring-2 ring-neutral-800"
-
-                    />
-                  ) : (
-                    <div className="h-16 w-16 rounded-full bg-gradient-to-br from-neutral-700 to-neutral-800 ring-2 ring-neutral-800 flex items-center justify-center text-xl font-bold text-neutral-300">
-                      {(s.displayName || s.username).charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <Avatar
+                    imageUrl={s.imageUrl}
+                    name={s.displayName || s.username}
+                    seed={s.id}
+                    size={64}
+                  />
                 </div>
                 <div className="mt-2 text-center">
                   <div className="font-medium truncate">{s.displayName || s.username}</div>
