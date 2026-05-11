@@ -17,16 +17,62 @@ export default async function MePage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  const [me] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!me) redirect("/");
+  // Wrap the user-row SELECT so a transient DB outage (Neon 402, etc.)
+  // doesn't 500 the whole /me page. If the lookup fails or finds
+  // nothing, render the outage state below rather than redirecting —
+  // the user wanted /me, sending them to / is just hiding the problem.
+  const meRows = await safeQuery(
+    () => db.select().from(users).where(eq(users.id, userId)).limit(1),
+    [] as (typeof users.$inferSelect)[],
+    "me-user-lookup",
+  );
+  const me = meRows[0] ?? null;
+  if (!me) {
+    return (
+      <div className="space-y-4 py-12 max-w-md mx-auto text-center">
+        <div className="text-5xl">🛠️</div>
+        <h1 className="text-2xl font-bold">Profile temporarily unavailable</h1>
+        <p className="text-neutral-400 text-sm">
+          Our database is catching its breath. Refresh in a minute. The
+          rest of the app (feed, discover) may still work.
+        </p>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <a
+            href="/feed"
+            className="rounded-full bg-white text-black px-5 py-2 font-medium"
+          >
+            Open feed
+          </a>
+          <a
+            href="/me"
+            className="rounded-full border border-neutral-700 px-5 py-2 font-medium hover:bg-neutral-900"
+          >
+            Try again
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   // Pending recommendations count → drives the badge on the Recs link.
-  const [recStat] = await db
-    .select({ n: count() })
-    .from(recommendations)
-    .where(
-      and(eq(recommendations.toUserId, userId), eq(recommendations.status, "pending")),
-    );
+  // safeQuery'd because a DB hiccup here shouldn't take down the page;
+  // worst case the badge just shows 0.
+  const recStat = (
+    await safeQuery(
+      () =>
+        db
+          .select({ n: count() })
+          .from(recommendations)
+          .where(
+            and(
+              eq(recommendations.toUserId, userId),
+              eq(recommendations.status, "pending"),
+            ),
+          ),
+      [] as { n: number }[],
+      "me-pending-recs",
+    )
+  )[0];
   const pendingRecs = Number(recStat?.n ?? 0);
 
   const spotifyConnected = (await safeQuery(
