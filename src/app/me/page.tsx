@@ -7,6 +7,7 @@ import UserProfile from "../u/[username]/UserProfile";
 import { PushBanner } from "@/components/PushBanner";
 import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { ProfileSpotifyPanel } from "@/components/ProfileSpotifyPanel";
+import { ProfileAppleMusicPanel } from "@/components/ProfileAppleMusicPanel";
 import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,7 @@ export default async function MePage() {
       </div>
       <UserProfile target={me} viewerId={userId} />
       <ProfileSpotifyPanel connected={spotifyConnected} />
+      <ProfileAppleMusicPanel />
     </div>
   );
 }

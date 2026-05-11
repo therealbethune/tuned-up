@@ -3,12 +3,15 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { db, songs, ratings, users, follows } from "@/db";
+import { db, songs, ratings, users, follows, spotifyAccounts } from "@/db";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { scoreLabel } from "@/lib/score-labels";
 import { RateButton } from "@/components/RateButton";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
+import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
+import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
+import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +122,23 @@ export default async function AlbumPage({
   const maxCount = Math.max(1, ...counts);
 
   const isAlbum = isAlbumId(song.id) || song.kind === "album";
+
+  // Does the viewer have Spotify connected? Spotify save needs the
+  // OAuth token; Apple Music save handles its own popup auth so it's
+  // shown unconditionally. Skip the query when unauthenticated.
+  let spotifyConnected = false;
+  if (userId) {
+    const linkRows = await safeQuery(
+      () =>
+        db
+          .select({ id: spotifyAccounts.userId })
+          .from(spotifyAccounts)
+          .where(eq(spotifyAccounts.userId, userId)),
+      [] as { id: string }[],
+      "album-spotify-link",
+    );
+    spotifyConnected = linkRows.length > 0;
+  }
   const url = ytUrlForSongId(song.id);
   const songForRate = {
     id: song.id,
@@ -186,18 +206,28 @@ export default async function AlbumPage({
             {!isAlbum && <AudioPreviewButton songId={song.id} />}
           </div>
           {userId && (
-            <div className="pt-1 flex items-center gap-3 flex-wrap">
-              <RateButton song={songForRate} initialScore={myRow?.score ?? null} />
-              {myRow != null && (
-                <span
-                  className="inline-flex items-baseline gap-1.5 rounded-full bg-neutral-800/80 border border-neutral-700 px-2.5 py-1 text-xs"
-                  title="Your rating"
-                >
-                  <span className="text-neutral-400">You:</span>
-                  <span className="font-bold tabular-nums text-emerald-400">{myRow.score}</span>
-                </span>
+            <>
+              <div className="pt-1 flex items-center gap-3 flex-wrap">
+                <RateButton song={songForRate} initialScore={myRow?.score ?? null} />
+                {myRow != null && (
+                  <span
+                    className="inline-flex items-baseline gap-1.5 rounded-full bg-neutral-800/80 border border-neutral-700 px-2.5 py-1 text-xs"
+                    title="Your rating"
+                  >
+                    <span className="text-neutral-400">You:</span>
+                    <span className="font-bold tabular-nums text-emerald-400">{myRow.score}</span>
+                  </span>
+                )}
+              </div>
+              {!isAlbum && (
+                <div className="pt-1 flex flex-wrap items-center gap-2">
+                  {spotifyConnected && (
+                    <SaveToSpotifyButton songId={song.id} connected={spotifyConnected} />
+                  )}
+                  <SaveToAppleMusicButton songId={song.id} />
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </header>
