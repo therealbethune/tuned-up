@@ -11,6 +11,7 @@ import { ytUrlForSongId } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { scoreLabel } from "@/lib/score-labels";
 import { Avatar } from "@/components/Avatar";
+import { canViewRatingsFrom } from "@/lib/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,17 @@ export async function generateMetadata({
   const r = await loadRating(username, songId);
   if (!r) return { title: "Tuned Up" };
 
+  // Don't leak score/review through OG / Twitter card metadata if the
+  // rating owner is private. The viewer of a metadata fetch is almost
+  // always a bot (Slack, iMessage, X, Discord) — we have no userId to
+  // gate on, so private = generic fallback.
+  if (r.isPrivate) {
+    return {
+      title: "Tuned Up",
+      description: "A music-rating social network.",
+    };
+  }
+
   const titleStr = `@${r.username} rated ${r.title} — ${r.score}/100`;
   const desc = r.review ?? `${r.artist} · ${r.score}/100 on Tuned Up`;
   const ogImage = `/api/og/rating?u=${encodeURIComponent(r.username)}&s=${encodeURIComponent(r.songId)}`;
@@ -102,14 +114,21 @@ export default async function SharedRatingPage({
   const { username, songId } = await params;
   const r = await loadRating(username, songId);
   if (!r) notFound();
-  // For private profiles, hide review/details from non-followers. The share
-  // page is itself a deliberate share, so we still show the rating; the user
-  // chose to share it.
-  //
+
+  const { userId } = await auth();
+
+  // Privacy gate: a private user's share URLs should still resolve for
+  // the owner and for accepted followers, but for everyone else (incl.
+  // logged-out viewers reached via copied link, search-engine bots, or
+  // OG-card-fetching bots) we 404 to prevent the URL from leaking
+  // score + review. Public users always pass.
+  if (r.isPrivate && !(await canViewRatingsFrom(userId ?? "", r.ratingUserId))) {
+    notFound();
+  }
+
   // Signed-in users: bounce them into the feed-focus view so we have one
   // canonical destination + they get the full feed context (comments,
   // likes, save buttons) inline instead of the bare share page.
-  const { userId } = await auth();
   if (userId) {
     redirect(
       `/feed?focus=${r.ratingUserId}:${encodeURIComponent(r.songId)}#rating-${r.ratingUserId}-${encodeSongIdForUrl(r.songId)}`,

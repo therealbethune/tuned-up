@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db, ratings } from "@/db";
+import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,18 @@ export async function POST(req: Request) {
   if (!Number.isFinite(s) || s < 1 || s > 100) {
     return NextResponse.json({ error: "score must be 1-100" }, { status: 400 });
   }
+
+  // Rate-limit edits the same way creates are limited. Without this a
+  // script could spam updatedAt on a single rating row uncapped.
+  const limited = await enforce(LIMITS.RATINGS, async () => {
+    const start = windowStartDate(LIMITS.RATINGS.windowSec);
+    const [r] = await db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(ratings)
+      .where(and(eq(ratings.userId, userId), gte(ratings.updatedAt, start)));
+    return Number(r?.c ?? 0);
+  });
+  if (limited) return limited;
 
   const result = await db
     .update(ratings)

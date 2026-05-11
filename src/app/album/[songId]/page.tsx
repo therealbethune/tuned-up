@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, songs, ratings, users, follows, spotifyAccounts } from "@/db";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
@@ -47,7 +47,10 @@ export default async function AlbumPage({
   if (!song) notFound();
 
   // All ratings for this item, joined to users for the reviewer rail.
-  const allRatings = await db
+  // We pull `isPrivate` so we can filter below — private users' ratings
+  // must NOT show to non-followers (this page is also reachable while
+  // logged-out, where the visibility check is "public users only").
+  const rawRatings = await db
     .select({
       score: ratings.score,
       review: ratings.review,
@@ -56,6 +59,7 @@ export default async function AlbumPage({
       username: users.username,
       displayName: users.displayName,
       imageUrl: users.imageUrl,
+      isPrivate: users.isPrivate,
     })
     .from(ratings)
     .innerJoin(users, eq(users.id, ratings.userId))
@@ -63,40 +67,43 @@ export default async function AlbumPage({
     .orderBy(desc(ratings.createdAt))
     .limit(50);
 
-  const total = allRatings.length;
-  const avg = total > 0
-    ? Math.round(allRatings.reduce((s, r) => s + r.score, 0) / total)
-    : null;
-  const myRow = userId ? allRatings.find((r) => r.raterId === userId) : null;
-
-  // If the viewer is signed in, partition the recent ratings into
-  // "people you follow" + "everyone else" so friends bubble to the top.
-  // This is the big UX shift on the album page revamp: most users care
-  // FAR more about how their friends rated a song than how random
-  // strangers rated it, and the original render was strict reverse
-  // chronological with no signal.
-  let followedSet: Set<string> = new Set();
+  // Privacy gate: drop rows from private users the viewer doesn't
+  // follow. Look up the viewer's accepted follows once and use that
+  // set to filter. Self is always included.
+  let acceptedFollows: Set<string> = new Set();
   if (userId) {
-    const rows = await db
+    const followRows = await db
       .select({ followeeId: follows.followeeId })
       .from(follows)
       .where(
         and(
           eq(follows.followerId, userId),
           eq(follows.status, "accepted"),
-          inArray(
-            follows.followeeId,
-            allRatings.map((r) => r.raterId).concat([userId]),
-          ),
         ),
       );
-    followedSet = new Set(rows.map((r) => r.followeeId));
+    acceptedFollows = new Set(followRows.map((r) => r.followeeId));
   }
+  const allRatings = rawRatings.filter((r) => {
+    if (!r.isPrivate) return true;
+    if (userId && r.raterId === userId) return true;
+    return acceptedFollows.has(r.raterId);
+  });
+
+  const total = allRatings.length;
+  const avg = total > 0
+    ? Math.round(allRatings.reduce((s, r) => s + r.score, 0) / total)
+    : null;
+  const myRow = userId ? allRatings.find((r) => r.raterId === userId) : null;
+
+  // Partition the visible ratings into "people you follow" + "everyone
+  // else" so friends bubble to the top. Strangers stay reverse-chrono.
+  // (`acceptedFollows` is computed above for privacy filtering — we
+  // reuse it here instead of issuing a second query.)
   const friendRatings = allRatings.filter(
-    (r) => r.raterId !== userId && followedSet.has(r.raterId),
+    (r) => r.raterId !== userId && acceptedFollows.has(r.raterId),
   );
   const otherRatings = allRatings.filter(
-    (r) => r.raterId !== userId && !followedSet.has(r.raterId),
+    (r) => r.raterId !== userId && !acceptedFollows.has(r.raterId),
   );
 
   // Average computed over friends only — gives the viewer a personalized

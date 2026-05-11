@@ -106,6 +106,10 @@ async function topReviewers(viewerId: string | null): Promise<TopReviewer[]> {
     .where(
       and(
         gte(ratings.createdAt, thirtyDaysAgo),
+        // Hide private users from "People to follow" — exposing their
+        // monthly rating count to non-followers leaks information they
+        // opted out of by going private.
+        eq(users.isPrivate, false),
         viewerId ? ne(users.id, viewerId) : sql`true`,
       ),
     )

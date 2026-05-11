@@ -559,7 +559,10 @@ async function EmptyFeed({ userId, followedIds }: { userId: string; followedIds:
     })
     .from(users)
     .leftJoin(ratings, eq(ratings.userId, users.id))
-    .where(notInArray(users.id, exclude))
+    // Suggestions exclude private users — even surfacing their name +
+    // rating count to a non-follower is more data than they consented
+    // to share. They can still be found by direct username search.
+    .where(and(notInArray(users.id, exclude), eq(users.isPrivate, false)))
     .groupBy(users.id)
     .orderBy(desc(sql`count(${ratings.userId})`))
     .limit(8);

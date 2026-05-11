@@ -21,6 +21,13 @@ export async function GET(req: Request) {
   if (!user) {
     return new ImageResponse(<Card title="Tuned Up" />, { width: 1200, height: 630 });
   }
+  // Privacy gate: never render a real OG card for a private user.
+  // Public bots fetching this URL have no userId to gate on, so we
+  // unconditionally fall through to the generic brand card for any
+  // private account.
+  if (user.isPrivate) {
+    return new ImageResponse(<Card title="Tuned Up" />, { width: 1200, height: 630 });
+  }
   const [row] = await db
     .select({
       score: ratings.score,

@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -171,11 +171,13 @@ function ActivityRowItem({
   const Inner = (
     <>
       {unread && <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" aria-label="unread" />}
-      {a.actorImageUrl ? (
-        <Image src={a.actorImageUrl} alt="" width={40} height={40} className="rounded-full h-10 w-10 shrink-0" />
-      ) : (
-        <div className="h-10 w-10 rounded-full bg-neutral-700 shrink-0" />
-      )}
+      <Avatar
+        imageUrl={a.actorImageUrl}
+        name={a.actorDisplayName || a.actorUsername}
+        seed={a.actorId}
+        size={40}
+        ring={false}
+      />
       <div className="flex-1 min-w-0 text-sm">
         <div>
           <span className="font-medium">{a.actorDisplayName || a.actorUsername}</span>{" "}

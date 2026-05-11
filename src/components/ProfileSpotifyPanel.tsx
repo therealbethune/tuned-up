@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { SpotifyIcon } from "@/components/icons";
 
@@ -215,16 +215,35 @@ function NowPlayingBlock({ now }: { now: NowPlaying }) {
 
 function TopTrackRow({ track, rank }: { track: TopTrack; rank: number }) {
   const [previewing, setPreviewing] = useState(false);
-  const audioRef = useState<HTMLAudioElement | null>(null);
+  // useRef, not useState — we don't want a re-render when the audio
+  // element is created, and we don't want the value to be captured by
+  // stale closures. The previous code mis-used useState as a ref,
+  // which (a) caused an extra render on first play and (b) leaked one
+  // audio element + one `ended` listener per play because cleanup
+  // never fired.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Stop + tear down the audio element on unmount so scrolling past
+  // a track in the list doesn't leave a hanging preview.
+  useEffect(() => {
+    return () => {
+      const a = audioRef.current;
+      if (a) {
+        a.pause();
+        a.src = "";
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   function togglePreview(e: React.MouseEvent) {
     e.preventDefault();
     if (!track.previewUrl) return;
-    let a = audioRef[0];
+    let a = audioRef.current;
     if (!a) {
       a = new Audio(track.previewUrl);
-      audioRef[1](a);
       a.addEventListener("ended", () => setPreviewing(false));
+      audioRef.current = a;
     }
     if (previewing) {
       a.pause();

@@ -35,27 +35,31 @@ export function dateStringInTimezone(date: Date, timeZone: string): string {
 // containing `date` in the given timezone. Used to query "ratings since
 // the start of the user's today".
 export function startOfDayUTC(date: Date, timeZone: string): Date {
+  // 1. Get the local Y-M-D for the input moment.
   const p = partsAt(date, timeZone);
-  // Build a local-clock "00:00" in that zone and resolve back to UTC by
-  // computing the offset for that exact moment.
-  const localMidnightAsIfUTC = Date.UTC(
-    Number(p.year),
-    Number(p.month) - 1,
-    Number(p.day),
-    0,
-    0,
-    0,
-    0,
+  const yy = Number(p.year);
+  const mm = Number(p.month);
+  const dd = Number(p.day);
+
+  // 2. Treat that local midnight as if it were a UTC instant. This is
+  //    "wrong" by exactly the tz offset; we compute the offset next.
+  const targetAsIfUtc = Date.UTC(yy, mm - 1, dd);
+
+  // 3. Read what `targetAsIfUtc` ACTUALLY looks like when interpreted in
+  //    `timeZone`. Then convert that wall clock back to a UTC-ms (as if
+  //    it were UTC). The difference is the tz offset at that moment.
+  //    Older versions subtracted hours×3600s of the candidate which
+  //    silently dropped 24h whenever the candidate's tz date had
+  //    crossed back to the previous day — i.e. for every tz west of UTC.
+  const cand = new Date(targetAsIfUtc);
+  const cp = partsAt(cand, timeZone);
+  const seenAsIfUtc = Date.UTC(
+    Number(cp.year),
+    Number(cp.month) - 1,
+    Number(cp.day),
+    Number(cp.hour),
+    Number(cp.minute),
   );
-  // Now figure out what UTC instant maps to that wall-clock midnight in tz.
-  // The trick: format the candidate UTC midnight in tz and see how off it is.
-  const candidate = new Date(localMidnightAsIfUTC);
-  const candidatePartsInTz = partsAt(candidate, timeZone);
-  // Compute the difference between the candidate's appearance in tz and
-  // actual midnight, then subtract that offset from the candidate to land on
-  // the correct UTC instant.
-  const candHour = Number(candidatePartsInTz.hour);
-  const candMin = Number(candidatePartsInTz.minute);
-  const offsetMs = (candHour * 60 + candMin) * 60_000;
-  return new Date(candidate.getTime() - offsetMs);
+  const offsetMs = seenAsIfUtc - targetAsIfUtc;
+  return new Date(targetAsIfUtc - offsetMs);
 }

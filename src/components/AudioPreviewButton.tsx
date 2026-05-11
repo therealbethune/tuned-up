@@ -33,11 +33,17 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
   useEffect(() => {
     // If another preview button starts playing, ours should stop. We
     // identify "ours" via the audio element identity check.
+    //
+    // Critical: also CLEAR myAudioRef when the shared audio is taken
+    // over by someone else, so when *this* component unmounts later
+    // it doesn't pause an audio element that another button is now
+    // playing. The previous version kept ownership forever, which
+    // meant scrolling away from a card whose preview had been
+    // superseded would cut off whoever was actually playing.
     function onActive(e: Event) {
       const detail = (e as CustomEvent<{ source: HTMLAudioElement }>).detail;
       if (myAudioRef.current && detail.source !== myAudioRef.current) {
-        // The shared audio is now serving another button; that's fine —
-        // we just need to reflect it in our state.
+        myAudioRef.current = null;
         setState("idle");
       }
     }
@@ -46,7 +52,9 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
   }, []);
 
   // Stop our playback when the component unmounts so previews don't
-  // outlive the rating card scrolling out of view.
+  // outlive the rating card scrolling out of view. By this point
+  // myAudioRef is null whenever someone else owns the shared audio
+  // (see the listener above), so we never pause a stranger's track.
   useEffect(() => {
     return () => {
       const audio = myAudioRef.current;
