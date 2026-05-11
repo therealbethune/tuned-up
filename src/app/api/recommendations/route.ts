@@ -1,12 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, recommendations, users, songs, activities } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
 import { extractMentions } from "@/lib/mentions";
+import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,19 @@ export async function POST(req: Request) {
     if (target.id === userId) {
       return NextResponse.json({ error: "cannot recommend to yourself" }, { status: 400 });
     }
+
+    // Rate-limit: recs are the highest-cost write (push notification +
+    // activity row to the recipient). Cap at 20/minute to stop someone
+    // from spam-recommending the same song to dozens of people at once.
+    const limited = await enforce(LIMITS.RECOMMENDATIONS, async () => {
+      const start = windowStartDate(LIMITS.RECOMMENDATIONS.windowSec);
+      const [r] = await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(recommendations)
+        .where(and(eq(recommendations.fromUserId, userId), gte(recommendations.createdAt, start)));
+      return Number(r?.c ?? 0);
+    });
+    if (limited) return limited;
 
     // Upsert the song so the FK is satisfied. Same logic as /api/ratings POST.
     const kind: "song" | "album" =

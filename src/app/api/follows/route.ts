@@ -1,10 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db, follows, users, activities } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { randomUUID } from "node:crypto";
 import { sendPushToUser } from "@/lib/push";
+import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -75,6 +76,22 @@ export async function POST(req: Request) {
 
   if (target.id === userId) {
     return NextResponse.json({ error: "cannot follow yourself" }, { status: 400 });
+  }
+
+  // Rate-limit follow creates only — accept/reject/unfollow can't be
+  // used to harass (they require an existing edge), so they're skipped
+  // above. This stops follow-spam-as-notification-bomb where someone
+  // floods their target with follow_request pushes.
+  if (action !== "unfollow") {
+    const limited = await enforce(LIMITS.FOLLOWS, async () => {
+      const start = windowStartDate(LIMITS.FOLLOWS.windowSec);
+      const [r] = await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(follows)
+        .where(and(eq(follows.followerId, userId), gte(follows.createdAt, start)));
+      return Number(r?.c ?? 0);
+    });
+    if (limited) return limited;
   }
 
   if (action === "unfollow") {

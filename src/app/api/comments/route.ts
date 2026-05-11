@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, comments, users, ratings, activities, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
@@ -8,6 +8,7 @@ import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
 import { extractMentions } from "@/lib/mentions";
 import { canViewRatingsFrom } from "@/lib/visibility";
+import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,6 +70,19 @@ export async function POST(req: Request) {
   if (text.length > 1000) {
     return NextResponse.json({ error: "comment too long" }, { status: 400 });
   }
+
+  // Rate-limit: comments are the easiest write to abuse (no rating
+  // required, just text). Cap at 15/minute, far above any human pace
+  // but well below what a script can do.
+  const limited = await enforce(LIMITS.COMMENTS, async () => {
+    const start = windowStartDate(LIMITS.COMMENTS.windowSec);
+    const [r] = await db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(comments)
+      .where(and(eq(comments.commenterId, userId), gte(comments.createdAt, start)));
+    return Number(r?.c ?? 0);
+  });
+  if (limited) return limited;
 
   // Confirm the rating exists; FK would catch this but the error is friendlier here.
   const [r] = await db

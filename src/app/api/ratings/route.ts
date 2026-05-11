@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, ne, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, songs, ratings, activities, recommendations, users } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/streak-milestones";
 import { encodeBase64Url } from "@/lib/encoding";
 import { extractMentions } from "@/lib/mentions";
+import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,22 @@ export async function POST(req: Request) {
   if (!Number.isFinite(s) || s < 1 || s > 100) {
     return NextResponse.json({ error: "score must be 1-100" }, { status: 400 });
   }
+
+  // Rate-limit: ratings is intentionally the most generous bucket
+  // because /import/spotify can fire ~50 rapid POSTs as the user taps
+  // chips. We count by `updatedAt` (not `createdAt`) so re-rating an
+  // existing song also counts — otherwise a script could keep editing
+  // the same row without limit. The bulk-rate flow only re-rates if
+  // the user re-taps, so this remains permissive for real use.
+  const limited = await enforce(LIMITS.RATINGS, async () => {
+    const start = windowStartDate(LIMITS.RATINGS.windowSec);
+    const [r] = await db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(ratings)
+      .where(and(eq(ratings.userId, userId), gte(ratings.updatedAt, start)));
+    return Number(r?.c ?? 0);
+  });
+  if (limited) return limited;
 
   // Detect kind from id prefix (or accept it from the client).
   const kind: "song" | "album" =

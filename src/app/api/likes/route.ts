@@ -1,12 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, desc, eq, count } from "drizzle-orm";
+import { and, desc, eq, gte, count, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, likes, ratings, activities, users, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
 import { canViewRatingsFrom } from "@/lib/visibility";
+import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -60,6 +61,19 @@ export async function POST(req: Request) {
   if (!ratingUserId || !songId) {
     return NextResponse.json({ error: "ratingUserId and songId required" }, { status: 400 });
   }
+
+  // Rate-limit toggle traffic. Likes can be spammed by holding down a
+  // button — 60/min is far past any human-paced UI and still blocks
+  // abuse. The toggle counts creates only; an unlike doesn't increment.
+  const limited = await enforce(LIMITS.LIKES, async () => {
+    const start = windowStartDate(LIMITS.LIKES.windowSec);
+    const [r] = await db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(likes)
+      .where(and(eq(likes.likerId, userId), gte(likes.createdAt, start)));
+    return Number(r?.c ?? 0);
+  });
+  if (limited) return limited;
 
   // The rating must exist (FK would catch this anyway).
   const [r] = await db
