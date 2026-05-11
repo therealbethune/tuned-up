@@ -4,12 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run check:clerk-buttons && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:clerk-buttons": "node scripts/check-clerk-buttons.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "preflight": "npm run typecheck && npm run build && npm run smoke"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.3.0",
