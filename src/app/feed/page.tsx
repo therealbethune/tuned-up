@@ -61,48 +61,81 @@ export default async function FeedPage({
     }
   }
 
-  const followedRows = await db
-    .select({ id: follows.followeeId })
-    .from(follows)
-    .where(and(eq(follows.followerId, userId), eq(follows.status, "accepted")));
+  // Wrap the two core feed queries in safeQuery — same defensive
+  // pattern as the rest of this file's data fetches. If either throws
+  // (DB hiccup, missing column on a fresh migration, etc.) the page
+  // renders the empty-feed state instead of 500-ing the whole route.
+  // The instrumentation.ts hook + console.warn inside safeQuery
+  // still log the real error so we can find it in Netlify logs.
+  const followedRows = await safeQuery(
+    () =>
+      db
+        .select({ id: follows.followeeId })
+        .from(follows)
+        .where(and(eq(follows.followerId, userId), eq(follows.status, "accepted"))),
+    [] as { id: string }[],
+    "feed-follows",
+  );
   const followedIds = followedRows.map((r) => r.id);
   followedIds.push(userId); // include self
 
-  const itemsPlusOne = followedIds.length
-    ? await db
-        .select({
-          ratingUserId: ratings.userId,
-          score: ratings.score,
-          review: ratings.review,
-          createdAt: ratings.createdAt,
-          songId: ratings.songId,
-          title: songs.title,
-          artist: songs.artist,
-          album: songs.album,
-          thumbnail: songs.thumbnail,
-          appleMusicUrl: songs.appleMusicUrl,
-          spotifyTrackId: songs.spotifyTrackId,
-          username: users.username,
-          displayName: users.displayName,
-          imageUrl: users.imageUrl,
-          // Rater's cached streak so we can show a "🔥 N" pill on each
-          // card. Refreshed on every new rating (refreshUserStreak in
-          // /api/ratings) so this stays close to live without recomputing.
-          currentStreak: users.currentStreak,
-        })
-        .from(ratings)
-        .innerJoin(songs, eq(ratings.songId, songs.id))
-        .innerJoin(users, eq(ratings.userId, users.id))
-        .where(
-          beforeDate
-            ? and(
-                inArray(ratings.userId, followedIds),
-                lt(ratings.createdAt, beforeDate),
-              )
-            : inArray(ratings.userId, followedIds),
-        )
-        .orderBy(desc(ratings.createdAt))
-        .limit(FEED_PAGE_SIZE + 1)
+  type FeedItemRow = {
+    ratingUserId: string;
+    score: number;
+    review: string | null;
+    createdAt: Date;
+    songId: string;
+    title: string;
+    artist: string;
+    album: string | null;
+    thumbnail: string | null;
+    appleMusicUrl: string | null;
+    spotifyTrackId: string | null;
+    username: string;
+    displayName: string | null;
+    imageUrl: string | null;
+    currentStreak: number;
+  };
+  const itemsPlusOne: FeedItemRow[] = followedIds.length
+    ? await safeQuery<FeedItemRow[]>(
+        () =>
+          db
+            .select({
+              ratingUserId: ratings.userId,
+              score: ratings.score,
+              review: ratings.review,
+              createdAt: ratings.createdAt,
+              songId: ratings.songId,
+              title: songs.title,
+              artist: songs.artist,
+              album: songs.album,
+              thumbnail: songs.thumbnail,
+              appleMusicUrl: songs.appleMusicUrl,
+              spotifyTrackId: songs.spotifyTrackId,
+              username: users.username,
+              displayName: users.displayName,
+              imageUrl: users.imageUrl,
+              // Rater's cached streak so we can show a "🔥 N" pill on each
+              // card. Refreshed on every new rating (refreshUserStreak in
+              // /api/ratings) so this stays close to live without recomputing.
+              currentStreak: users.currentStreak,
+            })
+            .from(ratings)
+            .innerJoin(songs, eq(ratings.songId, songs.id))
+            .innerJoin(users, eq(ratings.userId, users.id))
+            .where(
+              beforeDate
+                ? and(
+                    inArray(ratings.userId, followedIds),
+                    lt(ratings.createdAt, beforeDate),
+                  )
+                : inArray(ratings.userId, followedIds),
+            )
+            .orderBy(desc(ratings.createdAt))
+            .limit(FEED_PAGE_SIZE + 1),
+        [],
+        "feed-items",
+      )
     : [];
 
   const hasMore = itemsPlusOne.length > FEED_PAGE_SIZE;
@@ -120,32 +153,38 @@ export default async function FeedPage({
     focusSongId &&
     !items.some((it) => it.ratingUserId === focusUserId && it.songId === focusSongId)
   ) {
-    const [focused] = await db
-      .select({
-        ratingUserId: ratings.userId,
-        score: ratings.score,
-        review: ratings.review,
-        createdAt: ratings.createdAt,
-        songId: ratings.songId,
-        title: songs.title,
-        artist: songs.artist,
-        album: songs.album,
-        thumbnail: songs.thumbnail,
-        appleMusicUrl: songs.appleMusicUrl,
-        spotifyTrackId: songs.spotifyTrackId,
-        username: users.username,
-        displayName: users.displayName,
-        imageUrl: users.imageUrl,
-        currentStreak: users.currentStreak,
-        ratingOwnerIsPrivate: users.isPrivate,
-      })
-      .from(ratings)
-      .innerJoin(songs, eq(ratings.songId, songs.id))
-      .innerJoin(users, eq(ratings.userId, users.id))
-      .where(
-        and(eq(ratings.userId, focusUserId), eq(ratings.songId, focusSongId)),
-      )
-      .limit(1);
+    const focusedRows = await safeQuery(
+      () =>
+        db
+          .select({
+            ratingUserId: ratings.userId,
+            score: ratings.score,
+            review: ratings.review,
+            createdAt: ratings.createdAt,
+            songId: ratings.songId,
+            title: songs.title,
+            artist: songs.artist,
+            album: songs.album,
+            thumbnail: songs.thumbnail,
+            appleMusicUrl: songs.appleMusicUrl,
+            spotifyTrackId: songs.spotifyTrackId,
+            username: users.username,
+            displayName: users.displayName,
+            imageUrl: users.imageUrl,
+            currentStreak: users.currentStreak,
+            ratingOwnerIsPrivate: users.isPrivate,
+          })
+          .from(ratings)
+          .innerJoin(songs, eq(ratings.songId, songs.id))
+          .innerJoin(users, eq(ratings.userId, users.id))
+          .where(
+            and(eq(ratings.userId, focusUserId), eq(ratings.songId, focusSongId)),
+          )
+          .limit(1),
+      [],
+      "feed-focus",
+    );
+    const focused = focusedRows[0];
     if (focused) {
       const ownerIsPrivate = focused.ratingOwnerIsPrivate;
       const viewerOwnsIt = focused.ratingUserId === userId;
@@ -169,10 +208,15 @@ export default async function FeedPage({
   // an accurate "Rated X" label on the inline RateButton).
   const songIds = Array.from(new Set(items.map((i) => i.songId)));
   const myRatingsRows = songIds.length
-    ? await db
-        .select({ songId: ratings.songId, score: ratings.score })
-        .from(ratings)
-        .where(and(eq(ratings.userId, userId), inArray(ratings.songId, songIds)))
+    ? await safeQuery(
+        () =>
+          db
+            .select({ songId: ratings.songId, score: ratings.score })
+            .from(ratings)
+            .where(and(eq(ratings.userId, userId), inArray(ratings.songId, songIds))),
+        [] as { songId: string; score: number }[],
+        "feed-my-ratings",
+      )
     : [];
   const myRatingsMap = new Map(myRatingsRows.map((r) => [r.songId, r.score]));
 
@@ -190,23 +234,28 @@ export default async function FeedPage({
   };
   const otherRatersBySong = new Map<string, OtherRater[]>();
   if (songIds.length && followedIds.length) {
-    const rows = await db
-      .select({
-        songId: ratings.songId,
-        raterId: ratings.userId,
-        username: users.username,
-        displayName: users.displayName,
-        imageUrl: users.imageUrl,
-        score: ratings.score,
-      })
-      .from(ratings)
-      .innerJoin(users, eq(users.id, ratings.userId))
-      .where(
-        and(
-          inArray(ratings.songId, songIds),
-          inArray(ratings.userId, followedIds),
-        ),
-      );
+    const rows = await safeQuery<OtherRater[]>(
+      () =>
+        db
+          .select({
+            songId: ratings.songId,
+            raterId: ratings.userId,
+            username: users.username,
+            displayName: users.displayName,
+            imageUrl: users.imageUrl,
+            score: ratings.score,
+          })
+          .from(ratings)
+          .innerJoin(users, eq(users.id, ratings.userId))
+          .where(
+            and(
+              inArray(ratings.songId, songIds),
+              inArray(ratings.userId, followedIds),
+            ),
+          ),
+      [],
+      "feed-other-raters",
+    );
     for (const r of rows) {
       const arr = otherRatersBySong.get(r.songId) ?? [];
       arr.push(r);
@@ -250,44 +299,59 @@ export default async function FeedPage({
     const ratingUserIds = Array.from(new Set(items.map((i) => i.ratingUserId)));
 
     const [cCounts, lCounts, myLikeRows] = await Promise.all([
-      db
-        .select({
-          ratingUserId: comments.ratingUserId,
-          songId: comments.songId,
-          n: count(),
-        })
-        .from(comments)
-        .where(
-          and(
-            inArray(comments.ratingUserId, ratingUserIds),
-            inArray(comments.songId, songIds),
-          ),
-        )
-        .groupBy(comments.ratingUserId, comments.songId),
-      db
-        .select({
-          ratingUserId: likes.ratingUserId,
-          songId: likes.songId,
-          n: count(),
-        })
-        .from(likes)
-        .where(
-          and(
-            inArray(likes.ratingUserId, ratingUserIds),
-            inArray(likes.songId, songIds),
-          ),
-        )
-        .groupBy(likes.ratingUserId, likes.songId),
-      db
-        .select({ ratingUserId: likes.ratingUserId, songId: likes.songId })
-        .from(likes)
-        .where(
-          and(
-            eq(likes.likerId, userId),
-            inArray(likes.ratingUserId, ratingUserIds),
-            inArray(likes.songId, songIds),
-          ),
-        ),
+      safeQuery(
+        () =>
+          db
+            .select({
+              ratingUserId: comments.ratingUserId,
+              songId: comments.songId,
+              n: count(),
+            })
+            .from(comments)
+            .where(
+              and(
+                inArray(comments.ratingUserId, ratingUserIds),
+                inArray(comments.songId, songIds),
+              ),
+            )
+            .groupBy(comments.ratingUserId, comments.songId),
+          [] as { ratingUserId: string; songId: string; n: number }[],
+          "feed-comment-counts",
+      ),
+      safeQuery(
+        () =>
+          db
+            .select({
+              ratingUserId: likes.ratingUserId,
+              songId: likes.songId,
+              n: count(),
+            })
+            .from(likes)
+            .where(
+              and(
+                inArray(likes.ratingUserId, ratingUserIds),
+                inArray(likes.songId, songIds),
+              ),
+            )
+            .groupBy(likes.ratingUserId, likes.songId),
+          [] as { ratingUserId: string; songId: string; n: number }[],
+          "feed-like-counts",
+      ),
+      safeQuery(
+        () =>
+          db
+            .select({ ratingUserId: likes.ratingUserId, songId: likes.songId })
+            .from(likes)
+            .where(
+              and(
+                eq(likes.likerId, userId),
+                inArray(likes.ratingUserId, ratingUserIds),
+                inArray(likes.songId, songIds),
+              ),
+            ),
+          [] as { ratingUserId: string; songId: string }[],
+          "feed-my-likes",
+      ),
     ]);
     commentCounts = new Map(
       cCounts.map((c) => [`${c.ratingUserId}::${c.songId}`, Number(c.n)]),
