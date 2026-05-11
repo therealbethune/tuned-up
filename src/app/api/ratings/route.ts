@@ -15,6 +15,7 @@ import {
 import { encodeBase64Url } from "@/lib/encoding";
 import { extractMentions } from "@/lib/mentions";
 import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
+import { reportError } from "@/lib/report-error";
 
 export const runtime = "nodejs";
 
@@ -194,7 +195,7 @@ export async function POST(req: Request) {
             }),
         );
       } catch (e) {
-        console.error("[ratings POST] mention notify failed:", e);
+        reportError(e, "ratings POST mention notify");
       }
     }
   }

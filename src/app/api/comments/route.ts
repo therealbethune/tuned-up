@@ -9,6 +9,7 @@ import { encodeBase64Url } from "@/lib/encoding";
 import { extractMentions } from "@/lib/mentions";
 import { canViewRatingsFrom } from "@/lib/visibility";
 import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
+import { reportError } from "@/lib/report-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -211,7 +212,7 @@ export async function POST(req: Request) {
           }),
       );
     } catch (e) {
-      console.error("[comments POST] mention notify failed:", e);
+      reportError(e, "comments POST mention notify");
     }
   }
 
@@ -287,7 +288,7 @@ export async function POST(req: Request) {
         tag: `reply:${userId}:${songId}`,
       });
     } catch (e) {
-      console.error("[comments POST] reply notify failed:", e);
+      reportError(e, "comments POST reply notify");
     }
   }
 

@@ -8,6 +8,7 @@ import { sendPushToUser } from "@/lib/push";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
 import { extractMentions } from "@/lib/mentions";
 import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
+import { reportError } from "@/lib/report-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -181,7 +182,7 @@ export async function POST(req: Request) {
         songId: song.id,
       });
     } catch (e) {
-      console.error("[recommendations POST] activity insert failed:", e);
+      reportError(e, "recommendations POST activity insert");
     }
 
     // Push notification — best-effort.
@@ -202,7 +203,7 @@ export async function POST(req: Request) {
         tag: `rec:${userId}:${song.id}`,
       });
     } catch (e) {
-      console.error("[recommendations POST] push send failed:", e);
+      reportError(e, "recommendations POST push send");
     }
 
     // Notify any users @mentioned in the message body — but skip the
@@ -251,13 +252,13 @@ export async function POST(req: Request) {
           );
         }
       } catch (e) {
-        console.error("[recommendations POST] mention notify failed:", e);
+        reportError(e, "recommendations POST mention notify");
       }
     }
 
     return NextResponse.json({ ok: true, id: recId });
   } catch (e) {
-    console.error("[recommendations POST] unexpected error:", e);
+    reportError(e, "recommendations POST unexpected");
     return NextResponse.json(
       { error: (e as Error).message || "Internal error" },
       { status: 500 },

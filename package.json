@@ -18,6 +18,7 @@
     "@clerk/nextjs": "^7.3.0",
     "@netlify/blobs": "^10.7.4",
     "@netlify/neon": "^0.1.2",
+    "@sentry/nextjs": "^10.52.0",
     "@types/web-push": "^3.6.4",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",

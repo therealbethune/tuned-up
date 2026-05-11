@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // Allow Next/Image optimization for the third-party image hosts we pull from.
@@ -27,4 +28,27 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wrap with Sentry. The wrapper auto-discovers the three
+// sentry.*.config.ts files at project root and applies build-time
+// instrumentation: route-handler error boundaries, server-component
+// error capture, source-map upload (when SENTRY_AUTH_TOKEN is set).
+//
+// Without a DSN configured, the Sentry SDK itself becomes a no-op
+// at runtime — so local dev + preview deploys without env vars are
+// unaffected. The wrapper only adds build-time plumbing.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  // Quiet build unless we're in CI debugging the upload step.
+  silent: !process.env.CI,
+  // Include framework chunks so a throw inside Next's runtime still
+  // gets a useful stack.
+  widenClientFileUpload: true,
+  disableLogger: true,
+  // Skip the source-map upload plugin when there's no auth token
+  // (local dev, preview without secrets) — otherwise the build hard-
+  // fails on "missing auth token". When the token IS set, the plugin
+  // uploads maps and the wrapper hides them from the client bundle.
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+});

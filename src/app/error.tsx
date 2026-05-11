@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 
 // Top-level error boundary. Caught by Next when any server component or
 // nested route throws and isn't handled.
@@ -12,8 +13,13 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Surface the error in the console for the user to copy if they file a bug.
-    // We don't ship to a third-party service yet (Sentry would be the next step).
+    // Send to Sentry with the Next.js digest as a tag so the error
+    // shown to the user (the 6-digit code on the error page) is the
+    // same value searchable in the Sentry dashboard. No-op when the
+    // DSN is unset (local dev / first deploy before secrets land).
+    Sentry.captureException(error, {
+      tags: { digest: error.digest ?? "unknown" },
+    });
     if (typeof console !== "undefined") {
       console.error("[Tuned Up] uncaught:", error);
     }
