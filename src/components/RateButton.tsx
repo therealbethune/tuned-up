@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Avatar } from "@/components/Avatar";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 import { toast } from "@/lib/toast";
+import { RowSkeleton } from "@/components/RowSkeleton";
 import Link from "next/link";
 import type { SongResult } from "@/lib/ytmusic";
 import { scoreLabel } from "@/lib/score-labels";
@@ -291,9 +292,9 @@ export function RateButton({
 
           {/* Friend ratings */}
           {friends == null ? (
-            <p className="text-xs text-neutral-500">Loading friend ratings…</p>
+            <RowSkeleton size={28} lines={2} count={2} />
           ) : friends.length === 0 ? (
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-neutral-400">
               None of your follows have rated this yet.
             </p>
           ) : (

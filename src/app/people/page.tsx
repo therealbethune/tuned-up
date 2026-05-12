@@ -109,12 +109,17 @@ export default function PeoplePage() {
       )}
 
       {!loading && q.trim().length >= 2 && results.length === 0 && (
-        <p className="text-neutral-500 text-sm">
-          Nobody named &ldquo;{q.trim()}&rdquo; yet. Maybe they haven&apos;t signed up?
-        </p>
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 text-sm text-neutral-300">
+          <p>
+            No one found for <span className="text-white font-medium">&ldquo;{q.trim()}&rdquo;</span>.
+          </p>
+          <p className="text-neutral-400 text-xs mt-1">
+            Try a different spelling, or invite them by sharing your profile link.
+          </p>
+        </div>
       )}
       {!loading && q.trim().length < 2 && (
-        <p className="text-neutral-500 text-sm">
+        <p className="text-neutral-400 text-sm">
           Type a name or @handle to find people.
         </p>
       )}

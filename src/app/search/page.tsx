@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { SongRow } from "@/components/SongRow";
 import type { SongResult, ItemKind } from "@/lib/ytmusic";
 import { SearchIcon } from "@/components/icons";
@@ -158,19 +159,22 @@ export default function SearchPage() {
       )}
 
       {!loading && !error && q.trim().length >= 2 && results.length === 0 && (
-        <p className="text-neutral-500 text-sm">No results.</p>
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 text-sm text-neutral-300">
+          <p>No matches for <span className="text-white font-medium">&ldquo;{q.trim()}&rdquo;</span>.</p>
+          <p className="text-neutral-400 text-xs mt-1">Try a different spelling, or include the artist name.</p>
+        </div>
       )}
       {!loading && q.trim().length < 2 && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {recents.length > 0 ? (
-            <>
-              <h2 className="text-xs uppercase tracking-wider text-neutral-500">Recent searches</h2>
+            <div className="space-y-3">
+              <h2 className="text-xs uppercase tracking-wider text-neutral-400">Recent searches</h2>
               <div className="flex flex-wrap gap-2">
                 {recents.map((r) => (
                   <button
                     key={r}
                     onClick={() => setQ(r)}
-                    className="text-xs rounded-full border border-neutral-700 hover:border-neutral-500 hover:bg-neutral-900 px-3 py-1.5 text-neutral-300"
+                    className="text-xs rounded-full border border-neutral-700 hover:border-neutral-500 hover:bg-neutral-900 px-3 py-1.5 text-neutral-300 active:scale-95 transition-transform"
                   >
                     {r}
                   </button>
@@ -180,14 +184,35 @@ export default function SearchPage() {
                     try { window.localStorage.removeItem(RECENT_KEY); } catch {}
                     setRecents([]);
                   }}
-                  className="text-xs text-neutral-500 hover:text-red-400 px-2"
+                  className="text-xs text-neutral-400 hover:text-red-400 px-2"
                 >
                   Clear
                 </button>
               </div>
-            </>
+            </div>
           ) : (
-            <p className="text-neutral-500 text-sm">Type at least 2 characters to search.</p>
+            // First-visit state. Rather than a flat "type 2+ chars",
+            // suggest a few seed searches and surface a Discover CTA
+            // so the user has somewhere to go even before typing.
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h2 className="text-xs uppercase tracking-wider text-neutral-400">Try one of these</h2>
+                <div className="flex flex-wrap gap-2">
+                  {["Phoebe Bridgers", "Kendrick Lamar", "Wet Leg", "Mitski", "Tyler the Creator", "Charli XCX"].map((seed) => (
+                    <button
+                      key={seed}
+                      onClick={() => setQ(seed)}
+                      className="text-xs rounded-full border border-neutral-700 hover:border-neutral-500 hover:bg-neutral-900 px-3 py-1.5 text-neutral-300 active:scale-95 transition-transform"
+                    >
+                      {seed}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Or browse what people are rating on <Link href="/discover" className="underline text-white">Discover</Link>.
+              </p>
+            </div>
           )}
         </div>
       )}

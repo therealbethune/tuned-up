@@ -6,6 +6,7 @@ import { MentionInput, type MentionInputHandle } from "@/components/MentionInput
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
 import { toast } from "@/lib/toast";
+import { RowSkeleton } from "@/components/RowSkeleton";
 
 type Comment = {
   id: string;
@@ -278,7 +279,7 @@ export function CommentSection({
       {open && (
         <div className="mt-3 space-y-3">
           {loading && comments == null ? (
-            <p className="text-xs text-neutral-500">Loading…</p>
+            <RowSkeleton size={24} lines={2} count={2} />
           ) : (
             <ul className="space-y-2">
               {grouped.tops.map((c) => (

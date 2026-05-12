@@ -4,6 +4,7 @@ import Link from "next/link";
 import { relativeTime } from "@/lib/songs";
 import { Avatar } from "@/components/Avatar";
 import { useScrollLock } from "@/lib/use-scroll-lock";
+import { RowSkeleton } from "@/components/RowSkeleton";
 
 type Liker = {
   id: string;
@@ -127,17 +128,9 @@ export function LikersSheet({
 
         <div className="p-2">
           {loading && likers == null ? (
-            <ul className="space-y-2 p-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <li key={i} className="flex items-center gap-3 animate-pulse">
-                  <div className="h-9 w-9 rounded-full bg-neutral-800" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-1/2 rounded bg-neutral-800" />
-                    <div className="h-2 w-1/3 rounded bg-neutral-800/60" />
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="p-2">
+              <RowSkeleton size={36} lines={2} count={4} />
+            </div>
           ) : error ? (
             <p className="p-4 text-sm text-red-400">{error}</p>
           ) : likers && likers.length === 0 ? (
