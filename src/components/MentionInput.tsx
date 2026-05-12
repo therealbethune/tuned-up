@@ -257,7 +257,12 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
   }, [mentionsInValue.join("|")]);
 
   const showTypeahead = mentionAt != null && candidates.length > 0;
+  const listboxId = "mention-listbox";
 
+  // ARIA combobox pattern: the input announces itself as a combobox
+  // with an associated listbox; the active option is referenced by
+  // id via aria-activedescendant so screen readers announce the
+  // current suggestion as the user arrows through.
   const sharedProps = {
     ref: (el: HTMLInputElement | HTMLTextAreaElement | null) => {
       inputRef.current = el;
@@ -270,6 +275,14 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
     maxLength,
     disabled,
     className,
+    role: "combobox" as const,
+    "aria-autocomplete": "list" as const,
+    "aria-expanded": showTypeahead,
+    "aria-controls": showTypeahead ? listboxId : undefined,
+    "aria-activedescendant":
+      showTypeahead && activeIdx >= 0
+        ? `mention-opt-${activeIdx}`
+        : undefined,
   };
 
   return (
@@ -280,11 +293,19 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
         <input {...sharedProps} />
       )}
       {showTypeahead && (
-        <ul className="absolute left-0 right-0 bottom-full mb-1 z-30 max-h-56 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-lg text-sm">
+        <ul
+          id={listboxId}
+          role="listbox"
+          aria-label="Mention suggestions"
+          className="absolute left-0 right-0 bottom-full mb-1 z-30 max-h-56 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-lg text-sm"
+        >
           {candidates.map((c, i) => (
-            <li key={c.id}>
+            <li key={c.id} role="presentation">
               <button
                 type="button"
+                id={`mention-opt-${i}`}
+                role="option"
+                aria-selected={i === activeIdx}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   pick(c);

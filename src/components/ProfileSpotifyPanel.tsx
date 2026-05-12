@@ -114,7 +114,7 @@ export function ProfileSpotifyPanel({ connected }: { connected: boolean }) {
         <NowPlayingBlock now={now} />
       )}
       {nowChecked && !now && (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-neutral-400">
           Not playing anything on Spotify right now.
         </p>
       )}
@@ -161,7 +161,7 @@ export function ProfileSpotifyPanel({ connected }: { connected: boolean }) {
             ))}
           </ul>
         ) : (
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-neutral-400">
             No top tracks yet. Listen to a few songs on Spotify and check back.
           </p>
         )}
@@ -200,7 +200,7 @@ function NowPlayingBlock({ now }: { now: NowPlaying }) {
               <span className="w-0.5 bg-emerald-400 animate-[eq_1.1s_ease-in-out_infinite] h-2.5" />
             </div>
           ) : (
-            <span className="text-[10px] text-neutral-500 uppercase tracking-wider">Paused</span>
+            <span className="text-[10px] text-neutral-400 uppercase tracking-wider">Paused</span>
           )}
           <span className="text-[10px] text-emerald-400 uppercase tracking-wider">
             {now.isPlaying ? "Now playing" : "Recently"}

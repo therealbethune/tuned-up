@@ -125,7 +125,7 @@ export function ProfileAppleMusicPanel() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-300">
           Your Apple Music
         </h2>
-        <span className="ml-auto text-[10px] uppercase tracking-wider text-neutral-500">
+        <span className="ml-auto text-[10px] uppercase tracking-wider text-neutral-400">
           Heavy rotation
         </span>
       </div>
@@ -160,7 +160,7 @@ export function ProfileAppleMusicPanel() {
       )}
 
       {state.kind === "empty" && (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-neutral-400">
           Nothing in heavy rotation yet. Listen to a few songs on Apple Music and check back.
         </p>
       )}

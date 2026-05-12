@@ -44,19 +44,20 @@ export function ConfirmDialog({
 
   useScrollLock(open);
 
-  // Escape key + initial focus.
+  // Escape key + initial focus. Escape is also guarded against `busy`
+  // so a user can't dismiss the dialog mid-action by tapping Escape.
   useEffect(() => {
     if (!open) return;
     const id = requestAnimationFrame(() => cancelRef.current?.focus());
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !busy) onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => {
       cancelAnimationFrame(id);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, onClose]);
+  }, [open, onClose, busy]);
 
   if (!open) return null;
 
@@ -68,7 +69,10 @@ export function ConfirmDialog({
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => {
         // Backdrop close (only if clicked outside the inner card).
-        if (e.target === e.currentTarget) onClose();
+        // Guard against `busy`: tapping the backdrop while a
+        // destructive action is in flight would silently dismiss the
+        // dialog, leaving the user wondering whether the action ran.
+        if (e.target === e.currentTarget && !busy) onClose();
       }}
     >
       <div

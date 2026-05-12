@@ -209,7 +209,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           // Tab bar is ~56px + the iPhone home-indicator safe-area. The
           // previous pb-20 (80px) wasn't enough on iPhone 15 to keep
           // the last item in a long thread visible above the bar.
-          style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}
+          style={{
+            paddingBottom: "calc(5rem + env(safe-area-inset-bottom))",
+            // Landscape iPhones (Pro / Pro Max) clip body content into
+            // the notch / home-bar without these. Vertical insets are
+            // already handled by the header (top) and tab bar (bottom).
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)",
+          }}
         >
           <header
             className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur sticky top-0 z-10"

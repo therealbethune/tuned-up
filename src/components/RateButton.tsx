@@ -183,7 +183,7 @@ export function RateButton({
       className={`fixed inset-0 z-40 flex items-end sm:items-center justify-center transition-opacity duration-200 ${
         show ? "bg-black/60 backdrop-blur-sm" : "bg-black/0"
       }`}
-      onClick={close}
+      onClick={busy ? undefined : close}
     >
       <div
         onClick={(e) => e.stopPropagation()}

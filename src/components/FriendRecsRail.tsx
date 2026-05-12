@@ -37,8 +37,6 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
             thumbnail: r.thumbnail,
             durationSeconds: r.durationSeconds,
           };
-          const leadName =
-            r.topRaters[0]?.displayName || r.topRaters[0]?.username || "";
           return (
             <div
               key={r.songId}
@@ -104,9 +102,11 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
                     ))}
                   </span>
                   <span className="text-[11px] text-neutral-400 truncate">
+                    {/* Always show a short, bounded label rather than
+                        truncating a potentially-very-long username. */}
                     {r.friendCount === 1
-                      ? leadName
-                      : `${leadName.split(" ")[0] || leadName} +${r.friendCount - 1}`}
+                      ? "1 friend"
+                      : `${r.friendCount} friends`}
                   </span>
                 </div>
 

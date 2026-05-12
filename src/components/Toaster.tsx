@@ -19,8 +19,6 @@ export function Toaster() {
 
   return (
     <div
-      aria-live="polite"
-      aria-atomic
       // Pointer-events none on the container so toasts don't block
       // anything underneath; only the toast cards themselves receive
       // taps (for manual dismiss).
@@ -31,11 +29,16 @@ export function Toaster() {
       }}
     >
       {toasts.map((t) => (
-        <button
+        // Each toast is its own live region. Errors use `role="alert"`
+        // (assertive — announced immediately), info/success use
+        // `role="status"` (polite — waits for the user to finish). A
+        // separate dismiss button means tapping the toast TEXT to read
+        // it doesn't accidentally clear it, which the old version did.
+        <div
           key={t.id}
-          type="button"
-          onClick={() => dismiss(t.id)}
-          className={`pointer-events-auto rounded-xl border px-4 py-2.5 text-sm font-medium shadow-xl backdrop-blur-md max-w-sm text-left active:scale-95 transition-transform animate-[toast-in_0.18s_ease-out] ${
+          role={t.kind === "error" ? "alert" : "status"}
+          aria-live={t.kind === "error" ? "assertive" : "polite"}
+          className={`pointer-events-auto rounded-xl border px-4 py-2.5 text-sm font-medium shadow-xl backdrop-blur-md max-w-sm flex items-start gap-2 animate-[toast-in_0.18s_ease-out] ${
             t.kind === "success"
               ? "border-emerald-500/40 bg-emerald-950/85 text-emerald-100"
               : t.kind === "error"
@@ -43,8 +46,18 @@ export function Toaster() {
                 : "border-neutral-700 bg-neutral-900/90 text-neutral-100"
           }`}
         >
-          {t.message}
-        </button>
+          <span className="flex-1 leading-snug">{t.message}</span>
+          <button
+            type="button"
+            onClick={() => dismiss(t.id)}
+            aria-label="Dismiss notification"
+            className="shrink-0 -m-1 p-1 rounded-md opacity-60 hover:opacity-100 active:scale-95 transition-all"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       ))}
     </div>
   );
