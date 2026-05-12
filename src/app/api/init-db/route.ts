@@ -144,6 +144,14 @@ const STATEMENTS = [
   `ALTER TABLE "activities" ADD COLUMN IF NOT EXISTS "rating_user_id" text`,
   // follower-side index speeds up the feed's "followedIds" lookup.
   `CREATE INDEX IF NOT EXISTS "follows_follower_idx" ON "follows" USING btree ("follower_id","status")`,
+  // Wave G — performance indexes added 2026-05-11 after Neon quota
+  // incident. Each replaces a table scan within a partition.
+  //   - ratings_user_updated_idx: rate-limit count(updatedAt) on POST.
+  //   - likes_liker_idx: /feed "have I liked these?" check.
+  //   - activities_unread_idx: partial index for the unread badge.
+  `CREATE INDEX IF NOT EXISTS "ratings_user_updated_idx" ON "ratings" USING btree ("user_id","updated_at")`,
+  `CREATE INDEX IF NOT EXISTS "likes_liker_idx" ON "likes" USING btree ("liker_id")`,
+  `CREATE INDEX IF NOT EXISTS "activities_unread_idx" ON "activities" USING btree ("user_id") WHERE "read_at" IS NULL`,
   // Removed feature: sound_bites / reels. Drop dormant table (idempotent —
   // no-op if it was never created in this environment).
   `DROP TABLE IF EXISTS "sound_bites" CASCADE`,

@@ -13,7 +13,6 @@ import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { isAlbumId } from "@/lib/songs";
 import { computeTasteDetails } from "@/lib/taste";
-import { computeStreak } from "@/lib/streak";
 import { streakPercentile } from "@/lib/streak-milestones";
 import { safeQuery } from "@/lib/safe-query";
 import { TasteComparePanel } from "@/components/TasteComparePanel";
@@ -68,11 +67,10 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
 
   const followersCount = followerStat?.n ?? 0;
   const followingCount = followingStat?.n ?? 0;
-  const [taste, streak, targetSpotify, viewer] = await Promise.all([
+  const [taste, targetSpotify, viewer] = await Promise.all([
     viewerId && !isOwner
       ? safeQuery(() => computeTasteDetails(viewerId, target.id), null, "taste")
       : Promise.resolve(null),
-    safeQuery(() => computeStreak(target.id), 0, "streak"),
     // Whether the profile owner has linked Spotify — shows a green
     // Spotify chip in the header. Public info; doesn't expose tokens.
     safeQuery(
@@ -102,6 +100,12 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         )
       : Promise.resolve(null),
   ]);
+  // Read the cached streak straight off the user row — it's
+  // maintained on every new rating via refreshUserStreak in
+  // /api/ratings, so avoids a full scan of the target's ratings on
+  // every profile view. (computeStreak was the slowest query on this
+  // page; we'd pull every rating row across the wire just to count.)
+  const streak = target.currentStreak ?? 0;
   // Top X% percentile shown alongside the streak badge. Defensive: if the
   // streak-cache columns aren't migrated yet, fall back to "no badge".
   const streakPct = streak > 0

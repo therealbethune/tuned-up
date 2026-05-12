@@ -20,6 +20,7 @@ import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { FriendRecsRail } from "@/components/FriendRecsRail";
 import { recommendedFromFriends, type FriendRec } from "@/lib/recs";
 import { Avatar } from "@/components/Avatar";
+import { isSpotifyConnected } from "@/lib/cached-queries";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
@@ -263,19 +264,10 @@ export default async function FeedPage({
     }
   }
 
-  // Has the viewer linked their Spotify account? (Used to render the
-  // "Save to Spotify" button on each rating card.) Defensive: if the table
-  // hasn't migrated yet on a fresh deploy, treat as not-connected.
-  const spotifyLinkRows = await safeQuery(
-    () =>
-      db
-        .select({ id: spotifyAccounts.userId })
-        .from(spotifyAccounts)
-        .where(eq(spotifyAccounts.userId, userId)),
-    [] as { id: string }[],
-    "feed-spotify-link",
-  );
-  const spotifyConnected = spotifyLinkRows.length > 0;
+  // Has the viewer linked their Spotify account? Cached per-request so
+  // /feed + /me + /album all share one roundtrip when they happen in
+  // the same render tree.
+  const spotifyConnected = await isSpotifyConnected(userId);
 
   // "Friends loved" rail — only render on the first page (no `before`
   // cursor) so we don't disrupt the scroll position when paginating

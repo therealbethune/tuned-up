@@ -13,6 +13,7 @@ import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
 import { Avatar } from "@/components/Avatar";
 import { safeQuery } from "@/lib/safe-query";
+import { isSpotifyConnected } from "@/lib/cached-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -134,19 +135,7 @@ export default async function AlbumPage({
   // Does the viewer have Spotify connected? Spotify save needs the
   // OAuth token; Apple Music save handles its own popup auth so it's
   // shown unconditionally. Skip the query when unauthenticated.
-  let spotifyConnected = false;
-  if (userId) {
-    const linkRows = await safeQuery(
-      () =>
-        db
-          .select({ id: spotifyAccounts.userId })
-          .from(spotifyAccounts)
-          .where(eq(spotifyAccounts.userId, userId)),
-      [] as { id: string }[],
-      "album-spotify-link",
-    );
-    spotifyConnected = linkRows.length > 0;
-  }
+  const spotifyConnected = userId ? await isSpotifyConnected(userId) : false;
   const url = ytUrlForSongId(song.id);
   const songForRate = {
     id: song.id,

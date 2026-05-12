@@ -3,8 +3,6 @@ import Script from "next/script";
 import { ClerkProvider, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
-import { and, count, eq, isNull } from "drizzle-orm";
-import { db, activities } from "@/db";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { Toaster } from "@/components/Toaster";
@@ -51,17 +49,10 @@ try {
 } catch (e) {}
 `;
 
-async function unreadActivityCount(userId: string): Promise<number> {
-  try {
-    const [row] = await db
-      .select({ n: count() })
-      .from(activities)
-      .where(and(eq(activities.userId, userId), isNull(activities.readAt)));
-    return Number(row?.n ?? 0);
-  } catch {
-    return 0;
-  }
-}
+// Use the React-`cache()` version from cached-queries.ts so both the
+// desktop nav badge and the mobile tab-bar badge share one DB roundtrip
+// per render instead of two.
+import { unreadActivityCount } from "@/lib/cached-queries";
 
 function NavLink({
   href,

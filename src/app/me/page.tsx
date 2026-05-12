@@ -10,6 +10,7 @@ import { ProfileSpotifyPanel } from "@/components/ProfileSpotifyPanel";
 import { ProfileAppleMusicPanel } from "@/components/ProfileAppleMusicPanel";
 import { SettingsIcon, PaperPlaneIcon } from "@/components/icons";
 import { safeQuery } from "@/lib/safe-query";
+import { isSpotifyConnected } from "@/lib/cached-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -75,15 +76,7 @@ export default async function MePage() {
   )[0];
   const pendingRecs = Number(recStat?.n ?? 0);
 
-  const spotifyConnected = (await safeQuery(
-    () =>
-      db
-        .select({ id: spotifyAccounts.userId })
-        .from(spotifyAccounts)
-        .where(eq(spotifyAccounts.userId, userId)),
-    [] as { id: string }[],
-    "me-spotify-link",
-  )).length > 0;
+  const spotifyConnected = await isSpotifyConnected(userId);
 
   return (
     <div className="space-y-6">

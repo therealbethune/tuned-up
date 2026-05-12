@@ -60,6 +60,10 @@ export const ratings = pgTable("ratings", {
   primaryKey({ columns: [t.userId, t.songId] }),
   index("ratings_user_idx").on(t.userId, t.createdAt),
   index("ratings_song_idx").on(t.songId),
+  // Hot path: /api/ratings rate-limit count(*) by (userId, updatedAt).
+  // Without this index the per-user filter falls back to a scan within
+  // the user partition because the user_idx is keyed on createdAt.
+  index("ratings_user_updated_idx").on(t.userId, t.updatedAt),
 ]);
 
 // status: 'accepted' for normal follows, 'pending' when the target is
@@ -72,6 +76,11 @@ export const follows = pgTable("follows", {
 }, (t) => [
   primaryKey({ columns: [t.followerId, t.followeeId] }),
   index("follows_followee_idx").on(t.followeeId),
+  // Hot path: /feed loads "who I follow" — `WHERE followerId = ? AND
+  // status = 'accepted'`. The PK starts with followerId so it works,
+  // but a status-filtered index is much narrower for users following
+  // many accounts with pending requests in the mix.
+  index("follows_follower_idx").on(t.followerId, t.status),
 ]);
 
 // One user recommending a song to another. status: 'pending' | 'rated' |
@@ -124,6 +133,10 @@ export const likes = pgTable("likes", {
 }, (t) => [
   primaryKey({ columns: [t.ratingUserId, t.songId, t.likerId] }),
   index("likes_target_idx").on(t.ratingUserId, t.songId),
+  // Hot path: /feed "have I liked these?" check — filters by likerId
+  // and a list of songs. The PK starts with ratingUserId so without
+  // this index the planner has to scan all (rUid, sId) pairs.
+  index("likes_liker_idx").on(t.likerId),
 ]);
 
 // A comment on someone's rating of a song. Targets the (userId, songId)

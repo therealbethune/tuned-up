@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 
@@ -25,7 +26,13 @@ export type FriendRec = {
 // Empty list when the viewer follows no one, follows no one who rated
 // anything ≥ threshold, or has already rated everything their friends
 // rated. The caller hides the section silently in those cases.
-export async function recommendedFromFriends(
+//
+// Wrapped in React's `cache()` so /feed and /discover (both of which
+// render the rail) share one DB roundtrip per request — biggest single
+// query in the app, easily worth the dedup.
+export const recommendedFromFriends = cache(_recommendedFromFriends);
+
+async function _recommendedFromFriends(
   viewerId: string,
   limit = 8,
   minAvg = 80,
