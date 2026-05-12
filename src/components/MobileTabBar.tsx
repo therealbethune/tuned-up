@@ -95,7 +95,13 @@ export function MobileTabBar({ unread }: { unread: number }) {
                     className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-emerald-400"
                   />
                 )}
-                <span className="relative">
+                <span
+                  className={`relative inline-flex items-center justify-center rounded-full transition-colors ${
+                    active
+                      ? "bg-emerald-500/10 ring-1 ring-emerald-500/30 h-9 w-9"
+                      : ""
+                  }`}
+                >
                   {t.icon}
                   {t.hasUnread && unread > 0 && (
                     <span className="absolute -top-1 -right-2 h-4 min-w-4 px-1 rounded-full bg-emerald-500 text-[10px] text-black font-bold tabular-nums flex items-center justify-center">

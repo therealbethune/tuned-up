@@ -8,13 +8,25 @@ export const dynamic = "force-dynamic";
 
 const AUTH_URL = "https://accounts.spotify.com/authorize";
 
-// Sign the state param (userId + nonce) with INIT_DB_TOKEN as the HMAC key
-// so the callback can verify it came from us and recover the user id.
+// Sign the state param so the callback can verify it came from us and
+// recover the user id. Layout: `userId.nonce.issuedAtMs.sig` — the
+// timestamp gives the callback a TTL check (states older than ~10 min
+// are rejected) which prevents replay of an intercepted state long
+// after the original flow completed.
+//
+// Secret: prefers SPOTIFY_STATE_SECRET, falls back to INIT_DB_TOKEN
+// so existing deploys keep working without a re-env step. New deploys
+// should set SPOTIFY_STATE_SECRET so OAuth state isn't sharing a key
+// with migration auth + admin endpoints + cron — independent rotation.
+function stateSecret(): string {
+  return process.env.SPOTIFY_STATE_SECRET || process.env.INIT_DB_TOKEN || "";
+}
+
 function signState(userId: string): string {
   const nonce = randomBytes(8).toString("hex");
-  const payload = `${userId}.${nonce}`;
-  const secret = process.env.INIT_DB_TOKEN || "";
-  const sig = createHmac("sha256", secret).update(payload).digest("hex").slice(0, 32);
+  const issuedAt = Date.now().toString(36);
+  const payload = `${userId}.${nonce}.${issuedAt}`;
+  const sig = createHmac("sha256", stateSecret()).update(payload).digest("hex").slice(0, 32);
   return `${payload}.${sig}`;
 }
 

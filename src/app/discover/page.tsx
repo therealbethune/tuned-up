@@ -171,7 +171,13 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
           ) : (
             <div className="w-full aspect-square bg-neutral-800" />
           )}
-          <span className="absolute top-2 right-2 rounded-md bg-black/80 backdrop-blur-sm px-2 py-0.5 text-sm font-bold tabular-nums text-emerald-400 shadow-md">
+          {/* Score chip color-codes by tier so a glance through the
+              discover grid is also a glance at the quality spread —
+              previously every score was emerald regardless of value,
+              which collapsed an 80 and a 40 visually. */}
+          <span
+            className={`absolute top-2 right-2 rounded-md bg-black/80 backdrop-blur-sm px-2 py-0.5 text-sm font-bold tabular-nums shadow-md ${scoreLabel(r.avgScore).color}`}
+          >
             {r.avgScore}
           </span>
           {isAlbum && (

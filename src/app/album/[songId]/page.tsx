@@ -247,7 +247,10 @@ export default async function AlbumPage({
                   match how a magazine-style review card would treat its
                   rating. Used to be text-5xl; the extra weight reads as
                   more confident and matches the bigger label beside it. */}
-              <span className="text-6xl sm:text-7xl font-extrabold tabular-nums tracking-tight text-emerald-400 leading-none">
+              <span
+                className="text-6xl sm:text-7xl font-extrabold tabular-nums tracking-tight text-emerald-400 leading-none"
+                style={{ textShadow: "0 0 32px rgba(16, 185, 129, 0.35)" }}
+              >
                 {avg}
               </span>
               {avg != null && (
@@ -279,10 +282,18 @@ export default async function AlbumPage({
                 return (
                   <div key={b.label} className="flex items-center gap-2 text-xs">
                     <span className="w-12 text-neutral-400 tabular-nums">{b.label}</span>
-                    <div className="flex-1 h-2 rounded-full bg-neutral-800 overflow-hidden">
+                    <div className="flex-1 h-2.5 rounded-full bg-neutral-800/80 overflow-hidden">
+                      {/* bar-grow + a tiny per-bucket animation-delay so
+                          the bars cascade in. The width factor stays
+                          inline so the bar still has correct size at the
+                          start of the keyframe (we scale, not animate
+                          width, to keep the GPU path cheap). */}
                       <div
-                        className={`h-full ${b.color} ${isMyBucket ? "saturate-150" : ""}`}
-                        style={{ width: `${(counts[i] / maxCount) * 100}%` }}
+                        className={`h-full rounded-full bar-grow ${b.color} ${isMyBucket ? "saturate-150 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : ""}`}
+                        style={{
+                          width: `${(counts[i] / maxCount) * 100}%`,
+                          animationDelay: `${i * 60}ms`,
+                        }}
                       />
                     </div>
                     <span className="w-6 text-right text-neutral-400 tabular-nums">{counts[i]}</span>

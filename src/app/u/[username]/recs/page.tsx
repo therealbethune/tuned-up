@@ -5,7 +5,7 @@ import Image from "next/image";
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { db, users, recommendations, songs, ratings } from "@/db";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
-import { encodeSongIdForUrl } from "@/app/r/[username]/[songId]/page";
+import { encodeBase64Url } from "@/lib/encoding";
 
 export const dynamic = "force-dynamic";
 
@@ -206,7 +206,7 @@ function Column({
               r.status === "rated"
                 ? `/r/${
                     direction === "outgoing" ? otherUsername : "" /* viewer */
-                  }/${encodeSongIdForUrl(r.songId)}`
+                  }/${encodeBase64Url(r.songId)}`
                 : null;
             const cardWrapClass = "block rounded-lg border border-neutral-800 bg-neutral-900/50 p-3 hover:border-neutral-700 transition-colors";
             const inner = (

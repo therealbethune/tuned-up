@@ -63,6 +63,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
   const [
     [followerStat],
     [followingStat],
+    [ratingsStat],
     followingViewer,
     taste,
     targetSpotify,
@@ -77,6 +78,13 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
       .select({ n: count() })
       .from(follows)
       .where(and(eq(follows.followerId, target.id), eq(follows.status, "accepted"))),
+    // True total ratings count. Used to be inferred from `rows.length`
+    // below, but the rows query is .limit(100) — anyone past 100 ratings
+    // would show "100 ratings" forever. One-line count() fix.
+    db
+      .select({ n: count() })
+      .from(ratings)
+      .where(eq(ratings.userId, target.id)),
     viewerId && viewerId !== target.id
       ? db
           .select()
@@ -124,6 +132,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
 
   const followersCount = followerStat?.n ?? 0;
   const followingCount = followingStat?.n ?? 0;
+  const ratingsCount = ratingsStat?.n ?? 0;
   const streakPct = streak > 0 ? Math.max(1, 100 - streakPctRank) : 0;
   const followRow = followingViewer[0];
   const followState: "none" | "pending" | "accepted" = !followRow
@@ -297,13 +306,13 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           <span className="font-bold text-white tabular-nums">{followingCount}</span>{" "}
           <span className="text-neutral-400">following</span>
         </Link>
-        {canSeeRatings && rows.length > 0 && (
+        {canSeeRatings && ratingsCount > 0 && (
           <Link
             href={`/u/${target.username}/stats`}
             className="ml-auto inline-flex items-center gap-1 text-neutral-300 hover:text-white transition-colors"
           >
-            <span className="font-bold text-white tabular-nums">{rows.length}</span>
-            <span className="text-neutral-400">ratings</span>
+            <span className="font-bold text-white tabular-nums">{ratingsCount}</span>
+            <span className="text-neutral-400">{ratingsCount === 1 ? "rating" : "ratings"}</span>
             <span className="text-neutral-500 ml-1">→</span>
           </Link>
         )}

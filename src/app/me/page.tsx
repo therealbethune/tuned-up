@@ -55,11 +55,12 @@ export default async function MePage() {
     );
   }
 
-  // Pending recommendations count → drives the badge on the Recs link.
-  // safeQuery'd because a DB hiccup here shouldn't take down the page;
-  // worst case the badge just shows 0.
-  const recStat = (
-    await safeQuery(
+  // Pending-recs count + Spotify-link status fan out — both gate UI on
+  // the same page header and neither depends on the other. Same idea as
+  // /feed and the profile page: serial awaits here add up to a visible
+  // hold on every /me visit.
+  const [recStatRows, spotifyConnected] = await Promise.all([
+    safeQuery(
       () =>
         db
           .select({ n: count() })
@@ -72,11 +73,10 @@ export default async function MePage() {
           ),
       [] as { n: number }[],
       "me-pending-recs",
-    )
-  )[0];
-  const pendingRecs = Number(recStat?.n ?? 0);
-
-  const spotifyConnected = await isSpotifyConnected(userId);
+    ),
+    isSpotifyConnected(userId),
+  ]);
+  const pendingRecs = Number(recStatRows[0]?.n ?? 0);
 
   return (
     <div className="space-y-6">

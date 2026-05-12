@@ -125,6 +125,19 @@ html:not(.dark) input[type="range"].accent-white { accent-color: #171717; }
   to   { transform: translateY(0);   opacity: 1; }
 }
 
+/* Histogram bar grow-in. Used on the /album distribution chart so the
+   bars don't pop in fully-formed (felt static) — they ease out from 0
+   width with a small stagger via inline animation-delay. Cubic-bezier
+   gives a quick acceleration then a soft settle. */
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Like-button heart pop. Triggers on the .heart-pop class which the
    LikeButton applies for ~360ms after a fresh like. Briefly scales the
    filled heart up, settles back. The two scales feel slightly springy

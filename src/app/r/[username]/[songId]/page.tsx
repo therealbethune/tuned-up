@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 // URL: /r/<username>/<songId-base64>  (we store songId base64-encoded so
 // the `:` in `yt:<videoId>` doesn't break URL routing.)
 
-// Re-exports kept so other pages that imported these names still work.
+import { cache } from "react";
 import { encodeBase64Url, decodeBase64Url } from "@/lib/encoding";
 function decodeSongId(s: string): string {
   // Tolerant: either url-safe base64 or the literal id with %3A (colon).
@@ -30,9 +30,16 @@ function decodeSongId(s: string): string {
     return decodeURIComponent(s);
   }
 }
-export const encodeSongIdForUrl = encodeBase64Url;
 
-async function loadRating(username: string, encodedSongId: string) {
+// React.cache wrap: this page is rendered by Next twice per request —
+// once for generateMetadata (OG card), once for the page itself. Without
+// memoization that's two duplicate sets of (user, rating) queries hitting
+// the DB. cache() collapses both calls to a single fetch within the
+// same request.
+const loadRating = cache(async function loadRating(
+  username: string,
+  encodedSongId: string,
+) {
   // Both lookups wrapped — this page is called by social-media unfurl
   // bots constantly, and we'd rather return a generic OG card than a
   // 500 if the DB hiccups.
@@ -92,7 +99,7 @@ async function loadRating(username: string, encodedSongId: string) {
     "share-page-rating",
   );
   return ratingRows[0] ?? null;
-}
+});
 
 export async function generateMetadata({
   params,
@@ -161,7 +168,7 @@ export default async function SharedRatingPage({
   // likes, save buttons) inline instead of the bare share page.
   if (userId) {
     redirect(
-      `/feed?focus=${r.ratingUserId}:${encodeURIComponent(r.songId)}#rating-${r.ratingUserId}-${encodeSongIdForUrl(r.songId)}`,
+      `/feed?focus=${r.ratingUserId}:${encodeURIComponent(r.songId)}#rating-${r.ratingUserId}-${encodeBase64Url(r.songId)}`,
     );
   }
 

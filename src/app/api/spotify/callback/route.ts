@@ -7,21 +7,51 @@ import { exchangeCodeForUserTokens, fetchSpotifyMe } from "@/lib/spotify-server"
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Hard ceiling on how long a Spotify-flow state token stays valid. The
+// happy-path OAuth dance is <30s; 10 minutes is generous and still cuts
+// off replay of an intercepted state from being useful indefinitely.
+const STATE_TTL_MS = 10 * 60 * 1000;
+
+// Same secret resolver as /api/spotify/connect — keep these in lockstep
+// or the HMAC won't match.
+function stateSecret(): string {
+  return process.env.SPOTIFY_STATE_SECRET || process.env.INIT_DB_TOKEN || "";
+}
+
 // Verifies the state HMAC and returns the userId. Returns null if invalid.
 function verifyState(state: string): { userId: string; returnTo: string } | null {
-  // state = "userId.nonce.sig|<encoded returnTo>"
+  // state = "userId.nonce.issuedAtMs.sig|<encoded returnTo>"
+  // Backward-compat: also accepts the older "userId.nonce.sig" layout
+  // so a flow that started before this deploy can still complete.
   const [signed, encReturn] = state.split("|");
   if (!signed) return null;
   const parts = signed.split(".");
-  if (parts.length !== 3) return null;
-  const [userId, nonce, sig] = parts;
-  const payload = `${userId}.${nonce}`;
-  const secret = process.env.INIT_DB_TOKEN || "";
-  const expected = createHmac("sha256", secret).update(payload).digest("hex").slice(0, 32);
+  let userId: string;
+  let nonce: string;
+  let issuedAt: string | null;
+  let sig: string;
+  if (parts.length === 4) {
+    [userId, nonce, issuedAt, sig] = parts;
+  } else if (parts.length === 3) {
+    [userId, nonce, sig] = parts;
+    issuedAt = null;
+  } else {
+    return null;
+  }
+  const payload = issuedAt ? `${userId}.${nonce}.${issuedAt}` : `${userId}.${nonce}`;
+  const expected = createHmac("sha256", stateSecret()).update(payload).digest("hex").slice(0, 32);
   try {
     if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
   } catch {
     return null;
+  }
+  // TTL check (only applies to states that carry a timestamp — the
+  // pre-rollout layout is treated as expired-eligible for replay but
+  // those tokens age out as soon as users complete their pending flows).
+  if (issuedAt) {
+    const issued = parseInt(issuedAt, 36);
+    if (!Number.isFinite(issued)) return null;
+    if (Date.now() - issued > STATE_TTL_MS) return null;
   }
   // Defense-in-depth: even though /connect already sanitized this,
   // validate again on the callback. Use a strict allowlist of routes
