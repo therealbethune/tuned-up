@@ -308,7 +308,14 @@ function HeroSpotlight({
           </h2>
           <p className="text-neutral-400">{artist}</p>
           <div className="flex items-baseline gap-3 pt-1 flex-wrap">
-            <span className="text-5xl font-bold tabular-nums text-emerald-400 leading-none">
+            {/* Top-of-discover hero — color-coded by tier (was hardcoded
+                emerald) so the showcase number reflects whether the
+                "what's hot" pick is actually highly rated or just
+                heavily-rated. Soft glow for theatrical hierarchy. */}
+            <span
+              className={`text-5xl font-bold tabular-nums leading-none ${scoreLabel(avgScore).color}`}
+              style={{ textShadow: "0 0 28px rgba(16, 185, 129, 0.22)" }}
+            >
               {avgScore}
             </span>
             <span className={`text-sm font-semibold ${scoreLabel(avgScore).color}`}>

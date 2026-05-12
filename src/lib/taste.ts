@@ -4,7 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 // Compute how closely two users agree on the songs they've both rated.
 // Returns null if they have fewer than `minShared` songs in common.
-export async function computeTasteAgreement(
+async function computeTasteAgreement(
   viewerId: string,
   targetId: string,
   minShared = 3,

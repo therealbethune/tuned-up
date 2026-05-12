@@ -20,35 +20,19 @@ export default async function SettingsPage({
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  // safeQuery these so a transient DB outage doesn't 500 /settings.
-  // If the lookup fails, render an outage state below instead of
-  // redirecting to / — the user came here on purpose.
-  const meRows = await safeQuery(
-    () => db.select().from(users).where(eq(users.id, userId)).limit(1),
-    [] as (typeof users.$inferSelect)[],
-    "settings-user-lookup",
-  );
-  const me = meRows[0] ?? null;
-  if (!me) {
-    return (
-      <div className="space-y-4 py-12 max-w-md mx-auto text-center">
-        <div className="text-5xl">🛠️</div>
-        <h1 className="text-2xl font-bold">Settings temporarily unavailable</h1>
-        <p className="text-neutral-400 text-sm">
-          Our database is catching its breath. Refresh in a minute.
-        </p>
-        <a
-          href="/settings"
-          className="inline-block rounded-full bg-white text-black px-5 py-2 font-medium"
-        >
-          Try again
-        </a>
-      </div>
-    );
-  }
-
-  const link = (
-    await safeQuery(
+  // Fan out user + spotify-account lookups in parallel — they're
+  // independent and were previously two sequential round-trips. The
+  // user row is required (outage state below); the spotify row is
+  // optional, so we fall through to "not linked" if missing.
+  // safeQuery wrappers keep a transient DB outage from 500-ing the
+  // whole page.
+  const [meRows, linkRows] = await Promise.all([
+    safeQuery(
+      () => db.select().from(users).where(eq(users.id, userId)).limit(1),
+      [] as (typeof users.$inferSelect)[],
+      "settings-user-lookup",
+    ),
+    safeQuery(
       () =>
         db
           .select({
@@ -59,8 +43,30 @@ export default async function SettingsPage({
           .where(eq(spotifyAccounts.userId, userId)),
       [] as { spotifyUserId: string; scope: string }[],
       "settings-spotify-link",
-    )
-  )[0];
+    ),
+  ]);
+  const me = meRows[0] ?? null;
+  if (!me) {
+    return (
+      <div className="space-y-4 py-12 max-w-md mx-auto text-center">
+        <div className="text-5xl">🛠️</div>
+        <h1 className="text-2xl font-bold">Settings temporarily unavailable</h1>
+        <p className="text-neutral-400 text-sm">
+          Our database is catching its breath. Refresh in a minute.
+        </p>
+        {/* Use Next's <Link> not <a> so the retry doesn't do a full
+            page reload — keeps Clerk state warm and avoids a flash. */}
+        <Link
+          href="/settings"
+          className="inline-block rounded-full bg-white text-black px-5 py-2 font-medium"
+        >
+          Try again
+        </Link>
+      </div>
+    );
+  }
+
+  const link = linkRows[0];
 
   // Check whether the user's stored scopes cover every scope we currently
   // request. If they connected before we added a new scope (now-playing,

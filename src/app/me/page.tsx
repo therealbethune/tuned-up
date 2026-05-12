@@ -38,18 +38,20 @@ export default async function MePage() {
           rest of the app (feed, discover) may still work.
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
-          <a
+          {/* Use <Link> so the retry doesn't burn a full page reload
+              + Clerk-state rehydrate cycle when the DB is just slow. */}
+          <Link
             href="/feed"
             className="rounded-full bg-white text-black px-5 py-2 font-medium"
           >
             Open feed
-          </a>
-          <a
+          </Link>
+          <Link
             href="/me"
             className="rounded-full border border-neutral-700 px-5 py-2 font-medium hover:bg-neutral-900"
           >
             Try again
-          </a>
+          </Link>
         </div>
       </div>
     );

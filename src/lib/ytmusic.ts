@@ -83,7 +83,7 @@ function shelfContents(data: unknown): unknown[] {
   return out;
 }
 
-export async function searchSongs(query: string): Promise<SongResult[]> {
+async function searchSongs(query: string): Promise<SongResult[]> {
   const data = await rawSearch(query, SONGS_PARAMS);
   const results: SongResult[] = [];
   for (const it of shelfContents(data)) {
@@ -127,7 +127,7 @@ export async function searchSongs(query: string): Promise<SongResult[]> {
   return results.slice(0, 15);
 }
 
-export async function searchAlbums(query: string): Promise<SongResult[]> {
+async function searchAlbums(query: string): Promise<SongResult[]> {
   const data = await rawSearch(query, ALBUMS_PARAMS);
   const results: SongResult[] = [];
   for (const it of shelfContents(data)) {

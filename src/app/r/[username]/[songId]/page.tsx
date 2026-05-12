@@ -222,7 +222,16 @@ export default async function SharedRatingPage({
             </div>
             <div className="text-neutral-400">{r.artist}{r.album ? ` · ${r.album}` : ""}</div>
             <div className="mt-3 flex items-baseline gap-3">
-              <span className="text-5xl font-bold tabular-nums text-emerald-400">{r.score}</span>
+              {/* Share page is what someone sees when they click a
+                  Twitter/iMessage link. Color-code the score by tier
+                  (was hardcoded emerald-400) so the headline reads as
+                  the verdict instead of a generic chrome highlight. */}
+              <span
+                className={`text-5xl font-bold tabular-nums ${scoreLabel(r.score).color}`}
+                style={{ textShadow: "0 0 28px rgba(16, 185, 129, 0.18)" }}
+              >
+                {r.score}
+              </span>
               <span className={`text-base font-semibold ${scoreLabel(r.score).color}`}>
                 {scoreLabel(r.score).label}
               </span>
@@ -243,15 +252,17 @@ export default async function SharedRatingPage({
         )}
       </div>
 
+      {/* This page only renders for signed-out viewers (signed-in
+          users are redirect()-bounced to /feed?focus=... above). The
+          promo CTA is therefore unconditional — no extra auth() call
+          needed. The previous SignedInSharePromo sibling was dead
+          code for the same reason, so it was removed. */}
       <SignedOutSharePromo username={r.username} />
-      <SignedInSharePromo username={r.username} />
     </div>
   );
 }
 
-async function SignedOutSharePromo({ username }: { username: string }) {
-  const { userId } = await auth();
-  if (userId) return null;
+function SignedOutSharePromo({ username }: { username: string }) {
   return (
     <div className="rounded-xl border border-emerald-700/40 bg-gradient-to-br from-emerald-500/10 to-sky-500/5 p-5 space-y-3 text-center">
       <div className="flex items-center justify-center gap-2 text-2xl">
@@ -274,14 +285,3 @@ async function SignedOutSharePromo({ username }: { username: string }) {
   );
 }
 
-async function SignedInSharePromo({ username }: { username: string }) {
-  const { userId } = await auth();
-  if (!userId) return null;
-  return (
-    <div className="text-center text-sm text-neutral-400">
-      <Link href={`/u/${username}`} className="underline text-white">
-        See more of @{username}&apos;s ratings →
-      </Link>
-    </div>
-  );
-}

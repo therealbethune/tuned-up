@@ -283,24 +283,6 @@ export async function fetchUserNowPlaying(
   }
 }
 
-// Quick health check used by the profile UI to surface "Spotify connection
-// looks expired — reconnect" messages instead of a silent empty state.
-export async function pingUserSpotify(userId: string): Promise<
-  | { ok: true; spotifyUserId: string }
-  | { ok: false; reason: "not_linked" | "token_failed" | "api_failed" }
-> {
-  try {
-    const token = await getUserAccessToken(userId);
-    if (!token) return { ok: false, reason: "not_linked" };
-    const me = await fetchSpotifyMe(token);
-    return { ok: true, spotifyUserId: me.id };
-  } catch (e) {
-    const msg = (e as Error).message;
-    if (msg.includes("refresh failed")) return { ok: false, reason: "token_failed" };
-    return { ok: false, reason: "api_failed" };
-  }
-}
-
 // --- Track resolution (app-level, no user token needed) --------------------
 
 // Strip cruft that hurts search recall: parenthetical "(feat. X)" / "(Remix)",

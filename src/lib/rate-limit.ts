@@ -33,7 +33,7 @@ export const LIMITS = {
 // Standard 429 response. The Retry-After header lets clients back off
 // without retrying immediately; the JSON body gives the UI a
 // machine-readable shape it can surface as a toast.
-export function rateLimitedResponse(rl: RateLimit) {
+function rateLimitedResponse(rl: RateLimit) {
   return NextResponse.json(
     {
       error: `Too many ${rl.bucket} too quickly. Try again in a moment.`,

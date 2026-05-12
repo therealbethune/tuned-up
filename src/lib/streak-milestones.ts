@@ -141,20 +141,3 @@ export async function maybeAnnounceStreakMilestone(
   return { announced: true, milestone: newMilestone, percentile: topPct };
 }
 
-// Convenience: lookup the user's current cached streak + percentile in one
-// query. Used by the profile page to render a "Top X%" badge.
-export async function getStreakStanding(userId: string): Promise<{
-  streak: number;
-  topPercent: number;
-}> {
-  const [row] = await db
-    .select({ s: users.currentStreak })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  const streak = row?.s ?? 0;
-  if (streak <= 0) return { streak: 0, topPercent: 0 };
-  const pct = await streakPercentile(streak);
-  return { streak, topPercent: Math.max(1, 100 - pct) };
-}
-
