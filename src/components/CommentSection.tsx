@@ -245,9 +245,21 @@ export function CommentSection({
       });
       if (res.ok) {
         const id = pendingDeleteId;
-        // Also drop any replies whose parent we just removed.
+        // Server-side, deleting a parent comment now promotes its
+        // replies to top-level rather than cascading the delete (see
+        // /api/comments DELETE handler — Wave S). Mirror that locally
+        // so the optimistic state matches what a reload would render:
+        // remove the comment itself, then null out parentCommentId on
+        // its direct replies so they become free-standing top-level
+        // comments. Previously the client dropped the replies from
+        // view, which made them flash back into existence as orphans
+        // on the next page load.
         setComments((prev) =>
-          (prev ?? []).filter((c) => c.id !== id && c.parentCommentId !== id),
+          (prev ?? [])
+            .filter((c) => c.id !== id)
+            .map((c) =>
+              c.parentCommentId === id ? { ...c, parentCommentId: null } : c,
+            ),
         );
       }
     } finally {
