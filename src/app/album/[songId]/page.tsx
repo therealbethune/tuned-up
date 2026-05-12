@@ -258,18 +258,39 @@ export default async function AlbumPage({
               </span>
             </div>
             <div className="space-y-1.5">
-              {buckets.map((b, i) => (
-                <div key={b.label} className="flex items-center gap-2 text-xs">
-                  <span className="w-12 text-neutral-400 tabular-nums">{b.label}</span>
-                  <div className="flex-1 h-2 rounded-full bg-neutral-800 overflow-hidden">
-                    <div
-                      className={`h-full ${b.color}`}
-                      style={{ width: `${(counts[i] / maxCount) * 100}%` }}
-                    />
+              {buckets.map((b, i) => {
+                // "You are here" marker: which bucket contains the
+                // viewer's own score? Adds a small "You" chip next to
+                // the count so the personal anchor jumps out from the
+                // otherwise impersonal aggregate.
+                const isMyBucket =
+                  myRow != null && myRow.score >= b.min && myRow.score <= b.max;
+                return (
+                  <div key={b.label} className="flex items-center gap-2 text-xs">
+                    <span className="w-12 text-neutral-400 tabular-nums">{b.label}</span>
+                    <div className="flex-1 h-2 rounded-full bg-neutral-800 overflow-hidden">
+                      <div
+                        className={`h-full ${b.color} ${isMyBucket ? "saturate-150" : ""}`}
+                        style={{ width: `${(counts[i] / maxCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-6 text-right text-neutral-400 tabular-nums">{counts[i]}</span>
+                    {isMyBucket ? (
+                      <span
+                        className="text-[10px] font-semibold text-emerald-300 inline-flex items-center gap-0.5"
+                        title={`Your rating: ${myRow!.score}`}
+                      >
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden>
+                          <path d="M4 0l4 6H0z" />
+                        </svg>
+                        You
+                      </span>
+                    ) : (
+                      <span className="w-7" />
+                    )}
                   </div>
-                  <span className="w-6 text-right text-neutral-400 tabular-nums">{counts[i]}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

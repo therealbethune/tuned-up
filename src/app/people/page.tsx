@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { SuggestedFriends } from "@/components/SuggestedFriends";
 import { Avatar } from "@/components/Avatar";
+import { SearchIcon } from "@/components/icons";
 
 type UserResult = {
   id: string;
@@ -50,14 +51,9 @@ export default function PeoplePage() {
       <SuggestedFriends />
 
       <div className="relative">
-        <svg
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500"
-          width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-          aria-hidden
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400">
+          <SearchIcon size={16} />
+        </span>
         <input
           autoFocus
           value={q}

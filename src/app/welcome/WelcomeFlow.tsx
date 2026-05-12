@@ -5,7 +5,7 @@ import type { SongResult } from "@/lib/ytmusic";
 import { SongRow } from "@/components/SongRow";
 import { Avatar } from "@/components/Avatar";
 import { toast } from "@/lib/toast";
-import { SpotifyIconOnGreen } from "@/components/icons";
+import { SpotifyIconOnGreen, SearchIcon } from "@/components/icons";
 
 type SuggestedUser = {
   id: string;
@@ -123,6 +123,31 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
 
       {step === 1 && (
         <div className="space-y-4">
+          {/* Score-scale teaching strip. New users have no idea what
+              "rate 1–100" actually means in practice; showing the
+              emotional anchor of each tier makes the system click in
+              one glance. Pulled from lib/score-labels.ts so it stays
+              consistent with what the rest of the app displays. */}
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-2">
+              Rate songs 1–100
+            </div>
+            <div className="grid grid-cols-5 gap-1.5 text-center">
+              {[
+                { range: "1–19",   label: "Trash",  color: "bg-red-500/15 text-red-300" },
+                { range: "20–49",  label: "Meh",    color: "bg-orange-500/15 text-orange-300" },
+                { range: "50–69",  label: "OK",     color: "bg-yellow-500/15 text-yellow-300" },
+                { range: "70–84",  label: "Great",  color: "bg-lime-500/15 text-lime-300" },
+                { range: "85–100", label: "Banger", color: "bg-emerald-500/15 text-emerald-300" },
+              ].map((b) => (
+                <div key={b.range} className={`rounded-md py-1.5 ${b.color}`}>
+                  <div className="text-[10px] tabular-nums opacity-80">{b.range}</div>
+                  <div className="text-xs font-semibold">{b.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-lg border border-emerald-700/40 bg-emerald-500/5 p-4 space-y-3">
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 rounded-full bg-emerald-500 text-black inline-flex items-center justify-center shrink-0">
@@ -152,13 +177,9 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
           </div>
 
           <div className="relative">
-            <svg
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500"
-              width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400">
+              <SearchIcon size={16} />
+            </span>
             <input
               autoFocus
               value={q}
