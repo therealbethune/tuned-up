@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { encodeBase64Url as encodeSongIdForUrl } from "@/lib/encoding";
+import { encodeBase64Url } from "@/lib/encoding";
 import { toast } from "@/lib/toast";
 
 export function ShareButton({
@@ -13,7 +13,7 @@ export function ShareButton({
   const [copied, setCopied] = useState(false);
 
   async function share() {
-    const url = `${window.location.origin}/r/${encodeURIComponent(username)}/${encodeSongIdForUrl(songId)}`;
+    const url = `${window.location.origin}/r/${encodeURIComponent(username)}/${encodeBase64Url(songId)}`;
     try {
       if (navigator.share) {
         await navigator.share({ url });

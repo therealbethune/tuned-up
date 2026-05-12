@@ -6,6 +6,24 @@ import { scoreLabel } from "@/lib/score-labels";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// next/og's renderer doesn't run Tailwind, so we can't pass through the
+// scoreLabel.color class. Map each Tailwind text-color class we use in
+// score-labels.ts to a concrete hex. Keep these in lockstep — if a new
+// tier color appears in scoreLabel(), add the mapping here.
+const TIER_HEX: Record<string, string> = {
+  "text-emerald-300": "#6ee7b7",
+  "text-emerald-400": "#34d399",
+  "text-lime-400":    "#a3e635",
+  "text-yellow-400":  "#facc15",
+  "text-amber-400":   "#fbbf24",
+  "text-orange-400":  "#fb923c",
+  "text-red-400":     "#f87171",
+  "text-red-500":     "#ef4444",
+};
+function tierHex(score: number): string {
+  return TIER_HEX[scoreLabel(score).color] ?? "#10b981";
+}
+
 // /api/og/rating?u=<username>&s=<encoded songId>
 // Renders a 1200x630 social card image for sharing.
 export async function GET(req: Request) {
@@ -120,10 +138,16 @@ export async function GET(req: Request) {
                 marginTop: 32,
               }}
             >
-              <span style={{ fontSize: 140, fontWeight: 900, lineHeight: 1, color: "#10b981" }}>
+              {/* Score + label color-coded by tier (was hardcoded
+                  emerald + lime regardless of rating, so a 5-point
+                  "Skip" used to render in the same color as a 95
+                  "Classic" — making the OG card lie about the verdict
+                  in social previews). TIER_HEX above mirrors the
+                  Tailwind classes used inside scoreLabel(). */}
+              <span style={{ fontSize: 140, fontWeight: 900, lineHeight: 1, color: tierHex(row.score) }}>
                 {row.score}
               </span>
-              <span style={{ fontSize: 36, color: "#a3e635", fontWeight: 700 }}>
+              <span style={{ fontSize: 36, color: tierHex(row.score), fontWeight: 700 }}>
                 {scoreLabel(row.score).label}
               </span>
             </div>

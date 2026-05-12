@@ -320,6 +320,21 @@ export async function DELETE(req: Request) {
   const { songId } = (await req.json().catch(() => ({}))) ?? {};
   if (!songId) return NextResponse.json({ error: "songId required" }, { status: 400 });
 
+  // Sweep activity rows that point at this rating before we drop the
+  // rating itself. Comments + likes cascade via their FK to the
+  // ratings PK; activities don't have that FK (ratingUserId is a plain
+  // text column) so without this step the user's activity bell keeps
+  // showing "X liked your rating of Y" with a deep-link to a rating
+  // that no longer exists → click yields a 404-feeling empty card.
+  // Best-effort; the rating delete itself proceeds either way.
+  try {
+    await db
+      .delete(activities)
+      .where(and(eq(activities.ratingUserId, userId), eq(activities.songId, songId)));
+  } catch {
+    /* ignore — activity cleanup is non-critical */
+  }
+
   await db
     .delete(ratings)
     .where(and(eq(ratings.userId, userId), eq(ratings.songId, songId)));

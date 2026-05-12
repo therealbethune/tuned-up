@@ -338,6 +338,17 @@ export async function DELETE(req: Request) {
   if (c.commenterId !== userId && c.ratingUserId !== userId) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
+  // If this comment is a thread parent, promote its replies to
+  // top-level so the children stay visible. parent_comment_id has no
+  // foreign-key constraint, so without this step the replies would
+  // become invisible orphans (parentCommentId pointing at a row that
+  // no longer exists, while the CommentSection's render path only
+  // looks for replies under existing parents). Safe to run when c
+  // is itself a reply — there are no grand-children to promote.
+  await db
+    .update(comments)
+    .set({ parentCommentId: null })
+    .where(eq(comments.parentCommentId, commentId));
   await db.delete(comments).where(eq(comments.id, commentId));
   return NextResponse.json({ ok: true });
 }
