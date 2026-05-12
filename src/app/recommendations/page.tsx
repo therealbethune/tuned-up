@@ -8,37 +8,61 @@ import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RateButton } from "@/components/RateButton";
 import { DismissRec } from "./DismissRec";
+import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
+
+type RecRow = {
+  id: string;
+  message: string | null;
+  createdAt: Date;
+  fromUsername: string;
+  fromDisplayName: string | null;
+  fromImageUrl: string | null;
+  songId: string;
+  title: string;
+  artist: string;
+  album: string | null;
+  thumbnail: string | null;
+  appleMusicUrl: string | null;
+  spotifyTrackId: string | null;
+  kind: string;
+  durationSeconds: number | null;
+};
 
 export default async function RecommendationsPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  const rows = await db
-    .select({
-      id: recommendations.id,
-      message: recommendations.message,
-      createdAt: recommendations.createdAt,
-      fromUsername: users.username,
-      fromDisplayName: users.displayName,
-      fromImageUrl: users.imageUrl,
-      songId: songs.id,
-      title: songs.title,
-      artist: songs.artist,
-      album: songs.album,
-      thumbnail: songs.thumbnail,
-      appleMusicUrl: songs.appleMusicUrl,
-      spotifyTrackId: songs.spotifyTrackId,
-      kind: songs.kind,
-      durationSeconds: songs.durationSeconds,
-    })
-    .from(recommendations)
-    .innerJoin(users, eq(users.id, recommendations.fromUserId))
-    .innerJoin(songs, eq(songs.id, recommendations.songId))
-    .where(and(eq(recommendations.toUserId, userId), eq(recommendations.status, "pending")))
-    .orderBy(desc(recommendations.createdAt))
-    .limit(50);
+  const rows: RecRow[] = await safeQuery(
+    () =>
+      db
+        .select({
+          id: recommendations.id,
+          message: recommendations.message,
+          createdAt: recommendations.createdAt,
+          fromUsername: users.username,
+          fromDisplayName: users.displayName,
+          fromImageUrl: users.imageUrl,
+          songId: songs.id,
+          title: songs.title,
+          artist: songs.artist,
+          album: songs.album,
+          thumbnail: songs.thumbnail,
+          appleMusicUrl: songs.appleMusicUrl,
+          spotifyTrackId: songs.spotifyTrackId,
+          kind: songs.kind,
+          durationSeconds: songs.durationSeconds,
+        })
+        .from(recommendations)
+        .innerJoin(users, eq(users.id, recommendations.fromUserId))
+        .innerJoin(songs, eq(songs.id, recommendations.songId))
+        .where(and(eq(recommendations.toUserId, userId), eq(recommendations.status, "pending")))
+        .orderBy(desc(recommendations.createdAt))
+        .limit(50),
+    [],
+    "recommendations-page",
+  );
 
   return (
     <div className="space-y-6">

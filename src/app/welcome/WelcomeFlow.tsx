@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { SongResult } from "@/lib/ytmusic";
 import { SongRow } from "@/components/SongRow";
 import { Avatar } from "@/components/Avatar";
+import { toast } from "@/lib/toast";
 import { SpotifyIconOnGreen } from "@/components/icons";
 
 type SuggestedUser = {
@@ -86,7 +87,21 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
 
   async function finish() {
     setFinishing(true);
-    await fetch("/api/onboarding/complete", { method: "POST" });
+    try {
+      const res = await fetch("/api/onboarding/complete", { method: "POST" });
+      if (!res.ok) {
+        // If the write failed, don't redirect — /feed will just
+        // bounce them back to /welcome because onboardedAt is still
+        // null, and we'd be in an infinite loop until they refresh.
+        await toast.fromResponse(res, "Couldn't finish setup");
+        setFinishing(false);
+        return;
+      }
+    } catch (e) {
+      toast.error((e as Error).message || "Network error finishing setup");
+      setFinishing(false);
+      return;
+    }
     router.replace("/feed");
   }
 

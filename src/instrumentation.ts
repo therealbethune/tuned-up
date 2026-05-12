@@ -44,8 +44,20 @@ export async function onRequestError(
   request: RequestErrorRequest,
   context: RequestErrorContext,
 ) {
-  // Verbose log to Netlify function logs. The digest is what users
-  // see; logging it here lets us match a screenshot to a log line.
+  // Sentry's documented capture path for server-side throws. Carries
+  // the full request context so the resulting Sentry issue includes
+  // path, method, and digest as filterable tags. No-op when DSN unset.
+  try {
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.captureRequestError(err, request, context);
+  } catch {
+    /* Sentry import failed (build w/o dep) — fall through to console */
+  }
+
+  // Always also emit to Netlify function logs so we have a backup
+  // signal even when Sentry isn't configured. The digest matches the
+  // 9-digit code rendered in the user-facing error page, making it
+  // searchable across both surfaces.
   const digest = (err as { digest?: string })?.digest;
   const message = (err as Error)?.message ?? String(err);
   const stack = (err as Error)?.stack;

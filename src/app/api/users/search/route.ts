@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { ilike, or, sql, desc, eq, count } from "drizzle-orm";
+import { and, ilike, or, sql, desc, eq, count } from "drizzle-orm";
 import { db, users, ratings } from "@/db";
 
 export const runtime = "nodejs";
@@ -30,7 +30,15 @@ export async function GET(req: Request) {
     })
     .from(users)
     .leftJoin(ratings, eq(ratings.userId, users.id))
-    .where(or(ilike(users.username, pattern), ilike(users.displayName, pattern)))
+    // Hide private users from search results — but always keep the
+    // viewer themselves discoverable so they can `@`-mention their
+    // own handle without an exception.
+    .where(
+      and(
+        or(ilike(users.username, pattern), ilike(users.displayName, pattern)),
+        or(eq(users.isPrivate, false), eq(users.id, userId)),
+      ),
+    )
     .groupBy(users.id)
     .orderBy(desc(sql`count(${ratings.userId})`))
     .limit(20);

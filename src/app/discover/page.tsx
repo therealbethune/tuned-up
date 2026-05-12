@@ -31,49 +31,57 @@ type DiscoverRow = {
 
 async function trendingThisWeek(): Promise<DiscoverRow[]> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const rows = await db
-    .select({
-      songId: songs.id,
-      title: songs.title,
-      artist: songs.artist,
-      album: songs.album,
-      thumbnail: songs.thumbnail,
-      appleMusicUrl: songs.appleMusicUrl,
-      spotifyTrackId: songs.spotifyTrackId,
-      durationSeconds: songs.durationSeconds,
-      ratingCount: sql<number>`count(${ratings.songId})::int`,
-      avgScore: sql<number>`round(avg(${ratings.score}))::int`,
-    })
-    .from(ratings)
-    .innerJoin(songs, sql`${songs.id} = ${ratings.songId}`)
-    .where(gte(ratings.createdAt, sevenDaysAgo))
-    .groupBy(songs.id)
-    .orderBy(desc(sql`count(${ratings.songId})`))
-    .limit(12);
-  return rows;
+  return safeQuery(
+    () =>
+      db
+        .select({
+          songId: songs.id,
+          title: songs.title,
+          artist: songs.artist,
+          album: songs.album,
+          thumbnail: songs.thumbnail,
+          appleMusicUrl: songs.appleMusicUrl,
+          spotifyTrackId: songs.spotifyTrackId,
+          durationSeconds: songs.durationSeconds,
+          ratingCount: sql<number>`count(${ratings.songId})::int`,
+          avgScore: sql<number>`round(avg(${ratings.score}))::int`,
+        })
+        .from(ratings)
+        .innerJoin(songs, sql`${songs.id} = ${ratings.songId}`)
+        .where(gte(ratings.createdAt, sevenDaysAgo))
+        .groupBy(songs.id)
+        .orderBy(desc(sql`count(${ratings.songId})`))
+        .limit(12),
+    [],
+    "discover-trending",
+  );
 }
 
 async function topRated(): Promise<DiscoverRow[]> {
-  const rows = await db
-    .select({
-      songId: songs.id,
-      title: songs.title,
-      artist: songs.artist,
-      album: songs.album,
-      thumbnail: songs.thumbnail,
-      appleMusicUrl: songs.appleMusicUrl,
-      spotifyTrackId: songs.spotifyTrackId,
-      durationSeconds: songs.durationSeconds,
-      ratingCount: sql<number>`count(${ratings.songId})::int`,
-      avgScore: sql<number>`round(avg(${ratings.score}))::int`,
-    })
-    .from(ratings)
-    .innerJoin(songs, sql`${songs.id} = ${ratings.songId}`)
-    .groupBy(songs.id)
-    .having(sql`count(${ratings.songId}) >= 2`)
-    .orderBy(desc(sql`avg(${ratings.score})`), desc(sql`count(${ratings.songId})`))
-    .limit(12);
-  return rows;
+  return safeQuery(
+    () =>
+      db
+        .select({
+          songId: songs.id,
+          title: songs.title,
+          artist: songs.artist,
+          album: songs.album,
+          thumbnail: songs.thumbnail,
+          appleMusicUrl: songs.appleMusicUrl,
+          spotifyTrackId: songs.spotifyTrackId,
+          durationSeconds: songs.durationSeconds,
+          ratingCount: sql<number>`count(${ratings.songId})::int`,
+          avgScore: sql<number>`round(avg(${ratings.score}))::int`,
+        })
+        .from(ratings)
+        .innerJoin(songs, sql`${songs.id} = ${ratings.songId}`)
+        .groupBy(songs.id)
+        .having(sql`count(${ratings.songId}) >= 2`)
+        .orderBy(desc(sql`avg(${ratings.score})`), desc(sql`count(${ratings.songId})`))
+        .limit(12),
+    [],
+    "discover-top-rated",
+  );
 }
 
 type TopReviewer = {
@@ -90,44 +98,48 @@ type TopReviewer = {
 async function topReviewers(viewerId: string | null): Promise<TopReviewer[]> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  // Two-step: get top reviewer ids first, then exclude the viewer's
-  // existing follows. Doing it in SQL with a sub-select would be tidier
-  // but Drizzle's group-by + having + sub-select gets gnarly fast.
-  const rows = await db
-    .select({
-      id: users.id,
-      username: users.username,
-      displayName: users.displayName,
-      imageUrl: users.imageUrl,
-      ratingsCount: sql<number>`count(${ratings.userId})::int`,
-    })
-    .from(users)
-    .innerJoin(ratings, eq(ratings.userId, users.id))
-    .where(
-      and(
-        gte(ratings.createdAt, thirtyDaysAgo),
-        // Hide private users from "People to follow" — exposing their
-        // monthly rating count to non-followers leaks information they
-        // opted out of by going private.
-        eq(users.isPrivate, false),
-        viewerId ? ne(users.id, viewerId) : sql`true`,
-      ),
-    )
-    .groupBy(users.id)
-    .having(sql`count(${ratings.userId}) >= 3`)
-    .orderBy(desc(sql`count(${ratings.userId})`))
-    .limit(20);
-
-  if (!viewerId || rows.length === 0) return rows.slice(0, 8);
-
-  // Filter out users the viewer already follows (any status). One small
-  // IN-list query, then JS filter — cheaper than joining in SQL.
-  const followRows = await db
-    .select({ followeeId: follows.followeeId })
-    .from(follows)
-    .where(eq(follows.followerId, viewerId));
-  const followingIds = new Set(followRows.map((r) => r.followeeId));
-  return rows.filter((r) => !followingIds.has(r.id)).slice(0, 8);
+  // Use an anti-join (LEFT JOIN + IS NULL) to exclude in one query
+  // anyone the viewer already follows. The old two-step path pulled
+  // EVERY follow row across the wire just to JS-filter — wasteful for
+  // a user following hundreds of accounts.
+  return safeQuery(
+    () =>
+      db
+        .select({
+          id: users.id,
+          username: users.username,
+          displayName: users.displayName,
+          imageUrl: users.imageUrl,
+          ratingsCount: sql<number>`count(${ratings.userId})::int`,
+        })
+        .from(users)
+        .innerJoin(ratings, eq(ratings.userId, users.id))
+        .leftJoin(
+          follows,
+          and(
+            eq(follows.followerId, viewerId ?? "__noone__"),
+            eq(follows.followeeId, users.id),
+          ),
+        )
+        .where(
+          and(
+            gte(ratings.createdAt, thirtyDaysAgo),
+            // Hide private users from "People to follow" — exposing their
+            // monthly rating count to non-followers leaks information.
+            eq(users.isPrivate, false),
+            viewerId ? ne(users.id, viewerId) : sql`true`,
+            // Anti-join: only include rows where the viewer has NO
+            // existing follow edge.
+            viewerId ? sql`${follows.followerId} IS NULL` : sql`true`,
+          ),
+        )
+        .groupBy(users.id)
+        .having(sql`count(${ratings.userId}) >= 3`)
+        .orderBy(desc(sql`count(${ratings.userId})`))
+        .limit(8),
+    [],
+    "discover-top-reviewers",
+  );
 }
 
 // Reusable square-art card for songs/albums on /discover. Used by

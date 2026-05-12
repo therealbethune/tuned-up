@@ -1,5 +1,6 @@
 "use client";
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 // Tiny per-row error boundary. Wrap each feed/list item so a single bad
 // row renders a thin "couldn't load" placeholder instead of nuking the
@@ -18,7 +19,16 @@ export class SafeCardBoundary extends Component<{ children: ReactNode }, State> 
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error) {
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // The point of this boundary is to catch bugs in row-level renders
+    // (mention parser regex on weird unicode, image src crash, etc.) —
+    // we want Sentry to see them so we can fix them. Without this,
+    // bad-card crashes were silent in production: user sees "couldn't
+    // load" placeholder, we never know.
+    Sentry.captureException(error, {
+      tags: { boundary: "card" },
+      extra: { componentStack: info.componentStack },
+    });
     if (typeof console !== "undefined") {
       console.warn("[card-boundary]", error.message);
     }

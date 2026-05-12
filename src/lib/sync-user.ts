@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
+import { reportError } from "@/lib/report-error";
 
 export type SyncedUser = {
   id: string;
@@ -38,9 +39,7 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
   try {
     u = await currentUser();
   } catch (e) {
-    if (typeof console !== "undefined") {
-      console.warn("[sync-user] Clerk currentUser failed:", (e as Error).message);
-    }
+    reportError(e, "sync-user Clerk currentUser");
     return null;
   }
   if (!u) return null;
@@ -87,9 +86,7 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
     // Most common reason for this branch is a Neon billing 402, but
     // ANY DB hiccup (connection timeout, schema migration in flight)
     // ends up here. Log and fall through to the read-only path.
-    if (typeof console !== "undefined") {
-      console.warn("[sync-user] upsert failed:", (e as Error).message);
-    }
+    reportError(e, "sync-user upsert");
   }
 
   // Step 2: read-only fallback. If the upsert can't write, maybe the DB
@@ -110,9 +107,7 @@ export async function syncCurrentUser(): Promise<SyncedUser | null> {
       .limit(1);
     if (existing) return existing;
   } catch (e) {
-    if (typeof console !== "undefined") {
-      console.warn("[sync-user] read fallback failed:", (e as Error).message);
-    }
+    reportError(e, "sync-user read-fallback");
   }
 
   // Step 3: DB is fully down. Return null. Callers treat that as

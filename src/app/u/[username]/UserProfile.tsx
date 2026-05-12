@@ -115,25 +115,42 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     : "accepted";
   const canSeeRatings = isOwner || !target.isPrivate || followState === "accepted";
 
-  const rows = canSeeRatings
-    ? await db
-        .select({
-          score: ratings.score,
-          review: ratings.review,
-          createdAt: ratings.createdAt,
-          songId: songs.id,
-          title: songs.title,
-          artist: songs.artist,
-          album: songs.album,
-          thumbnail: songs.thumbnail,
-          appleMusicUrl: songs.appleMusicUrl,
-          spotifyTrackId: songs.spotifyTrackId,
-        })
-        .from(ratings)
-        .innerJoin(songs, eq(ratings.songId, songs.id))
-        .where(eq(ratings.userId, target.id))
-        .orderBy(desc(ratings.createdAt))
-        .limit(100)
+  type RatingRow = {
+    score: number;
+    review: string | null;
+    createdAt: Date;
+    songId: string;
+    title: string;
+    artist: string;
+    album: string | null;
+    thumbnail: string | null;
+    appleMusicUrl: string | null;
+    spotifyTrackId: string | null;
+  };
+  const rows: RatingRow[] = canSeeRatings
+    ? await safeQuery(
+        () =>
+          db
+            .select({
+              score: ratings.score,
+              review: ratings.review,
+              createdAt: ratings.createdAt,
+              songId: songs.id,
+              title: songs.title,
+              artist: songs.artist,
+              album: songs.album,
+              thumbnail: songs.thumbnail,
+              appleMusicUrl: songs.appleMusicUrl,
+              spotifyTrackId: songs.spotifyTrackId,
+            })
+            .from(ratings)
+            .innerJoin(songs, eq(ratings.songId, songs.id))
+            .where(eq(ratings.userId, target.id))
+            .orderBy(desc(ratings.createdAt))
+            .limit(100),
+        [],
+        "profile-ratings",
+      )
     : [];
 
   // Comment + like counts for this user's ratings.
@@ -143,28 +160,43 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
   let myLikes: Set<string> = new Set();
   if (songIds.length) {
     const [cCounts, lCounts, myLikeRows] = await Promise.all([
-      db
-        .select({ songId: comments.songId, n: count() })
-        .from(comments)
-        .where(and(eq(comments.ratingUserId, target.id), inArray(comments.songId, songIds)))
-        .groupBy(comments.songId),
-      db
-        .select({ songId: likes.songId, n: count() })
-        .from(likes)
-        .where(and(eq(likes.ratingUserId, target.id), inArray(likes.songId, songIds)))
-        .groupBy(likes.songId),
-      viewerId
-        ? db
-            .select({ songId: likes.songId })
+      safeQuery(
+        () =>
+          db
+            .select({ songId: comments.songId, n: count() })
+            .from(comments)
+            .where(and(eq(comments.ratingUserId, target.id), inArray(comments.songId, songIds)))
+            .groupBy(comments.songId),
+        [] as { songId: string; n: number }[],
+        "profile-comment-counts",
+      ),
+      safeQuery(
+        () =>
+          db
+            .select({ songId: likes.songId, n: count() })
             .from(likes)
-            .where(
-              and(
-                eq(likes.likerId, viewerId),
-                eq(likes.ratingUserId, target.id),
-                inArray(likes.songId, songIds),
-              ),
-            )
-        : Promise.resolve([]),
+            .where(and(eq(likes.ratingUserId, target.id), inArray(likes.songId, songIds)))
+            .groupBy(likes.songId),
+        [] as { songId: string; n: number }[],
+        "profile-like-counts",
+      ),
+      viewerId
+        ? safeQuery(
+            () =>
+              db
+                .select({ songId: likes.songId })
+                .from(likes)
+                .where(
+                  and(
+                    eq(likes.likerId, viewerId),
+                    eq(likes.ratingUserId, target.id),
+                    inArray(likes.songId, songIds),
+                  ),
+                ),
+            [] as { songId: string }[],
+            "profile-my-likes",
+          )
+        : Promise.resolve([] as { songId: string }[]),
     ]);
     commentCounts = new Map(cCounts.map((c) => [c.songId, Number(c.n)]));
     likeCounts = new Map(lCounts.map((l) => [l.songId, Number(l.n)]));

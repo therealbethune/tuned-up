@@ -31,10 +31,17 @@ export function TimezoneSync({ serverTimezone }: { serverTimezone: string | null
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ timezone: tz }),
     })
-      .then(() => {
-        try {
-          localStorage.setItem(STORAGE_KEY, tz);
-        } catch {}
+      .then((res) => {
+        // Only cache when the server actually accepted the value. The
+        // previous version persisted on any response — a single failed
+        // 4xx/5xx response would short-circuit every subsequent sync
+        // because lastSynced === tz would match. Result: streak
+        // cron fires in the wrong timezone for that user forever.
+        if (res.ok) {
+          try {
+            localStorage.setItem(STORAGE_KEY, tz);
+          } catch {}
+        }
       })
       .catch(() => {});
   }, [serverTimezone]);

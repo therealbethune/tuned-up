@@ -80,6 +80,10 @@ export async function GET(req: Request) {
           ) AS mutual_sample
         FROM users u
         WHERE u.id <> ${userId}
+          -- Exclude private users from suggestions so we don't leak
+          -- their existence + rating count to strangers. They can
+          -- still be found by direct username search of self.
+          AND u.is_private = false
           AND u.id NOT IN (SELECT id FROM my_follows)
           AND NOT EXISTS (
             SELECT 1 FROM follows

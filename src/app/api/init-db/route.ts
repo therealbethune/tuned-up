@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { neon } from "@netlify/neon";
+import { neon } from "@neondatabase/serverless";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -160,7 +160,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const sql = neon();
+  const url = process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL;
+  if (!url) {
+    return NextResponse.json({ error: "DB url missing" }, { status: 500 });
+  }
+  const sql = neon(url);
   const results: { ok: boolean; preview: string; error?: string }[] = [];
   for (const stmt of STATEMENTS) {
     try {
@@ -180,15 +184,23 @@ export async function POST(req: Request) {
   return NextResponse.json({ applied: results.length, results });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Diagnostic GET. Used to be unauth + leaked which env vars are set —
+  // a small info-leak that confirmed exactly which secrets exist. Now
+  // we require the same INIT_DB_TOKEN as POST, and only return a
+  // generic hint to anyone else.
+  const expected = process.env.INIT_DB_TOKEN;
+  const got = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!expected || got !== expected) {
+    return NextResponse.json({ hint: "POST with Authorization: Bearer <INIT_DB_TOKEN>" });
+  }
   const env = {
     NETLIFY_DATABASE_URL: !!process.env.NETLIFY_DATABASE_URL,
-    NETLIFY_DATABASE_URL_UNPOOLED: !!process.env.NETLIFY_DATABASE_URL_UNPOOLED,
     DATABASE_URL: !!process.env.DATABASE_URL,
-    INIT_DB_TOKEN: !!process.env.INIT_DB_TOKEN,
     CLERK_SECRET_KEY: !!process.env.CLERK_SECRET_KEY,
     NEXT_PUBLIC_SPOTIFY_CLIENT_ID: !!process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID,
     SPOTIFY_CLIENT_SECRET: !!process.env.SPOTIFY_CLIENT_SECRET,
+    SENTRY_DSN: !!process.env.SENTRY_DSN,
   };
-  return NextResponse.json({ hint: "POST with Authorization: Bearer <INIT_DB_TOKEN>", env });
+  return NextResponse.json({ env });
 }

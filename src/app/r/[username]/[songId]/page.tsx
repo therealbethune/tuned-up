@@ -12,6 +12,7 @@ import { StreamingLinks } from "@/components/StreamingLinks";
 import { scoreLabel } from "@/lib/score-labels";
 import { Avatar } from "@/components/Avatar";
 import { canViewRatingsFrom } from "@/lib/visibility";
+import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
 
@@ -32,36 +33,65 @@ function decodeSongId(s: string): string {
 export const encodeSongIdForUrl = encodeBase64Url;
 
 async function loadRating(username: string, encodedSongId: string) {
-  const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  // Both lookups wrapped — this page is called by social-media unfurl
+  // bots constantly, and we'd rather return a generic OG card than a
+  // 500 if the DB hiccups.
+  const userRows = await safeQuery(
+    () => db.select().from(users).where(eq(users.username, username)).limit(1),
+    [] as (typeof users.$inferSelect)[],
+    "share-page-user-lookup",
+  );
+  const user = userRows[0];
   if (!user) return null;
 
   const songId = decodeSongId(encodedSongId);
-  const [row] = await db
-    .select({
-      ratingUserId: ratings.userId,
-      score: ratings.score,
-      review: ratings.review,
-      createdAt: ratings.createdAt,
-      songId: songs.id,
-      title: songs.title,
-      artist: songs.artist,
-      album: songs.album,
-      thumbnail: songs.thumbnail,
-      appleMusicUrl: songs.appleMusicUrl,
-      spotifyTrackId: songs.spotifyTrackId,
-      kind: songs.kind,
-      username: users.username,
-      displayName: users.displayName,
-      imageUrl: users.imageUrl,
-      isPrivate: users.isPrivate,
-    })
-    .from(ratings)
-    .innerJoin(songs, eq(ratings.songId, songs.id))
-    .innerJoin(users, eq(users.id, ratings.userId))
-    .where(and(eq(ratings.userId, user.id), eq(ratings.songId, songId)))
-    .limit(1);
-
-  return row ?? null;
+  const ratingRows = await safeQuery(
+    () =>
+      db
+        .select({
+          ratingUserId: ratings.userId,
+          score: ratings.score,
+          review: ratings.review,
+          createdAt: ratings.createdAt,
+          songId: songs.id,
+          title: songs.title,
+          artist: songs.artist,
+          album: songs.album,
+          thumbnail: songs.thumbnail,
+          appleMusicUrl: songs.appleMusicUrl,
+          spotifyTrackId: songs.spotifyTrackId,
+          kind: songs.kind,
+          username: users.username,
+          displayName: users.displayName,
+          imageUrl: users.imageUrl,
+          isPrivate: users.isPrivate,
+        })
+        .from(ratings)
+        .innerJoin(songs, eq(ratings.songId, songs.id))
+        .innerJoin(users, eq(users.id, ratings.userId))
+        .where(and(eq(ratings.userId, user.id), eq(ratings.songId, songId)))
+        .limit(1),
+    [] as Array<{
+      ratingUserId: string;
+      score: number;
+      review: string | null;
+      createdAt: Date;
+      songId: string;
+      title: string;
+      artist: string;
+      album: string | null;
+      thumbnail: string | null;
+      appleMusicUrl: string | null;
+      spotifyTrackId: string | null;
+      kind: string;
+      username: string;
+      displayName: string | null;
+      imageUrl: string | null;
+      isPrivate: boolean;
+    }>,
+    "share-page-rating",
+  );
+  return ratingRows[0] ?? null;
 }
 
 export async function generateMetadata({

@@ -23,15 +23,18 @@ function verifyState(state: string): { userId: string; returnTo: string } | null
   } catch {
     return null;
   }
-  // Defense-in-depth: even though /connect already sanitized this, validate
-  // again on the callback so a tampered cookie / out-of-flow request can't
-  // bounce the user off-site.
+  // Defense-in-depth: even though /connect already sanitized this,
+  // validate again on the callback. Use a strict allowlist of routes
+  // the flow can legitimately end on, rather than character-level
+  // checks (which let oddities like backslash, %2F%2F, and other
+  // browser-quirky variants through).
+  const ALLOWED_RETURN_PREFIXES = ["/settings", "/welcome", "/me", "/feed"];
   const decoded = encReturn ? decodeURIComponent(encReturn) : "/settings";
   const returnTo =
-    decoded.startsWith("/") &&
-    !decoded.startsWith("//") &&
-    !decoded.includes("://") &&
-    decoded.length < 200
+    decoded.length < 200 &&
+    ALLOWED_RETURN_PREFIXES.some(
+      (p) => decoded === p || decoded.startsWith(p + "?") || decoded.startsWith(p + "/"),
+    )
       ? decoded
       : "/settings";
   return { userId, returnTo };
