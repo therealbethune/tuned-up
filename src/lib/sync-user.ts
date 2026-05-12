@@ -1,4 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { reportError } from "@/lib/report-error";
@@ -34,7 +35,15 @@ export type SyncedUser = {
 // `reportError` makes sure each step still surfaces in Netlify logs
 // and Sentry so we know the DB is unhealthy.
 
-export async function syncCurrentUser(): Promise<SyncedUser | null> {
+// React.cache() wrap so layout + a child page that both call this in
+// the same render see one set of Clerk + DB roundtrips. Without the
+// cache, /feed (which calls syncCurrentUser in both the root layout
+// AND the page itself) was paying for two Clerk fetches + two
+// DB upserts per render — ~150-300ms of wasted time on every signed-in
+// page load.
+export const syncCurrentUser = cache(_syncCurrentUser);
+
+async function _syncCurrentUser(): Promise<SyncedUser | null> {
   let u: Awaited<ReturnType<typeof currentUser>>;
   try {
     u = await currentUser();

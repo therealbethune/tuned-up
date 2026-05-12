@@ -66,12 +66,17 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    // Length-bound the user-supplied song metadata.
+    // Length-bound every user-supplied string so a hostile client can't
+    // stuff the songs row with megabytes of garbage on first recommend.
+    // Matches the validation in /api/ratings POST — used to be looser
+    // here (album/thumbnail were unchecked).
     if (
       typeof toUsername !== "string" || toUsername.length > 64 ||
       typeof song.id !== "string" || song.id.length > 256 ||
       typeof song.title !== "string" || song.title.length > 500 ||
-      typeof song.artist !== "string" || song.artist.length > 500
+      typeof song.artist !== "string" || song.artist.length > 500 ||
+      (song.album != null && (typeof song.album !== "string" || song.album.length > 500)) ||
+      (song.thumbnail != null && (typeof song.thumbnail !== "string" || song.thumbnail.length > 1024))
     ) {
       return NextResponse.json({ error: "fields too long" }, { status: 400 });
     }
@@ -101,23 +106,17 @@ export async function POST(req: Request) {
         ? "album"
         : "song";
 
+    // Don't block the user's "Send recommendation" tap on an iTunes
+    // lookup (1-5s on a cold cache). Save the row immediately with the
+    // existing apple_music_url if any; if we don't have one yet, fire
+    // a background resolve + UPDATE WHERE apple_music_url IS NULL.
+    // Same pattern as Wave K's /api/ratings fix.
     const [existing] = await db
       .select({ appleMusicUrl: songs.appleMusicUrl })
       .from(songs)
       .where(eq(songs.id, song.id))
       .limit(1);
-    let appleMusicUrl: string | null = existing?.appleMusicUrl ?? null;
-    if (!appleMusicUrl) {
-      try {
-        appleMusicUrl = await resolveAppleMusicUrl({
-          title: song.title,
-          artist: song.artist,
-          kind,
-        });
-      } catch {
-        appleMusicUrl = null;
-      }
-    }
+    const haveAppleMusicUrl = !!existing?.appleMusicUrl;
 
     await db
       .insert(songs)
@@ -129,7 +128,7 @@ export async function POST(req: Request) {
         album: song.album ?? null,
         thumbnail: song.thumbnail ?? null,
         durationSeconds: song.durationSeconds ?? null,
-        appleMusicUrl,
+        appleMusicUrl: existing?.appleMusicUrl ?? null,
       })
       .onConflictDoUpdate({
         target: songs.id,
@@ -139,9 +138,21 @@ export async function POST(req: Request) {
           artist: song.artist,
           album: song.album ?? null,
           thumbnail: song.thumbnail ?? null,
-          ...(appleMusicUrl ? { appleMusicUrl } : {}),
+          // Never blow away an existing apple_music_url on re-recommend.
         },
       });
+
+    if (!haveAppleMusicUrl) {
+      resolveAppleMusicUrl({ title: song.title, artist: song.artist, kind })
+        .then((url) => {
+          if (!url) return;
+          return db
+            .update(songs)
+            .set({ appleMusicUrl: url })
+            .where(and(eq(songs.id, song.id), sql`${songs.appleMusicUrl} IS NULL`));
+        })
+        .catch(() => {});
+    }
 
     // Insert / refresh the recommendation. Unique on (from, to, song).
     const id = randomUUID();
