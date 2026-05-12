@@ -7,6 +7,7 @@ import { db, recommendations, users, songs } from "@/db";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RateButton } from "@/components/RateButton";
+import { Avatar } from "@/components/Avatar";
 import { DismissRec } from "./DismissRec";
 import { safeQuery } from "@/lib/safe-query";
 
@@ -16,6 +17,7 @@ type RecRow = {
   id: string;
   message: string | null;
   createdAt: Date;
+  fromUserId: string;
   fromUsername: string;
   fromDisplayName: string | null;
   fromImageUrl: string | null;
@@ -41,6 +43,7 @@ export default async function RecommendationsPage() {
           id: recommendations.id,
           message: recommendations.message,
           createdAt: recommendations.createdAt,
+          fromUserId: users.id,
           fromUsername: users.username,
           fromDisplayName: users.displayName,
           fromImageUrl: users.imageUrl,
@@ -106,11 +109,13 @@ export default async function RecommendationsPage() {
                 className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4"
               >
                 <div className="flex items-center gap-2 mb-3 text-sm">
-                  {r.fromImageUrl ? (
-                    <Image src={r.fromImageUrl} alt="" width={28} height={28} className="rounded-full h-7 w-7" />
-                  ) : (
-                    <div className="h-7 w-7 rounded-full bg-neutral-700" />
-                  )}
+                  <Avatar
+                    imageUrl={r.fromImageUrl}
+                    name={r.fromDisplayName || r.fromUsername}
+                    seed={r.fromUserId}
+                    size={28}
+                    ring={false}
+                  />
                   <Link href={`/u/${r.fromUsername}`} className="font-medium hover:underline">
                     {r.fromDisplayName || r.fromUsername}
                   </Link>

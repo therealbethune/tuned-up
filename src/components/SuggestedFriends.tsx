@@ -20,16 +20,25 @@ export function SuggestedFriends({ initial }: { initial?: Suggestion[] }) {
   const [loading, setLoading] = useState(initial == null);
   const [actingId, setActingId] = useState<string | null>(null);
 
-  // Lazy-load if no initial data was passed.
+  // Lazy-load if no initial data was passed. Failures are silent —
+  // the UI just shows the empty state. Without a catch a non-2xx
+  // response (or a network error) would surface as an unhandled
+  // promise rejection in dev tools.
   useEffect(() => {
     if (initial != null) return;
     let cancelled = false;
     setLoading(true);
     fetch("/api/users/suggestions?limit=20")
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         if (cancelled) return;
         setItems(data.suggestions ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

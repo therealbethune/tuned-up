@@ -55,7 +55,6 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
                       width={176}
                       height={176}
                       className="w-full aspect-square object-cover"
-                      unoptimized
                     />
                   ) : (
                     <div className="w-full aspect-square bg-neutral-800" />

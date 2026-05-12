@@ -40,50 +40,59 @@ export default async function AlbumPage({
   const songId = decodeSongId(enc);
   const { userId } = await auth();
 
-  const [song] = await db
-    .select()
-    .from(songs)
-    .where(eq(songs.id, songId))
-    .limit(1);
+  // All four queries are independent — fan out in one Promise.all so
+  // the page renders in ~1 DB roundtrip instead of 4 sequential ones.
+  // The song row is required (notFound on miss); the other three are
+  // best-effort and short-circuit to empty / false on auth state.
+  const [
+    [song],
+    rawRatings,
+    followRows,
+    spotifyConnected,
+  ] = await Promise.all([
+    db.select().from(songs).where(eq(songs.id, songId)).limit(1),
+    // All ratings for this item, joined to users for the reviewer rail.
+    // We pull `isPrivate` so we can filter below — private users'
+    // ratings must NOT show to non-followers (this page is also reachable
+    // while logged-out, where the visibility check is "public users only").
+    db
+      .select({
+        score: ratings.score,
+        review: ratings.review,
+        createdAt: ratings.createdAt,
+        raterId: users.id,
+        username: users.username,
+        displayName: users.displayName,
+        imageUrl: users.imageUrl,
+        isPrivate: users.isPrivate,
+      })
+      .from(ratings)
+      .innerJoin(users, eq(users.id, ratings.userId))
+      .where(eq(ratings.songId, songId))
+      .orderBy(desc(ratings.createdAt))
+      .limit(50),
+    // Viewer's accepted follows — used to filter private ratings and to
+    // partition the reviewer rail into "people you follow" + "everyone
+    // else". Skipped when logged out (acceptedFollows stays empty).
+    userId
+      ? db
+          .select({ followeeId: follows.followeeId })
+          .from(follows)
+          .where(
+            and(
+              eq(follows.followerId, userId),
+              eq(follows.status, "accepted"),
+            ),
+          )
+      : Promise.resolve([] as { followeeId: string }[]),
+    // Does the viewer have Spotify connected? Spotify save needs the
+    // OAuth token; Apple Music save handles its own popup auth so it's
+    // shown unconditionally. Skip the query when unauthenticated.
+    userId ? isSpotifyConnected(userId) : Promise.resolve(false),
+  ]);
   if (!song) notFound();
 
-  // All ratings for this item, joined to users for the reviewer rail.
-  // We pull `isPrivate` so we can filter below — private users' ratings
-  // must NOT show to non-followers (this page is also reachable while
-  // logged-out, where the visibility check is "public users only").
-  const rawRatings = await db
-    .select({
-      score: ratings.score,
-      review: ratings.review,
-      createdAt: ratings.createdAt,
-      raterId: users.id,
-      username: users.username,
-      displayName: users.displayName,
-      imageUrl: users.imageUrl,
-      isPrivate: users.isPrivate,
-    })
-    .from(ratings)
-    .innerJoin(users, eq(users.id, ratings.userId))
-    .where(eq(ratings.songId, songId))
-    .orderBy(desc(ratings.createdAt))
-    .limit(50);
-
-  // Privacy gate: drop rows from private users the viewer doesn't
-  // follow. Look up the viewer's accepted follows once and use that
-  // set to filter. Self is always included.
-  let acceptedFollows: Set<string> = new Set();
-  if (userId) {
-    const followRows = await db
-      .select({ followeeId: follows.followeeId })
-      .from(follows)
-      .where(
-        and(
-          eq(follows.followerId, userId),
-          eq(follows.status, "accepted"),
-        ),
-      );
-    acceptedFollows = new Set(followRows.map((r) => r.followeeId));
-  }
+  const acceptedFollows = new Set(followRows.map((r) => r.followeeId));
   const allRatings = rawRatings.filter((r) => {
     if (!r.isPrivate) return true;
     if (userId && r.raterId === userId) return true;
@@ -131,11 +140,6 @@ export default async function AlbumPage({
   const maxCount = Math.max(1, ...counts);
 
   const isAlbum = isAlbumId(song.id) || song.kind === "album";
-
-  // Does the viewer have Spotify connected? Spotify save needs the
-  // OAuth token; Apple Music save handles its own popup auth so it's
-  // shown unconditionally. Skip the query when unauthenticated.
-  const spotifyConnected = userId ? await isSpotifyConnected(userId) : false;
   const url = ytUrlForSongId(song.id);
   const songForRate = {
     id: song.id,
@@ -238,9 +242,16 @@ export default async function AlbumPage({
         ) : (
           <>
             <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="text-5xl font-bold tabular-nums text-emerald-400">{avg}</span>
+              {/* Hero score is the page's headline number — supersize
+                  it (text-6xl/sm:text-7xl) with tight letter-spacing to
+                  match how a magazine-style review card would treat its
+                  rating. Used to be text-5xl; the extra weight reads as
+                  more confident and matches the bigger label beside it. */}
+              <span className="text-6xl sm:text-7xl font-extrabold tabular-nums tracking-tight text-emerald-400 leading-none">
+                {avg}
+              </span>
               {avg != null && (
-                <span className={`text-base font-semibold ${scoreLabel(avg).color}`}>
+                <span className={`text-lg font-semibold ${scoreLabel(avg).color}`}>
                   {scoreLabel(avg).label}
                 </span>
               )}

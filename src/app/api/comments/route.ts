@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, comments, users, ratings, activities, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
@@ -342,5 +342,3 @@ export async function DELETE(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
-// (asc/desc imports kept for future tooling; silence unused warning)
-void desc;

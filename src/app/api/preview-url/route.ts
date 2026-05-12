@@ -4,18 +4,23 @@ import { eq } from "drizzle-orm";
 import { db, songs } from "@/db";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 // GET /api/preview-url?songId=<id>
 // Returns { previewUrl: string | null }
 //
-// First tries the iTunes Search API (no auth needed; same lookup we use
-// for Apple Music URLs). iTunes responses include a `previewUrl` (~30s
+// Tries the iTunes Search API (no auth needed; same lookup we use for
+// Apple Music URLs). iTunes responses include a `previewUrl` (~30s
 // audio). Falls back to null if no match — UI then hides the play button.
 //
-// We don't cache on the songs table yet (one extra schema column is on
-// the roadmap; for now we re-resolve each click, which is fine because
-// each user only triggers a few of these per session).
+// Caching:
+//  - The iTunes lookup itself is cached at the Next.js data-cache layer
+//    (revalidate: 1 day). Preview URLs are stable; iTunes also rate-
+//    limits aggressively, so collapsing duplicate lookups across users
+//    is a meaningful win for popular songs.
+//  - The HTTP response is sent with s-maxage so the platform's edge
+//    cache (Netlify) can serve repeat hits without invoking the
+//    function. We mark it `public` because the body is the same for
+//    every signed-in user — `?songId` is the only thing that varies it.
 export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -42,6 +47,9 @@ export async function GET(req: Request) {
       {
         headers: { "user-agent": "TunedUp/1.0 (https://tuned-up.com)" },
         signal: AbortSignal.timeout(5000),
+        // Day-long fetch cache so repeated lookups for the same song
+        // hit the local cache instead of iTunes.
+        next: { revalidate: 86400 },
       },
     );
     if (!res.ok) return NextResponse.json({ previewUrl: null });
@@ -49,8 +57,16 @@ export async function GET(req: Request) {
     const previewUrl = data.results?.[0]?.previewUrl ?? null;
     return NextResponse.json(
       { previewUrl },
-      // Browser cache 1h — preview URLs don't change once iTunes returns them.
-      { headers: { "cache-control": "private, max-age=3600" } },
+      {
+        headers: {
+          // Browser cache 1h. CDN cache 1d with 1d stale-while-revalidate
+          // — preview URLs don't change once iTunes returns them, so the
+          // edge can serve subsequent requests for the same songId with
+          // no function invocation.
+          "cache-control":
+            "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400",
+        },
+      },
     );
   } catch {
     return NextResponse.json({ previewUrl: null });

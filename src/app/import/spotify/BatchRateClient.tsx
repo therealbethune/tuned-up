@@ -145,7 +145,6 @@ export function BatchRateClient({
                     width={48}
                     height={48}
                     className="rounded h-12 w-12 object-cover shrink-0"
-                    unoptimized
                   />
                 ) : (
                   <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />

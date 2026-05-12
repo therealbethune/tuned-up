@@ -125,6 +125,44 @@ html:not(.dark) input[type="range"].accent-white { accent-color: #171717; }
   to   { transform: translateY(0);   opacity: 1; }
 }
 
+/* Like-button heart pop. Triggers on the .heart-pop class which the
+   LikeButton applies for ~360ms after a fresh like. Briefly scales the
+   filled heart up, settles back. The two scales feel slightly springy
+   without needing a real spring physics library. */
+@keyframes heart-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.45); }
+  60%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+.heart-pop {
+  animation: heart-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+
+/* Branded auth/error page glow — soft emerald radial used by /not-found
+   and the global error boundary. Renders as an absolutely-positioned
+   ::before so the surrounding layout is unaffected. */
+.tu-emerald-glow {
+  position: relative;
+}
+.tu-emerald-glow::before {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background: radial-gradient(
+    circle at 50% 40%,
+    rgba(16, 185, 129, 0.18),
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+.tu-emerald-glow > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* Clerk-rendered Sign-in / Sign-up buttons in the top nav. We can't
    pass our own <button> as a child to <SignInButton> any more (Clerk
    6's React.Children.only trips on JSX whitespace under React 19), so
@@ -145,12 +183,20 @@ html:not(.dark) input[type="range"].accent-white { accent-color: #171717; }
 }
 .clerk-nav > button:last-of-type,
 .clerk-nav .cl-rootBox > button:last-of-type {
-  /* "Sign up" — primary pill */
-  background: #ffffff;
-  color: #000000;
-  font-weight: 500;
+  /* "Sign up" — primary emerald pill. Brand-color CTA against the
+     neutral header reads as the obvious next step for someone landing
+     unauthenticated; the prior white pill blended with the page bg
+     in light mode. */
+  background: #10b981;
+  color: #052e22;
+  font-weight: 600;
   padding: 4px 12px;
   border-radius: 9999px;
+  transition: background-color 100ms ease;
+}
+.clerk-nav > button:last-of-type:hover,
+.clerk-nav .cl-rootBox > button:last-of-type:hover {
+  background: #34d399;
 }
 
 /* Landing-page primary CTA from Clerk's wrapped button (same reason

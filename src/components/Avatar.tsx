@@ -60,6 +60,30 @@ function isClerkDefault(url: string): boolean {
   return /\/preview\.png(\?|$)/.test(url) || /img_anonymous/.test(url);
 }
 
+// Whether a URL is safe to render via next/image. We only allow the
+// hosts we've explicitly configured in next.config.ts (mirrored here
+// for client-side cheapness). Blocks data: / blob: / javascript: URLs
+// and any third-party host that snuck into the DB — those would crash
+// next/image at request time and could be an exfiltration vector if a
+// malicious display name made its way into imageUrl.
+const ALLOWED_IMAGE_HOSTS = new Set([
+  "img.clerk.com",
+  "images.clerk.dev",
+  "secure.gravatar.com",
+  "lh3.googleusercontent.com",
+  "yt3.googleusercontent.com",
+  "i.scdn.co",
+]);
+function isSafeImageUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return false;
+    return ALLOWED_IMAGE_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function Avatar({
   imageUrl,
   name,
@@ -84,14 +108,24 @@ export function Avatar({
   ring?: boolean;
   className?: string;
 }) {
-  const showImage = imageUrl && !isClerkDefault(imageUrl);
+  const showImage =
+    !!imageUrl && isSafeImageUrl(imageUrl) && !isClerkDefault(imageUrl);
   const initial =
     Array.from(name.trim())[0]?.toUpperCase() ?? "?";
   const palette = PALETTE[paletteIndexFor((seed || name || "?").toLowerCase())];
   const ringCls = ring ? "ring-2 ring-neutral-900" : "";
-  const radius = size <= 24 ? "rounded-full" : "rounded-full";
+  const radius = "rounded-full";
 
-  const dim = { width: size, height: size, fontSize: Math.round(size * 0.42) };
+  // Initials font sizing. Linear scale (size * 0.42) reads fine at
+  // ≥32px but goes blurry-thin at very small sizes — at 20px that's a
+  // 8px glyph rendered in font-weight 600, easy to mistake for a smudge.
+  // Floor it at 10px so the initial stays legible across the smallest
+  // avatar slots (comment-reply, friend-stack overflow chip).
+  const dim = {
+    width: size,
+    height: size,
+    fontSize: Math.max(10, Math.round(size * 0.5)),
+  };
 
   if (showImage) {
     return (
@@ -103,14 +137,13 @@ export function Avatar({
         loading="lazy"
         className={`${radius} ${ringCls} object-cover shrink-0 ${className}`}
         style={{ width: size, height: size }}
-        unoptimized
       />
     );
   }
 
   return (
     <span
-      className={`${radius} ${ringCls} ${palette.bg} ${palette.text} inline-flex items-center justify-center font-semibold shrink-0 select-none ${className}`}
+      className={`${radius} ${ringCls} ${palette.bg} ${palette.text} inline-flex items-center justify-center font-bold tracking-tight shrink-0 select-none ${className}`}
       style={{ width: dim.width, height: dim.height, fontSize: dim.fontSize }}
       aria-hidden
     >

@@ -21,6 +21,10 @@ export function LikeButton({
   const [count, setCount] = useState(initialCount);
   const [busy, setBusy] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Pop animation token: bumped on each fresh-like (not unlike) to
+  // re-trigger the keyframe. Used as a key on the heart svg so React
+  // remounts the element and the CSS animation plays from frame 0.
+  const [popKey, setPopKey] = useState(0);
 
   async function toggle() {
     if (busy) return;
@@ -29,6 +33,9 @@ export function LikeButton({
     const prevCount = count;
     setLiked(!prevLiked);
     setCount(prevCount + (prevLiked ? -1 : 1));
+    // Only celebrate the like, not the unlike — popping on remove
+    // would feel like the heart cheering being taken away.
+    if (!prevLiked) setPopKey((k) => k + 1);
     setBusy(true);
     try {
       const res = await fetch("/api/likes", {
@@ -69,6 +76,7 @@ export function LikeButton({
         } active:scale-95 disabled:opacity-50`}
       >
         <svg
+          key={popKey}
           width="18"
           height="18"
           viewBox="0 0 24 24"
@@ -76,7 +84,9 @@ export function LikeButton({
           stroke="currentColor"
           strokeWidth="2"
           aria-hidden
-          className={`transition-transform ${liked ? "scale-110" : ""}`}
+          className={`transition-transform ${liked ? "scale-110" : ""} ${
+            popKey > 0 && liked ? "heart-pop" : ""
+          }`}
         >
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>

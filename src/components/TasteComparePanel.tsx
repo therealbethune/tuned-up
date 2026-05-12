@@ -120,7 +120,6 @@ function Bucket({
                     width={36}
                     height={36}
                     className="rounded h-9 w-9 object-cover shrink-0"
-                    unoptimized
                   />
                 ) : (
                   <div className="h-9 w-9 rounded bg-neutral-800 shrink-0" />

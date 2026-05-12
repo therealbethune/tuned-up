@@ -196,7 +196,6 @@ export function ProfileAppleMusicPanel() {
                     alt=""
                     width={36}
                     height={36}
-                    unoptimized
                     className="h-9 w-9 rounded object-cover shrink-0"
                   />
                 ) : (

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { PlayIcon } from "./icons";
 
 // Module-level audio coordinator: only one preview plays at a time.
 // When a new one starts, any currently-playing instance pauses itself
@@ -127,9 +128,7 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
           <rect x="14" y="5" width="4" height="14" rx="1" />
         </svg>
       ) : (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-          <path d="M8 5v14l11-7z" />
-        </svg>
+        <PlayIcon size={14} />
       )}
     </button>
   );

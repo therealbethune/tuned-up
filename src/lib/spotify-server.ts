@@ -424,25 +424,3 @@ export async function saveTrackToLibrary(userId: string, spotifyTrackId: string)
   }
 }
 
-// Returns whether the user already has each given track id saved. Useful for
-// rendering filled vs. empty heart on the SaveToSpotify button.
-export async function checkTracksSaved(
-  userId: string,
-  spotifyTrackIds: string[],
-): Promise<Record<string, boolean>> {
-  if (spotifyTrackIds.length === 0) return {};
-  const token = await getUserAccessToken(userId);
-  if (!token) return {};
-  const res = await fetch(
-    `${API}/me/tracks/contains?ids=${spotifyTrackIds.map(encodeURIComponent).join(",")}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(5000),
-    },
-  );
-  if (!res.ok) return {};
-  const arr: boolean[] = await res.json();
-  const out: Record<string, boolean> = {};
-  spotifyTrackIds.forEach((id, i) => (out[id] = !!arr[i]));
-  return out;
-}

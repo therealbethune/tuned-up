@@ -6,6 +6,7 @@ import { SongRow } from "@/components/SongRow";
 import { Avatar } from "@/components/Avatar";
 import { toast } from "@/lib/toast";
 import { SpotifyIconOnGreen, SearchIcon } from "@/components/icons";
+import { SCORE_TIERS } from "@/lib/score-labels";
 
 type SuggestedUser = {
   id: string;
@@ -126,21 +127,14 @@ export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
           {/* Score-scale teaching strip. New users have no idea what
               "rate 1–100" actually means in practice; showing the
               emotional anchor of each tier makes the system click in
-              one glance. Pulled from lib/score-labels.ts so it stays
-              consistent with what the rest of the app displays. */}
+              one glance. Source: SCORE_TIERS in lib/score-labels.ts. */}
           <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
             <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-2">
               Rate songs 1–100
             </div>
             <div className="grid grid-cols-5 gap-1.5 text-center">
-              {[
-                { range: "1–19",   label: "Trash",  color: "bg-red-500/15 text-red-300" },
-                { range: "20–49",  label: "Meh",    color: "bg-orange-500/15 text-orange-300" },
-                { range: "50–69",  label: "OK",     color: "bg-yellow-500/15 text-yellow-300" },
-                { range: "70–84",  label: "Great",  color: "bg-lime-500/15 text-lime-300" },
-                { range: "85–100", label: "Banger", color: "bg-emerald-500/15 text-emerald-300" },
-              ].map((b) => (
-                <div key={b.range} className={`rounded-md py-1.5 ${b.color}`}>
+              {SCORE_TIERS.map((b) => (
+                <div key={b.range} className={`rounded-md py-1.5 ${b.bg}`}>
                   <div className="text-[10px] tabular-nums opacity-80">{b.range}</div>
                   <div className="text-xs font-semibold">{b.label}</div>
                 </div>

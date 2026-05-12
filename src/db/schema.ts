@@ -121,8 +121,6 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   index("push_subscriptions_user_idx").on(t.userId),
 ]);
 
-// Activity / notifications. type='follow' means actorId followed userId.
-// Future types: 'rating_match' (actorId rated a song userId also rated), etc.
 // A like on someone's rating. Composite key prevents duplicates;
 // toggling is delete-then-insert.
 export const likes = pgTable("likes", {
@@ -156,6 +154,16 @@ export const comments = pgTable("comments", {
   index("comments_parent_idx").on(t.parentCommentId),
 ]);
 
+// Activity / notifications. One row per thing that should appear in
+// the recipient's activity bell. type values currently in use:
+//   follow         — actorId started following userId
+//   comment        — actorId commented on userId's rating
+//   reply          — actorId replied to userId's comment
+//   like           — actorId liked userId's rating
+//   mention        — actorId @-mentioned userId in a comment/review
+//   rating_match   — actorId rated a song userId had also rated
+//   rec_rated      — actorId rated a song userId had recommended to them
+//   streak_3 / streak_7 / streak_30 / streak_60 / ... — milestone toasts
 export const activities = pgTable("activities", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

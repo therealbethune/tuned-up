@@ -25,7 +25,9 @@ export async function POST(req: Request) {
 
   await syncCurrentUser();
 
-  const body = await req.json();
+  // Guard against malformed JSON bodies — bare `await req.json()` throws
+  // a 500 instead of a 400, which then crashes the route + spams Sentry.
+  const body = await req.json().catch(() => null);
   const { song, score, review } = body ?? {};
   if (!song?.id || !song.title || !song.artist) {
     return NextResponse.json({ error: "invalid song" }, { status: 400 });
@@ -71,20 +73,18 @@ export async function POST(req: Request) {
       ? "album"
       : "song";
 
-  // Look up the canonical Apple Music URL once on first save. We do this
-  // before the upsert so a brand-new song row gets the link immediately.
-  // If iTunes is slow/down, we just skip it (column stays null and the
-  // streaming-links UI falls back to the search URL).
+  // Look up whether we already have the canonical Apple Music URL on file.
+  // We DO NOT block the save on the lookup — iTunes can take 1–5 seconds
+  // on a cold cache, which used to sit on the user's "Save rating" tap.
+  // Instead, save the row immediately; if we don't have an apple_music_url
+  // yet, fire a background resolve + UPDATE WHERE apple_music_url IS NULL
+  // so the link materializes by the time anyone clicks the streaming icon.
   const [existing] = await db
     .select({ appleMusicUrl: songs.appleMusicUrl })
     .from(songs)
     .where(eq(songs.id, song.id))
     .limit(1);
-
-  let appleMusicUrl: string | null = existing?.appleMusicUrl ?? null;
-  if (!appleMusicUrl) {
-    appleMusicUrl = await resolveAppleMusicUrl({ title: song.title, artist: song.artist, kind });
-  }
+  const haveAppleMusicUrl = !!existing?.appleMusicUrl;
 
   await db
     .insert(songs)
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       album: song.album ?? null,
       thumbnail: song.thumbnail ?? null,
       durationSeconds: song.durationSeconds ?? null,
-      appleMusicUrl,
+      appleMusicUrl: existing?.appleMusicUrl ?? null,
     })
     .onConflictDoUpdate({
       target: songs.id,
@@ -106,10 +106,24 @@ export async function POST(req: Request) {
         artist: song.artist,
         album: song.album ?? null,
         thumbnail: song.thumbnail ?? null,
-        // Don't blow away an existing apple_music_url with null on a re-save.
-        ...(appleMusicUrl ? { appleMusicUrl } : {}),
+        // Don't blow away an existing apple_music_url on a re-save.
       },
     });
+
+  // Background-resolve the Apple Music URL on first save. Fire-and-forget;
+  // any failure (iTunes 4xx/5xx, timeout, no match) leaves the column null
+  // and the streaming-links UI falls back to a search URL.
+  if (!haveAppleMusicUrl) {
+    resolveAppleMusicUrl({ title: song.title, artist: song.artist, kind })
+      .then((url) => {
+        if (!url) return;
+        return db
+          .update(songs)
+          .set({ appleMusicUrl: url })
+          .where(and(eq(songs.id, song.id), sql`${songs.appleMusicUrl} IS NULL`));
+      })
+      .catch(() => {});
+  }
 
   // Best-effort: resolve & cache the Spotify track id for tracks (not albums)
   // so the "Open in Spotify" link is direct, not a search. Fire-and-forget —

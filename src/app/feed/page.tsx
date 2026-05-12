@@ -20,6 +20,7 @@ import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { FriendRecsRail } from "@/components/FriendRecsRail";
 import { recommendedFromFriends, type FriendRec } from "@/lib/recs";
 import { Avatar } from "@/components/Avatar";
+import { PlayIcon } from "@/components/icons";
 import { isSpotifyConnected } from "@/lib/cached-queries";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
@@ -205,26 +206,10 @@ export default async function FeedPage({
   }
   const oldestCreatedAt = items.length > 0 ? items[items.length - 1].createdAt : null;
 
-  // Viewer's own ratings on the songs visible in the feed (so we can show
-  // an accurate "Rated X" label on the inline RateButton).
-  const songIds = Array.from(new Set(items.map((i) => i.songId)));
-  const myRatingsRows = songIds.length
-    ? await safeQuery(
-        () =>
-          db
-            .select({ songId: ratings.songId, score: ratings.score })
-            .from(ratings)
-            .where(and(eq(ratings.userId, userId), inArray(ratings.songId, songIds))),
-        [] as { songId: string; score: number }[],
-        "feed-my-ratings",
-      )
-    : [];
-  const myRatingsMap = new Map(myRatingsRows.map((r) => [r.songId, r.score]));
-
-  // For each song in the feed, who else (among the viewer's follows) has
-  // rated it? Surfaces as a small avatar stack under the card — "Sarah,
-  // Alex +2 also rated this". Only show users the viewer follows (incl.
-  // self for completeness, though we hide self in render).
+  // Everything below depends on `items` being resolved but is otherwise
+  // independent — fan out in one Promise.all rather than running each
+  // query serially. On a warm /feed render this drops the after-items
+  // wall-clock from ~6 sequential roundtrips to one parallel batch.
   type OtherRater = {
     songId: string;
     raterId: string;
@@ -233,118 +218,144 @@ export default async function FeedPage({
     imageUrl: string | null;
     score: number;
   };
+  const songIds = Array.from(new Set(items.map((i) => i.songId)));
+  const ratingUserIds = Array.from(new Set(items.map((i) => i.ratingUserId)));
+  const hasItems = items.length > 0;
+  const wantsFriendRecs = followedIds.length > 0 && !sp.before;
+
+  const [
+    myRatingsRows,
+    otherRaterRows,
+    spotifyConnected,
+    friendRecs,
+    cCounts,
+    lCounts,
+    myLikeRows,
+  ] = await Promise.all([
+    songIds.length
+      ? safeQuery(
+          () =>
+            db
+              .select({ songId: ratings.songId, score: ratings.score })
+              .from(ratings)
+              .where(and(eq(ratings.userId, userId), inArray(ratings.songId, songIds))),
+          [] as { songId: string; score: number }[],
+          "feed-my-ratings",
+        )
+      : Promise.resolve([] as { songId: string; score: number }[]),
+    songIds.length && followedIds.length
+      ? safeQuery<OtherRater[]>(
+          () =>
+            db
+              .select({
+                songId: ratings.songId,
+                raterId: ratings.userId,
+                username: users.username,
+                displayName: users.displayName,
+                imageUrl: users.imageUrl,
+                score: ratings.score,
+              })
+              .from(ratings)
+              .innerJoin(users, eq(users.id, ratings.userId))
+              .where(
+                and(
+                  inArray(ratings.songId, songIds),
+                  inArray(ratings.userId, followedIds),
+                ),
+              ),
+          [],
+          "feed-other-raters",
+        )
+      : Promise.resolve([] as OtherRater[]),
+    // Cached per-request so /feed + /me + /album share one roundtrip
+    // when they happen in the same render tree.
+    isSpotifyConnected(userId),
+    // "Friends loved" rail — only on the first page (no `before` cursor)
+    // so pagination doesn't reshuffle scroll position.
+    wantsFriendRecs
+      ? safeQuery(
+          () => recommendedFromFriends(userId, 8),
+          [] as FriendRec[],
+          "feed-friend-recs",
+        )
+      : Promise.resolve([] as FriendRec[]),
+    hasItems
+      ? safeQuery(
+          () =>
+            db
+              .select({
+                ratingUserId: comments.ratingUserId,
+                songId: comments.songId,
+                n: count(),
+              })
+              .from(comments)
+              .where(
+                and(
+                  inArray(comments.ratingUserId, ratingUserIds),
+                  inArray(comments.songId, songIds),
+                ),
+              )
+              .groupBy(comments.ratingUserId, comments.songId),
+          [] as { ratingUserId: string; songId: string; n: number }[],
+          "feed-comment-counts",
+        )
+      : Promise.resolve(
+          [] as { ratingUserId: string; songId: string; n: number }[],
+        ),
+    hasItems
+      ? safeQuery(
+          () =>
+            db
+              .select({
+                ratingUserId: likes.ratingUserId,
+                songId: likes.songId,
+                n: count(),
+              })
+              .from(likes)
+              .where(
+                and(
+                  inArray(likes.ratingUserId, ratingUserIds),
+                  inArray(likes.songId, songIds),
+                ),
+              )
+              .groupBy(likes.ratingUserId, likes.songId),
+          [] as { ratingUserId: string; songId: string; n: number }[],
+          "feed-like-counts",
+        )
+      : Promise.resolve(
+          [] as { ratingUserId: string; songId: string; n: number }[],
+        ),
+    hasItems
+      ? safeQuery(
+          () =>
+            db
+              .select({ ratingUserId: likes.ratingUserId, songId: likes.songId })
+              .from(likes)
+              .where(
+                and(
+                  eq(likes.likerId, userId),
+                  inArray(likes.ratingUserId, ratingUserIds),
+                  inArray(likes.songId, songIds),
+                ),
+              ),
+          [] as { ratingUserId: string; songId: string }[],
+          "feed-my-likes",
+        )
+      : Promise.resolve([] as { ratingUserId: string; songId: string }[]),
+  ]);
+
+  const myRatingsMap = new Map(myRatingsRows.map((r) => [r.songId, r.score]));
   const otherRatersBySong = new Map<string, OtherRater[]>();
-  if (songIds.length && followedIds.length) {
-    const rows = await safeQuery<OtherRater[]>(
-      () =>
-        db
-          .select({
-            songId: ratings.songId,
-            raterId: ratings.userId,
-            username: users.username,
-            displayName: users.displayName,
-            imageUrl: users.imageUrl,
-            score: ratings.score,
-          })
-          .from(ratings)
-          .innerJoin(users, eq(users.id, ratings.userId))
-          .where(
-            and(
-              inArray(ratings.songId, songIds),
-              inArray(ratings.userId, followedIds),
-            ),
-          ),
-      [],
-      "feed-other-raters",
-    );
-    for (const r of rows) {
-      const arr = otherRatersBySong.get(r.songId) ?? [];
-      arr.push(r);
-      otherRatersBySong.set(r.songId, arr);
-    }
+  for (const r of otherRaterRows) {
+    const arr = otherRatersBySong.get(r.songId) ?? [];
+    arr.push(r);
+    otherRatersBySong.set(r.songId, arr);
   }
 
-  // Has the viewer linked their Spotify account? Cached per-request so
-  // /feed + /me + /album all share one roundtrip when they happen in
-  // the same render tree.
-  const spotifyConnected = await isSpotifyConnected(userId);
-
-  // "Friends loved" rail — only render on the first page (no `before`
-  // cursor) so we don't disrupt the scroll position when paginating
-  // through older feed items. Skipped entirely for users who follow
-  // nobody (the SQL would just return zero rows anyway, but we save the
-  // roundtrip).
-  let friendRecs: FriendRec[] = [];
-  if (followedIds.length > 0 && !sp.before) {
-    friendRecs = await safeQuery(
-      () => recommendedFromFriends(userId, 8),
-      [] as FriendRec[],
-      "feed-friend-recs",
-    );
-  }
-
-  // Comment counts per (ratingUserId, songId) grouped by both.
   let commentCounts: Map<string, number> = new Map();
   let likeCounts: Map<string, number> = new Map();
   let myLikes: Set<string> = new Set();
-  if (items.length) {
-    const ratingUserIds = Array.from(new Set(items.map((i) => i.ratingUserId)));
-
-    const [cCounts, lCounts, myLikeRows] = await Promise.all([
-      safeQuery(
-        () =>
-          db
-            .select({
-              ratingUserId: comments.ratingUserId,
-              songId: comments.songId,
-              n: count(),
-            })
-            .from(comments)
-            .where(
-              and(
-                inArray(comments.ratingUserId, ratingUserIds),
-                inArray(comments.songId, songIds),
-              ),
-            )
-            .groupBy(comments.ratingUserId, comments.songId),
-          [] as { ratingUserId: string; songId: string; n: number }[],
-          "feed-comment-counts",
-      ),
-      safeQuery(
-        () =>
-          db
-            .select({
-              ratingUserId: likes.ratingUserId,
-              songId: likes.songId,
-              n: count(),
-            })
-            .from(likes)
-            .where(
-              and(
-                inArray(likes.ratingUserId, ratingUserIds),
-                inArray(likes.songId, songIds),
-              ),
-            )
-            .groupBy(likes.ratingUserId, likes.songId),
-          [] as { ratingUserId: string; songId: string; n: number }[],
-          "feed-like-counts",
-      ),
-      safeQuery(
-        () =>
-          db
-            .select({ ratingUserId: likes.ratingUserId, songId: likes.songId })
-            .from(likes)
-            .where(
-              and(
-                eq(likes.likerId, userId),
-                inArray(likes.ratingUserId, ratingUserIds),
-                inArray(likes.songId, songIds),
-              ),
-            ),
-          [] as { ratingUserId: string; songId: string }[],
-          "feed-my-likes",
-      ),
-    ]);
+  if (hasItems) {
     commentCounts = new Map(
       cCounts.map((c) => [`${c.ratingUserId}::${c.songId}`, Number(c.n)]),
     );
@@ -448,18 +459,14 @@ export default async function FeedPage({
                           the corner shows the thumbnail is tappable
                           (no hover state exists). On desktop: a full
                           dark overlay reveals on hover. */}
-                      <span className="sm:hidden absolute bottom-1 right-1 h-5 w-5 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="white" aria-hidden>
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
+                      <span className="sm:hidden absolute bottom-1 right-1 h-5 w-5 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center text-white">
+                        <PlayIcon size={10} />
                       </span>
-                      <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors">
-                        <svg
+                      <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors text-white">
+                        <PlayIcon
+                          size={20}
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          width="20" height="20" viewBox="0 0 24 24" fill="white" aria-hidden
-                        >
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
+                        />
                       </div>
                     </a>
                   ) : it.thumbnail ? (

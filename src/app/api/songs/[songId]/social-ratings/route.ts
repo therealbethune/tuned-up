@@ -18,8 +18,12 @@ export async function GET(
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { songId } = await params;
-  const decoded = decodeURIComponent(songId);
+  // Next.js already decodes dynamic-segment params once before handing
+  // them to the route handler. The previous `decodeURIComponent` call
+  // here applied a second decode, which mangles any id that legitimately
+  // contains a literal `%XX` byte (e.g. encoded spaces inside synthetic
+  // ids). Use the param as-is.
+  const { songId: decoded } = await params;
 
   // Whom does this user follow?
   const followed = await db

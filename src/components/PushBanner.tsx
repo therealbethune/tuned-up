@@ -88,10 +88,11 @@ export function PushBanner() {
       });
       setShouldShow(false);
     } catch {
-      // Don't show an alert; the banner is supposed to be unobtrusive.
-      try {
-        localStorage.setItem(DISMISS_KEY, "1");
-      } catch {}
+      // Hide for this session only — don't write DISMISS_KEY. A transient
+      // failure (network blip, denied permission they may grant later,
+      // browser quirk) shouldn't permanently suppress the banner. They'll
+      // still see it on their next visit. Only the explicit Dismiss
+      // button writes the persistent flag.
       setShouldShow(false);
     } finally {
       setBusy(false);

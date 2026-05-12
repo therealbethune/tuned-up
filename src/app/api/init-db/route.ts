@@ -4,8 +4,12 @@ import { neon } from "@neondatabase/serverless";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Inline schema (same as drizzle/0000_init.sql). Safe to run multiple times —
-// "already exists" errors are treated as success.
+// Single source of truth for the production schema. We migrated off
+// drizzle-kit's per-migration files (which had drifted) to one
+// idempotent statement list — each statement uses IF NOT EXISTS / IF
+// EXISTS so it's safe to re-run, and "already exists" errors are
+// treated as success on POST. Add new columns/tables/indexes at the
+// bottom; never edit historical statements.
 const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS "users" (
     "id" text PRIMARY KEY NOT NULL,
@@ -190,25 +194,4 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ applied: results.length, results });
-}
-
-export async function GET(req: Request) {
-  // Diagnostic GET. Used to be unauth + leaked which env vars are set —
-  // a small info-leak that confirmed exactly which secrets exist. Now
-  // we require the same INIT_DB_TOKEN as POST, and only return a
-  // generic hint to anyone else.
-  const expected = process.env.INIT_DB_TOKEN;
-  const got = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!expected || got !== expected) {
-    return NextResponse.json({ hint: "POST with Authorization: Bearer <INIT_DB_TOKEN>" });
-  }
-  const env = {
-    NETLIFY_DATABASE_URL: !!process.env.NETLIFY_DATABASE_URL,
-    DATABASE_URL: !!process.env.DATABASE_URL,
-    CLERK_SECRET_KEY: !!process.env.CLERK_SECRET_KEY,
-    NEXT_PUBLIC_SPOTIFY_CLIENT_ID: !!process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET: !!process.env.SPOTIFY_CLIENT_SECRET,
-    SENTRY_DSN: !!process.env.SENTRY_DSN,
-  };
-  return NextResponse.json({ env });
 }

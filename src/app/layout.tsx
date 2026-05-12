@@ -228,10 +228,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 className="inline-flex items-center gap-2 font-bold text-lg tracking-tight whitespace-nowrap group"
                 aria-label="Tuned Up — home"
               >
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500 text-black group-hover:bg-emerald-400 transition-colors">
+                {/* Logomark with a soft emerald glow so the brand pops
+                    against the otherwise dark header. The glow doubles as
+                    a subtle group-hover halo. The wordmark stays visible
+                    on every breakpoint (previously hidden under sm:),
+                    because at mobile widths the lone glyph reads as a
+                    decorative bullet rather than a clickable home link. */}
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500 text-black ring-1 ring-emerald-300/40 shadow-[0_0_18px_-4px_rgba(16,185,129,0.55)] group-hover:bg-emerald-400 group-hover:shadow-[0_0_24px_-2px_rgba(16,185,129,0.75)] transition-all">
                   <TunedUpMark size={16} />
                 </span>
-                <span className="hidden sm:inline">Tuned Up</span>
+                <span>Tuned Up</span>
               </Link>
               <div className="flex items-center gap-2 sm:gap-4 text-sm">
                 {userId ? <SignedInNav userId={userId} /> : <SignedOutNav />}

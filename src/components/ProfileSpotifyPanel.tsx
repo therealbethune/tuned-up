@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { SpotifyIcon } from "@/components/icons";
+import { SpotifyIcon, PlayIcon } from "@/components/icons";
 
 type TopTrack = {
   id: string;
@@ -185,7 +185,6 @@ function NowPlayingBlock({ now }: { now: NowPlaying }) {
           alt=""
           width={48}
           height={48}
-          unoptimized
           className="h-12 w-12 rounded object-cover shrink-0"
         />
       ) : (
@@ -271,7 +270,6 @@ function TopTrackRow({ track, rank }: { track: TopTrack; rank: number }) {
             alt=""
             width={36}
             height={36}
-            unoptimized
             className="h-9 w-9 rounded object-cover shrink-0"
           />
         ) : (
@@ -293,9 +291,7 @@ function TopTrackRow({ track, rank }: { track: TopTrack; rank: number }) {
                 <rect x="14" y="5" width="4" height="14" />
               </svg>
             ) : (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <path d="M8 5v14l11-7z" />
-              </svg>
+              <PlayIcon size={12} />
             )}
           </button>
         )}

@@ -16,7 +16,9 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   await syncCurrentUser();
 
-  const { username, action } = (await req.json()) ?? {};
+  // Guard against malformed JSON bodies — `await req.json()` without a
+  // catch throws a 500 instead of returning 400.
+  const { username, action } = (await req.json().catch(() => null)) ?? {};
   if (!username) return NextResponse.json({ error: "username required" }, { status: 400 });
 
   const [target] = await db.select().from(users).where(eq(users.username, username)).limit(1);

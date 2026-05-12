@@ -4,6 +4,7 @@ import type { SongResult } from "@/lib/ytmusic";
 import { ytUrlForSongId } from "@/lib/songs";
 import { StreamingLinks } from "./StreamingLinks";
 import { RecommendButton } from "./RecommendButton";
+import { PlayIcon } from "./icons";
 
 function durationLabel(seconds: number | null | undefined): string | null {
   if (seconds == null) return null;
@@ -54,22 +55,14 @@ export function SongRow({
           ) : (
             <div className="h-14 w-14 rounded bg-neutral-800" />
           )}
-          <span className="sm:hidden absolute bottom-1 right-1 h-5 w-5 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="white" aria-hidden>
-              <path d="M8 5v14l11-7z" />
-            </svg>
+          <span className="sm:hidden absolute bottom-1 right-1 h-5 w-5 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center text-white">
+            <PlayIcon size={10} />
           </span>
-          <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors">
-            <svg
+          <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors text-white">
+            <PlayIcon
+              size={20}
               className="opacity-0 group-hover:opacity-100 transition-opacity"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="white"
-              aria-hidden
-            >
-              <path d="M8 5v14l11-7z" />
-            </svg>
+            />
           </div>
         </a>
       ) : song.thumbnail ? (

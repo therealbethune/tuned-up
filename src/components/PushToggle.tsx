@@ -89,12 +89,17 @@ export function PushToggle() {
       const sub = reg ? await reg.pushManager.getSubscription() : null;
       if (sub) {
         const endpoint = sub.endpoint;
-        await sub.unsubscribe();
+        // Tell the server first, then unsubscribe locally. If we
+        // unsubscribed first and the DELETE request failed, the row
+        // would linger in push_subscriptions and we'd keep trying to
+        // send pushes to a dead endpoint (web-push would 410, which
+        // we don't currently prune — see lib/push.ts).
         await fetch("/api/push/subscribe", {
           method: "DELETE",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ endpoint }),
         });
+        await sub.unsubscribe();
       }
       setStatus("off");
       setMsg("Notifications disabled on this device.");

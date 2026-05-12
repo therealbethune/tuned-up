@@ -109,13 +109,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, evaluated, warned: 0, errors, at: now.toISOString() });
   }
 
-  // Batch: fetch "did each candidate rate since the earliest dayStartUTC"
-  // in one query. We over-include users whose dayStart is later, then
-  // filter per-user with the correct cutoff in JS. Cheap.
+  // Batch: fetch each candidate's recent rating timestamps in one query.
+  // We need both:
+  //   - "did they rate today" (in their local timezone) → skip warn
+  //   - "did they rate yesterday" → validates that the cached streak is
+  //     still accurate. If their most recent rating is >48h ago the
+  //     streak has already broken even though `currentStreak` won't
+  //     reflect it until they rate again (refreshUserStreak only runs on
+  //     POST /api/ratings). Sending "your 5-day streak is at risk" to
+  //     someone whose streak is actually already 0 is the most annoying
+  //     possible notification — guard against it.
+  //
+  // Query window: earliest candidate's dayStart, then walk back 24h to
+  // catch yesterday too.
   const earliestDayStart = candidates.reduce(
     (acc, c) => (c.dayStartUTC < acc ? c.dayStartUTC : acc),
     candidates[0].dayStartUTC,
   );
+  const lookbackStart = new Date(earliestDayStart.getTime() - 24 * 60 * 60 * 1000);
   const recentRatings = await db
     .select({
       userId: ratings.userId,
@@ -125,19 +136,35 @@ export async function POST(req: Request) {
     .where(
       and(
         inArray(ratings.userId, candidates.map((c) => c.id)),
-        gte(ratings.createdAt, earliestDayStart),
+        gte(ratings.createdAt, lookbackStart),
       ),
     );
+  // Build candidate lookup map once (was an O(n²) `.find` inside the
+  // recentRatings loop — fine at a few hundred candidates, painful as the
+  // user base grows).
+  const byId = new Map(candidates.map((c) => [c.id, c]));
   const ratedTodayBy = new Set<string>();
+  const ratedYesterdayBy = new Set<string>();
   for (const r of recentRatings) {
-    const c = candidates.find((x) => x.id === r.userId);
-    if (c && r.createdAt >= c.dayStartUTC) ratedTodayBy.add(r.userId);
+    const c = byId.get(r.userId);
+    if (!c) continue;
+    if (r.createdAt >= c.dayStartUTC) {
+      ratedTodayBy.add(r.userId);
+    } else {
+      // Falls in the [lookbackStart, dayStartUTC) window → "yesterday".
+      ratedYesterdayBy.add(r.userId);
+    }
   }
 
   for (const c of candidates) {
     if (ratedTodayBy.has(c.id)) continue;
     // Skip if cached streak is already 0 — nothing to lose.
     if (c.cachedStreak < 1) continue;
+    // Guard against the stale-cache case: if they didn't rate yesterday
+    // either, their streak is already broken — don't send a misleading
+    // "your streak is at risk" warning. (currentStreak won't reflect
+    // the break until they rate again; this is the cheapest backstop.)
+    if (!ratedYesterdayBy.has(c.id)) continue;
 
     try {
       const isUrgent = c.stage === "urgent";

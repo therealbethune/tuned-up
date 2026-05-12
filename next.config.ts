@@ -2,10 +2,12 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  // Allow Next/Image optimization for the third-party image hosts we pull from.
-  // Anything not on this allowlist still falls through to the unoptimized
-  // <Image> path because we keep that prop on a few callsites — but for these
-  // hosts we get automatic resizing, format negotiation, and lazy-loading.
+  // Allow Next/Image optimization for the third-party image hosts we pull
+  // from. Every <Image> in the app loads from one of these hosts, so we
+  // can rely on automatic resizing, format negotiation, and lazy-loading
+  // — no `unoptimized` escape hatches anywhere. If you add a new host
+  // (new streaming service, new avatar source), add it here too or the
+  // image will 400 at build/runtime.
   images: {
     remotePatterns: [
       // YouTube Music album art / artist photos

@@ -167,7 +167,6 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
               width={240}
               height={240}
               className="w-full aspect-square object-cover"
-              unoptimized
             />
           ) : (
             <div className="w-full aspect-square bg-neutral-800" />
@@ -278,7 +277,6 @@ function HeroSpotlight({
                 height={200}
                 priority
                 className="rounded-lg w-40 h-40 sm:w-48 sm:h-48 object-cover ring-2 ring-neutral-800 shadow-xl"
-                unoptimized
               />
             ) : (
               <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-lg bg-neutral-800 ring-2 ring-neutral-800" />

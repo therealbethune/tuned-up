@@ -2,9 +2,12 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
+import { TunedUpMark } from "@/components/icons";
 
 // Top-level error boundary. Caught by Next when any server component or
-// nested route throws and isn't handled.
+// nested route throws and isn't handled. Branded to match /not-found so
+// "something broke" doesn't feel like a different application than the
+// rest of the surface.
 export default function GlobalError({
   error,
   reset,
@@ -26,28 +29,35 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="space-y-6 py-12 max-w-md mx-auto text-center">
-      <div className="text-5xl">😬</div>
+    <div className="tu-emerald-glow space-y-6 py-16 max-w-md mx-auto text-center">
+      <div className="inline-flex h-14 w-14 rounded-2xl bg-emerald-500 text-black items-center justify-center shadow-lg shadow-emerald-500/20 mx-auto">
+        <TunedUpMark size={28} />
+      </div>
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Something broke.</h1>
+        <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-400/80 font-semibold">
+          Server error
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Out of tune</h1>
         <p className="text-neutral-400 text-sm">
-          A server error occurred. It&apos;s not you — it&apos;s us. Try again, and if it
-          keeps happening, let me know.
+          Something broke on our end. Try again — if it keeps happening,
+          let me know.
         </p>
         {error.digest && (
-          <p className="text-xs text-neutral-600 font-mono">error: {error.digest}</p>
+          <p className="text-xs text-neutral-600 font-mono pt-1">
+            error: {error.digest}
+          </p>
         )}
       </div>
-      <div className="flex items-center justify-center gap-3">
+      <div className="flex items-center justify-center gap-3 pt-2">
         <button
           onClick={() => reset()}
-          className="rounded-full bg-white text-black px-5 py-2 font-medium"
+          className="rounded-full bg-white text-black px-5 py-2 font-medium active:scale-95 transition-transform"
         >
           Try again
         </button>
         <Link
           href="/"
-          className="rounded-full border border-neutral-700 px-5 py-2 font-medium hover:bg-neutral-900"
+          className="rounded-full border border-neutral-700 px-5 py-2 font-medium hover:bg-neutral-900 active:scale-95 transition-transform"
         >
           Home
         </Link>

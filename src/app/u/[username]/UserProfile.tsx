@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { and, desc, eq, count, inArray } from "drizzle-orm";
 import { db, ratings, songs, follows, users, comments, likes, spotifyAccounts } from "@/db";
-import { SpotifyIcon } from "@/components/icons";
+import { SpotifyIcon, PlayIcon } from "@/components/icons";
 import { renderWithMentions } from "@/lib/mentions";
 import { FollowButton } from "./FollowButton";
 import { ytUrlForSongId } from "@/lib/songs";
@@ -47,7 +47,28 @@ function joinedAgo(d: Date | string | number): string {
 export default async function UserProfile({ target, viewerId }: { target: User; viewerId: string | null }) {
   const isOwner = viewerId === target.id;
 
-  const [[followerStat], [followingStat], followingViewer] = await Promise.all([
+  // Read the cached streak straight off the user row — it's
+  // maintained on every new rating via refreshUserStreak in
+  // /api/ratings, so avoids a full scan of the target's ratings on
+  // every profile view. (computeStreak was the slowest query on this
+  // page; we'd pull every rating row across the wire just to count.)
+  const streak = target.currentStreak ?? 0;
+
+  // All header-block queries fan out in one parallel batch. Previously
+  // these ran as two sequential Promise.all's plus an inline streakPct
+  // await — that put 3 sequential roundtrips on the critical path for
+  // every profile view. Inputs are all derivable from
+  // {target, viewerId, isOwner, streak} which are known up front, so
+  // there's no real dependency between any of them.
+  const [
+    [followerStat],
+    [followingStat],
+    followingViewer,
+    taste,
+    targetSpotify,
+    viewer,
+    streakPctRank,
+  ] = await Promise.all([
     db
       .select({ n: count() })
       .from(follows)
@@ -63,11 +84,6 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           .where(and(eq(follows.followerId, viewerId), eq(follows.followeeId, target.id)))
           .limit(1)
       : Promise.resolve([]),
-  ]);
-
-  const followersCount = followerStat?.n ?? 0;
-  const followingCount = followingStat?.n ?? 0;
-  const [taste, targetSpotify, viewer] = await Promise.all([
     viewerId && !isOwner
       ? safeQuery(() => computeTasteDetails(viewerId, target.id), null, "taste")
       : Promise.resolve(null),
@@ -99,18 +115,16 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           "viewer-name",
         )
       : Promise.resolve(null),
+    // Streak-percentile rank (used for the "top X%" badge). Defensive:
+    // if the streak-cache columns aren't migrated yet, fall back to 0.
+    streak > 0
+      ? safeQuery(() => streakPercentile(streak), 0, "streak-pct")
+      : Promise.resolve(0),
   ]);
-  // Read the cached streak straight off the user row — it's
-  // maintained on every new rating via refreshUserStreak in
-  // /api/ratings, so avoids a full scan of the target's ratings on
-  // every profile view. (computeStreak was the slowest query on this
-  // page; we'd pull every rating row across the wire just to count.)
-  const streak = target.currentStreak ?? 0;
-  // Top X% percentile shown alongside the streak badge. Defensive: if the
-  // streak-cache columns aren't migrated yet, fall back to "no badge".
-  const streakPct = streak > 0
-    ? Math.max(1, 100 - (await safeQuery(() => streakPercentile(streak), 0, "streak-pct")))
-    : 0;
+
+  const followersCount = followerStat?.n ?? 0;
+  const followingCount = followingStat?.n ?? 0;
+  const streakPct = streak > 0 ? Math.max(1, 100 - streakPctRank) : 0;
   const followRow = followingViewer[0];
   const followState: "none" | "pending" | "accepted" = !followRow
     ? "none"
@@ -345,18 +359,14 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
                           ) : (
                             <div className="h-12 w-12 rounded bg-neutral-800" />
                           )}
-                          <span className="sm:hidden absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center">
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="white" aria-hidden>
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
+                          <span className="sm:hidden absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center text-white">
+                            <PlayIcon size={8} />
                           </span>
-                          <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors">
-                            <svg
+                          <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors text-white">
+                            <PlayIcon
+                              size={18}
                               className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden
-                            >
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
+                            />
                           </div>
                         </a>
                       ) : r.thumbnail ? (
