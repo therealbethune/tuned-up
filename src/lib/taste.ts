@@ -1,4 +1,4 @@
-import { db, ratings, songs, users, blocks } from "@/db";
+import { db, ratings, songs } from "@/db";
 import { sql, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -187,7 +187,3 @@ export async function findTasteTwins(
     agreement: Number(r.agreement) || 0,
   }));
 }
-
-// silence unused-import in case neither helper above is called.
-void users;
-void blocks;

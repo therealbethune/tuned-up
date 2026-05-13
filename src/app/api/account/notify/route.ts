@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { reportError } from "@/lib/report-error";
+import { memoryRateLimited, LIMITS } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ const FIELD_MAP = {
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const limited = memoryRateLimited(LIMITS.ACCOUNT, `notify:${userId}`);
+  if (limited) return limited;
 
   let body: unknown;
   try {

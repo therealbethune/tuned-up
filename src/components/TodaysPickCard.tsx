@@ -48,6 +48,7 @@ export function TodaysPickCard({ pick }: { pick: DailyPick }) {
               alt=""
               width={72}
               height={72}
+              sizes="72px"
               className="rounded h-16 w-16 sm:h-[72px] sm:w-[72px] object-cover ring-1 ring-neutral-800"
               priority
             />

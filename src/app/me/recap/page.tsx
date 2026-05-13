@@ -9,6 +9,7 @@ import { scoreLabel } from "@/lib/score-labels";
 import { encodeBase64Url } from "@/lib/encoding";
 import { ShareButton } from "@/components/ShareButton";
 import { isAlbumId } from "@/lib/songs";
+import { WEEK_MS } from "@/lib/time-constants";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function WeeklyRecapPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  const sevenDaysAgo = new Date(Date.now() - WEEK_MS);
 
   type WeekRow = {
     score: number;
@@ -144,6 +145,7 @@ export default async function WeeklyRecapPage() {
                         alt=""
                         width={48}
                         height={48}
+                        sizes="48px"
                         className="rounded h-12 w-12 object-cover shrink-0"
                       />
                     ) : (

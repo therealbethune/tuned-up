@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { and, desc, eq, gte, count, sql, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, likes, ratings, activities, users, songs, blocks } from "@/db";
+import { getBlockEdges } from "@/lib/block-edges";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
@@ -40,14 +41,7 @@ export async function GET(req: Request) {
 
   // Block-aware: strip likers on either side of a block edge so the
   // viewer doesn't see (and isn't visible to) anyone they've muted.
-  const blockEdges = await db
-    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-    .from(blocks)
-    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
-  const hiddenIds: string[] = [];
-  for (const b of blockEdges) {
-    hiddenIds.push(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
+  const { hiddenIds } = await getBlockEdges(userId);
 
   const rows = await db
     .select({

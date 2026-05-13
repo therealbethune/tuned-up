@@ -31,6 +31,18 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* .scrollbar-hide — visually hide the horizontal/vertical scrollbar
+   without disabling scroll behavior. Used on tight rails (streak
+   heatmap, FriendRecsRail) so the swipe affordance remains but the
+   bar doesn't eat 8-12px of vertical rhythm on macOS / Linux. */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Default keyboard-focus indicator for interactive elements. Apple
    App Store reviewers test on Mac with a keyboard during web review,
    and WCAG 2.5.5 requires a visible focus ring. Individual components

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { and, desc, eq, gte, inArray, sql, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, recommendations, users, songs, activities, blocks } from "@/db";
+import { getBlockEdges } from "@/lib/block-edges";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
@@ -19,14 +20,7 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   // Block-aware: hide recs from anyone on either side of a block edge.
-  const blockEdges = await db
-    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-    .from(blocks)
-    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
-  const hiddenIds: string[] = [];
-  for (const b of blockEdges) {
-    hiddenIds.push(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
+  const { hiddenIds } = await getBlockEdges(userId);
 
   const rows = await db
     .select({

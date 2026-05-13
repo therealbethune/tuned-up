@@ -333,14 +333,17 @@ export function RateButton({
             </div>
           </div>
 
-          {/* Optional vibe / mood tag. Renders as a small chip row;
+          {/* Optional vibe / mood tag. Renders as a chip row;
               tapping a selected chip clears it. Stored on the rating
-              row + displayed as a colored chip on the feed card. */}
+              row + displayed as a colored chip on the feed card.
+              min-h-9 → 36pt baseline; px-3 py-2 makes the touch
+              target ≥40pt across the chip without bloating the
+              modal vertically. */}
           <div className="space-y-1.5">
             <div className="text-[10px] uppercase tracking-wider text-neutral-500">
               Vibe (optional)
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {MOODS.map((m) => {
                 const active = mood === m.id;
                 return (
@@ -349,7 +352,7 @@ export function RateButton({
                     type="button"
                     onClick={() => setMood(active ? null : m.id)}
                     aria-pressed={active}
-                    className={`text-xs inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 min-h-7 border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
+                    className={`text-sm inline-flex items-center gap-1.5 rounded-full px-3 py-2 min-h-9 border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
                       active
                         ? m.className
                         : "border-neutral-800 bg-neutral-900 text-neutral-300 hover:border-neutral-700"

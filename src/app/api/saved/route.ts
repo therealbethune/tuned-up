@@ -1,8 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, gte } from "drizzle-orm";
 import { db, savedSongs, songs } from "@/db";
 import { reportError } from "@/lib/report-error";
+import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,22 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Rate-limit saves to prevent a stuck client from hammering the
+  // toggle. Counts the user's own saved_songs writes in the window.
+  const limited = await enforce(LIMITS.SAVES, async () => {
+    const [row] = await db
+      .select({ n: count() })
+      .from(savedSongs)
+      .where(
+        and(
+          eq(savedSongs.userId, userId),
+          gte(savedSongs.createdAt, windowStartDate(LIMITS.SAVES.windowSec)),
+        ),
+      );
+    return Number(row?.n ?? 0);
+  });
+  if (limited) return limited;
 
   let body: unknown;
   try {

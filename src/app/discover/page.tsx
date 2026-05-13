@@ -4,6 +4,7 @@ import { encodeBase64Url } from "@/lib/encoding";
 import { auth } from "@clerk/nextjs/server";
 import { desc, sql, gte, eq, ne, and, or } from "drizzle-orm";
 import { db, ratings, songs, users, follows, blocks } from "@/db";
+import { WEEK_MS, MONTH_MS } from "@/lib/time-constants";
 import { isAlbumId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
@@ -30,7 +31,7 @@ type DiscoverRow = {
 };
 
 async function trendingThisWeek(): Promise<DiscoverRow[]> {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = new Date(Date.now() - WEEK_MS);
   return safeQuery(
     () =>
       db
@@ -107,7 +108,7 @@ type WeeklyLeader = {
 // even if they're not following anyone yet.
 async function friendLeaderboardThisWeek(viewerId: string | null): Promise<WeeklyLeader[]> {
   if (!viewerId) return [];
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  const sevenDaysAgo = new Date(Date.now() - WEEK_MS);
   return safeQuery(
     () =>
       db
@@ -154,7 +155,7 @@ async function friendLeaderboardThisWeek(viewerId: string | null): Promise<Weekl
 // isn't already following. Good "who to follow" signal — they're
 // active and have rated enough that following them populates the feed.
 async function topReviewers(viewerId: string | null): Promise<TopReviewer[]> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(Date.now() - MONTH_MS);
 
   // Use an anti-join (LEFT JOIN + IS NULL) to exclude in one query
   // anyone the viewer already follows. The old two-step path pulled

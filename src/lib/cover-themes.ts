@@ -47,7 +47,7 @@ export const COVER_THEMES = [
   },
 ] as const;
 
-export type CoverThemeId = (typeof COVER_THEMES)[number]["id"];
+type CoverThemeId = (typeof COVER_THEMES)[number]["id"];
 
 const BY_ID = new Map(COVER_THEMES.map((t) => [t.id, t]));
 

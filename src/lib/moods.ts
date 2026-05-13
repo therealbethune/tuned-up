@@ -13,7 +13,7 @@ export const MOODS = [
   { id: "romantic", label: "Romantic", emoji: "💗", className: "bg-rose-500/15 text-rose-300 border-rose-500/40" },
 ] as const;
 
-export type MoodId = (typeof MOODS)[number]["id"];
+type MoodId = (typeof MOODS)[number]["id"];
 
 const MOOD_BY_ID = new Map(MOODS.map((m) => [m.id, m]));
 

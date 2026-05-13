@@ -2,10 +2,11 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { and, desc, eq, isNull, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, isNull, notInArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { encodeBase64Url } from "@/lib/encoding";
-import { db, activities, users, songs, blocks } from "@/db";
+import { db, activities, users, songs } from "@/db";
+import { getBlockEdges } from "@/lib/block-edges";
 import { relativeTime } from "@/lib/songs";
 import { FollowRequestActions } from "./FollowRequestActions";
 
@@ -108,14 +109,7 @@ export default async function ActivityPage() {
   // block edge with the viewer is hidden. Without this, a blocked user
   // can still notify you (e.g. by liking your rating) — defeats the
   // point of blocking per App Store Guideline 1.2.
-  const blockEdges = await db
-    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-    .from(blocks)
-    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
-  const hiddenIds: string[] = [];
-  for (const b of blockEdges) {
-    hiddenIds.push(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
+  const { hiddenIds } = await getBlockEdges(userId);
 
   const rows = await db
     .select({

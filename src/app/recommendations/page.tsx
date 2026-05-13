@@ -2,8 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { and, desc, eq, notInArray, or } from "drizzle-orm";
-import { db, recommendations, users, songs, blocks } from "@/db";
+import { and, desc, eq, notInArray } from "drizzle-orm";
+import { db, recommendations, users, songs } from "@/db";
+import { getBlockEdges } from "@/lib/block-edges";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RateButton } from "@/components/RateButton";
@@ -38,19 +39,7 @@ export default async function RecommendationsPage() {
 
   // Pull blocks first so we can exclude recs from anyone on either
   // side of a block edge in the same SELECT.
-  const blockEdges = await safeQuery(
-    () =>
-      db
-        .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-        .from(blocks)
-        .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId))),
-    [] as { blockerId: string; blockedId: string }[],
-    "recommendations-page-blocks",
-  );
-  const hiddenIds: string[] = [];
-  for (const b of blockEdges) {
-    hiddenIds.push(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
+  const { hiddenIds } = await getBlockEdges(userId);
 
   const rows: RecRow[] = await safeQuery(
     () =>

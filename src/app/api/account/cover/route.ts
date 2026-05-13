@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { isValidCoverTheme } from "@/lib/cover-themes";
+import { memoryRateLimited, LIMITS } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,8 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const limited = memoryRateLimited(LIMITS.ACCOUNT, `cover:${userId}`);
+  if (limited) return limited;
 
   const body = (await req.json().catch(() => ({}))) ?? {};
   const theme = body.theme === null ? null : body.theme;

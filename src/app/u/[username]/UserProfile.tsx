@@ -296,19 +296,22 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
   const cover = coverThemeFor(target.coverTheme);
   return (
     <div className="space-y-6">
-      {/* Cover banner — purely cosmetic gradient backdrop. The avatar
-          and stack of header info sit below; the avatar visually
-          overlaps the banner via -mt-12 to land in the classic
-          "profile picture sits on the cover" position. */}
+      {/* Cover banner — purely cosmetic gradient backdrop. The
+          avatar visually overlaps the banner via a negative margin
+          to land in the classic "profile picture sits on the cover"
+          position; the rest of the header info sits BELOW the banner
+          so the name + chips don't fight the gradient. */}
       <div className={`relative -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden h-28 sm:h-32 ${cover.css}`} aria-hidden />
       {/* Header: avatar + name + streak + follow */}
-      <div className="flex items-start gap-4 -mt-12">
-        <Avatar
-          imageUrl={target.imageUrl}
-          name={target.displayName || target.username}
-          seed={target.id}
-          size={80}
-        />
+      <div className="flex items-start gap-4">
+        <div className="-mt-12 shrink-0 rounded-full ring-4 ring-neutral-950">
+          <Avatar
+            imageUrl={target.imageUrl}
+            name={target.displayName || target.username}
+            seed={target.id}
+            size={80}
+          />
+        </div>
         <div className="flex-1 min-w-0 pt-1 space-y-1.5">
           <h1 className="text-3xl font-bold tracking-tight truncate leading-tight">
             {target.displayName || target.username}

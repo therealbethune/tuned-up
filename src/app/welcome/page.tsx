@@ -18,8 +18,8 @@ export default async function WelcomePage() {
   // Pre-load the page in three parallel queries:
   //
   //   - ratingsCount: seeds the "rate at least one song" gate so
-  //     rating via /import/spotify or coming back to /welcome with
-  //     existing ratings doesn't reset the counter to 0.
+  //     reloads or re-entries to /welcome don't reset the counter
+  //     when the user already has existing ratings.
   //   - existingFollows: lets us filter suggested users to people the
   //     viewer doesn't already follow. Before this, a user who'd
   //     followed Alice yesterday would still see Alice in step 2's

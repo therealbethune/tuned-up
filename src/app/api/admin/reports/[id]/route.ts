@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, reports, ratings, comments, activities } from "@/db";
 import { reportError } from "@/lib/report-error";
+import { memoryRateLimited, LIMITS } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ export async function POST(
   if (!isAdmin(userId)) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
+  const limited = memoryRateLimited(LIMITS.ACCOUNT, `admin-reports:${userId}`);
+  if (limited) return limited;
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "bad_id" }, { status: 400 });
 

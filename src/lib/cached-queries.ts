@@ -1,7 +1,8 @@
 import { cache } from "react";
-import { and, count, eq, isNull, notInArray, or } from "drizzle-orm";
-import { db, activities, blocks } from "@/db";
+import { and, count, eq, isNull, notInArray } from "drizzle-orm";
+import { db, activities } from "@/db";
 import { safeQuery } from "@/lib/safe-query";
+import { getBlockEdges } from "@/lib/block-edges";
 
 // Per-request memoized DB queries. React's `cache()` dedupes calls
 // inside a single server render — so even though both the page and
@@ -12,19 +13,7 @@ export const unreadActivityCount = cache(async (userId: string): Promise<number>
   // Block-aware: don't count activities authored by anyone the viewer
   // has blocked (or who blocked them). Keeps the bell badge honest
   // with what the user actually sees on /activity.
-  const blockEdges = await safeQuery(
-    () =>
-      db
-        .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-        .from(blocks)
-        .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId))),
-    [] as { blockerId: string; blockedId: string }[],
-    "cached-unread-blocks",
-  );
-  const hiddenIds: string[] = [];
-  for (const b of blockEdges) {
-    hiddenIds.push(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
+  const { hiddenIds } = await getBlockEdges(userId);
   const [row] = await safeQuery(
     () =>
       db

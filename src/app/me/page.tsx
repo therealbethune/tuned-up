@@ -94,11 +94,11 @@ export default async function MePage() {
           /recommendations and /settings. The pending-recs badge sits
           on the Recs link. Keep the link weights low so they don't
           compete with the profile header below. */}
-      <div className="flex justify-end gap-2 text-sm">
+      <div className="flex justify-end gap-1.5 sm:gap-2 text-sm flex-wrap">
         <Link
           href="/me/recap"
           aria-label="Your week in music"
-          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
+          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-2.5 sm:px-3 py-1.5 active:scale-95 transition-all"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="17" rx="2" />
@@ -109,7 +109,7 @@ export default async function MePage() {
         <Link
           href="/me/saved"
           aria-label="Saved for later"
-          className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
+          className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-2.5 sm:px-3 py-1.5 active:scale-95 transition-all"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
             <path d="M6 4h12v17l-6-4-6 4z" />
@@ -124,7 +124,7 @@ export default async function MePage() {
         <Link
           href="/recommendations"
           aria-label="Recommendations"
-          className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
+          className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-2.5 sm:px-3 py-1.5 active:scale-95 transition-all"
         >
           <PaperPlaneIcon size={14} />
           Recs
@@ -137,7 +137,7 @@ export default async function MePage() {
         <Link
           href="/settings"
           aria-label="Settings"
-          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
+          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-2.5 sm:px-3 py-1.5 active:scale-95 transition-all"
         >
           <SettingsIcon size={14} />
           Settings

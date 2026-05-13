@@ -1,11 +1,15 @@
+import { MS_PER_DAY } from "@/lib/time-constants";
+
 // GitHub-style 90-day rating heatmap. Each cell is one UTC day,
 // shaded by how many ratings the user logged that day. The data is
 // pre-computed server-side (single GROUP BY query) so this is a
 // pure-render component with no client work.
 //
-// Why 90 days? Long enough to show seasonality + streak depth, short
-// enough that 7 × 13 cells stay readable on a mobile width without
-// horizontal scroll.
+// Mobile behavior: at narrow widths the 13-column grid would crush
+// each cell down to ~16px and lose the visual rhythm. We instead let
+// the grid have a minimum cell size (12px) and put it in an x-scroll
+// container; the scrollbar disappears on iOS via webkit-scrollbar
+// hiding so it reads as a swipeable rail.
 
 export type HeatmapDay = {
   date: string; // YYYY-MM-DD UTC
@@ -27,7 +31,7 @@ function fillerForRange(rows: HeatmapDay[]): HeatmapDay[] {
     ),
   );
   for (let i = DAYS - 1; i >= 0; i--) {
-    const d = new Date(todayUtc.getTime() - i * 86_400_000);
+    const d = new Date(todayUtc.getTime() - i * MS_PER_DAY);
     const key = d.toISOString().slice(0, 10);
     out.push({ date: key, n: byDate.get(key) ?? 0 });
   }
@@ -64,23 +68,28 @@ export function StreakHeatmap({ days }: { days: HeatmapDay[] }) {
           {totalRated} ratings · {activeDays} active days
         </div>
       </div>
-      <div
-        className="grid gap-1"
-        style={{ gridTemplateColumns: `repeat(${WEEKS}, minmax(0, 1fr))` }}
-        role="img"
-        aria-label={`Daily rating activity. ${totalRated} ratings across ${activeDays} active days in the last 90 days.`}
-      >
-        {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-rows-7 gap-1">
-            {week.map((d) => (
-              <div
-                key={d.date}
-                title={`${d.date} — ${d.n} ${d.n === 1 ? "rating" : "ratings"}`}
-                className={`aspect-square rounded-sm ${levelClass(d.n)}`}
-              />
-            ))}
-          </div>
-        ))}
+      {/* Scroll-x on mobile so cells stay tappable + readable instead
+          of getting crushed to invisibility. The wrapper hides the
+          scrollbar visually (webkit-scrollbar:none in globals.css). */}
+      <div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">
+        <div
+          className="grid gap-1 min-w-fit"
+          style={{ gridTemplateColumns: `repeat(${WEEKS}, minmax(16px, 1fr))` }}
+          role="img"
+          aria-label={`Daily rating activity. ${totalRated} ratings across ${activeDays} active days in the last 90 days.`}
+        >
+          {weeks.map((week, wi) => (
+            <div key={wi} className="grid grid-rows-7 gap-1">
+              {week.map((d) => (
+                <div
+                  key={d.date}
+                  title={`${d.date} — ${d.n} ${d.n === 1 ? "rating" : "ratings"}`}
+                  className={`aspect-square rounded-sm ${levelClass(d.n)}`}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
       <div className="flex items-center gap-2 text-[10px] text-neutral-500">
         <span>Less</span>

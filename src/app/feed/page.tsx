@@ -2,8 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { and, desc, eq, inArray, lt, notInArray, sql, count, or } from "drizzle-orm";
-import { db, ratings, songs, users, follows, comments, likes, blocks, savedSongs } from "@/db";
+import { and, desc, eq, inArray, lt, notInArray, sql, count } from "drizzle-orm";
+import { db, ratings, songs, users, follows, comments, likes, savedSongs } from "@/db";
+import { getBlockEdges } from "@/lib/block-edges";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
@@ -88,15 +89,7 @@ export default async function FeedPage({
       [] as { id: string }[],
       "feed-follows",
     ),
-    safeQuery(
-      () =>
-        db
-          .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-          .from(blocks)
-          .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId))),
-      [] as { blockerId: string; blockedId: string }[],
-      "feed-blocks",
-    ),
+    getBlockEdges(userId),
     // Daily-pick card pinned to top of /feed. Suppressed when the
     // viewer is paginating (?before=…) so older pages don't show
     // today's prompt; only the first page of /feed does.
@@ -120,10 +113,7 @@ export default async function FeedPage({
   ]);
   const todayCount = Number(meStatus?.today ?? 0);
   const currentStreak = Number(meStatus?.streak ?? 0);
-  const hiddenIds = new Set<string>();
-  for (const b of blockEdges) {
-    hiddenIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
+  const { hiddenSet: hiddenIds } = blockEdges;
   const followedIds = followedRows.map((r) => r.id).filter((id) => !hiddenIds.has(id));
   followedIds.push(userId); // include self
 
@@ -427,7 +417,10 @@ export default async function FeedPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+      {/* Header stacks on mobile so the daily-counter pill never
+          competes for width with Surprise Me + Rate-a-song. On sm
+          (≥640px) the row collapses back to a single line. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="text-2xl font-bold">Feed</h1>
           {(todayCount > 0 || currentStreak > 0) && (
@@ -454,7 +447,7 @@ export default async function FeedPage({
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <SurpriseMeButton />
-          <Link href="/search" className="text-sm text-neutral-400 hover:text-white">+ Rate a song</Link>
+          <Link href="/search" className="text-sm text-neutral-400 hover:text-white whitespace-nowrap">+ Rate a song</Link>
         </div>
       </div>
 

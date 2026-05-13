@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { memoryRateLimited, LIMITS } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const limited = memoryRateLimited(LIMITS.SUGGESTIONS, `similar:${userId}`);
+  if (limited) return limited;
 
   const url = new URL(req.url);
   const songId = url.searchParams.get("songId") ?? "";

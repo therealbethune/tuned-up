@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, asc, eq, gte, inArray, sql, or, notInArray } from "drizzle-orm";
+import { getBlockEdges } from "@/lib/block-edges";
 import { randomUUID } from "node:crypto";
 import { db, comments, users, ratings, activities, songs, blocks } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
@@ -39,15 +40,7 @@ export async function GET(req: Request) {
   // Pull the viewer's block edges in parallel so we can strip out
   // comments from either side of a block. Blocking is two-way for
   // visibility per App Store 1.2.
-  const blockEdges = await db
-    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-    .from(blocks)
-    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
-  const hiddenIds = new Set<string>();
-  for (const b of blockEdges) {
-    hiddenIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
-  const hiddenList = Array.from(hiddenIds);
+  const { hiddenIds: hiddenList } = await getBlockEdges(userId);
 
   const rows = await db
     .select({
@@ -198,14 +191,7 @@ export async function POST(req: Request) {
   // comment notifications going to anyone the commenter has blocked
   // (or who blocked them) — a blocked user shouldn't be able to ping
   // their target via @mention or by replying to the target's comment.
-  const blockEdges = await db
-    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-    .from(blocks)
-    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
-  const notifyBlocked = new Set<string>();
-  for (const b of blockEdges) {
-    notifyBlocked.add(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
+  const { hiddenSet: notifyBlocked } = await getBlockEdges(userId);
 
   const MENTION_LIMIT = 10;
   const mentionedUsernames = extractMentions(text).slice(0, MENTION_LIMIT);

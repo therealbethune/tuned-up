@@ -59,7 +59,7 @@ export function NotifySettings({ initial }: { initial: Prefs }) {
         {ROWS.map((row) => {
           const on = prefs[row.key];
           return (
-            <li key={row.key} className="flex items-center gap-3 p-3">
+            <li key={row.key} className="flex items-center gap-4 py-3.5 px-3 min-h-14">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium">{row.label}</div>
                 <div className="text-xs text-neutral-400">{row.sublabel}</div>

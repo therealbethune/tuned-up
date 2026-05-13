@@ -34,6 +34,15 @@ export const LIMITS = {
   // Blocks toggle on/off; a few back-and-forth taps is fine but no
   // floods. Per-hour cap is generous and keeps churn bounded.
   BLOCKS: { max: 60, windowSec: 3600, bucket: "blocks" },
+  // Saves are user-driven bookmarks; tight enough to stop automated
+  // hammering but never in the way for normal interactive use.
+  SAVES: { max: 120, windowSec: 60, bucket: "saves" },
+  // Surprise + similar suggestions hit the DB harder than most reads.
+  // Cap at ~once per second per user so a stuck button can't DDoS us.
+  SUGGESTIONS: { max: 60, windowSec: 60, bucket: "suggestions" },
+  // Account preference patches (notify toggles, cover theme). High
+  // cap because users may flip several settings in a row.
+  ACCOUNT: { max: 60, windowSec: 60, bucket: "account" },
 } satisfies Record<string, RateLimit>;
 
 // Standard 429 response. The Retry-After header lets clients back off
@@ -72,4 +81,40 @@ export async function enforce(
 // every count() callback below but worth a one-liner.
 export function windowStartDate(windowSec: number): Date {
   return new Date(Date.now() - windowSec * 1000);
+}
+
+// In-memory token bucket for endpoints whose abuse vector doesn't fit
+// the DB-count pattern (suggestions GETs, settings patches, anything
+// without a natural per-user timestamp). Process-local, so across
+// multiple Netlify instances a determined attacker can multiply the
+// cap by the instance count — that's fine for these endpoints since
+// abuse is more "stuck client retrying" than "coordinated DDoS".
+const buckets = new Map<string, number[]>();
+export function memoryRateLimited(rl: RateLimit, key: string): NextResponse | null {
+  const now = Date.now();
+  const cutoff = now - rl.windowSec * 1000;
+  const arr = (buckets.get(key) ?? []).filter((t) => t >= cutoff);
+  if (arr.length >= rl.max) {
+    return NextResponse.json(
+      {
+        error: `Too many ${rl.bucket} too quickly. Try again in a moment.`,
+        retryAfterSec: rl.windowSec,
+        bucket: rl.bucket,
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rl.windowSec), "Cache-Control": "no-store" },
+      },
+    );
+  }
+  arr.push(now);
+  buckets.set(key, arr);
+  // Best-effort eviction: bounded growth across many users isn't
+  // realistic in practice but keep the map from leaking forever.
+  if (buckets.size > 5000) {
+    for (const [k, v] of buckets) {
+      if (v[v.length - 1] < cutoff) buckets.delete(k);
+    }
+  }
+  return null;
 }

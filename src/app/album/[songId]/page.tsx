@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
-import { db, songs, ratings, users, follows, blocks, savedSongs } from "@/db";
-import { or } from "drizzle-orm";
+import { db, songs, ratings, users, follows, savedSongs } from "@/db";
+import { getBlockEdges } from "@/lib/block-edges";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { scoreLabel } from "@/lib/score-labels";
@@ -48,7 +48,7 @@ export default async function AlbumPage({
     [song],
     rawRatings,
     followRows,
-    blockRows,
+    blockedIds,
     [savedRow],
   ] = await Promise.all([
     db.select().from(songs).where(eq(songs.id, songId)).limit(1),
@@ -87,11 +87,8 @@ export default async function AlbumPage({
           )
       : Promise.resolve([] as { followeeId: string }[]),
     userId
-      ? db
-          .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
-          .from(blocks)
-          .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)))
-      : Promise.resolve([] as { blockerId: string; blockedId: string }[]),
+      ? getBlockEdges(userId).then((b) => b.hiddenSet)
+      : Promise.resolve(new Set<string>()),
     userId
       ? db
           .select({ songId: savedSongs.songId })
@@ -106,10 +103,6 @@ export default async function AlbumPage({
   const acceptedFollows = new Set(followRows.map((r) => r.followeeId));
   // Blocked-out raters disappear from the reviewer rail + the average
   // score calculation, in both directions (mine of them + theirs of me).
-  const blockedIds = new Set<string>();
-  for (const b of blockRows) {
-    blockedIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
-  }
   const allRatings = rawRatings.filter((r) => {
     if (blockedIds.has(r.raterId)) return false;
     if (!r.isPrivate) return true;

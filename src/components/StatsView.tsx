@@ -5,6 +5,7 @@ import { db, ratings, songs, users } from "@/db";
 import { ytUrlForSongId } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { StreakHeatmap, type HeatmapDay } from "@/components/StreakHeatmap";
+import { QUARTER_MS } from "@/lib/time-constants";
 
 type User = typeof users.$inferSelect;
 
@@ -33,7 +34,7 @@ export default async function StatsView({
   const freezes = target.streakFreezeTokens ?? 0;
 
   // 90 days back from now (UTC midnight) — drives the heatmap window.
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000);
+  const ninetyDaysAgo = new Date(Date.now() - QUARTER_MS);
   const [aggResult, topSongs, topArtists, monthly, heatmapRows] = await Promise.all([
     db.execute(sql`
       SELECT
