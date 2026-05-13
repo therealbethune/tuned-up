@@ -24,8 +24,10 @@ export default async function Home() {
     avg: number;
     n: number;
   };
-  // 4 highest-average songs/albums with at least 2 ratings — small
-  // enough to keep the home page lean, big enough to suggest range.
+  // 4 highest-average songs/albums on the site — ordered by avg score
+  // then by rating count so a single high score doesn't lead the list
+  // over a 3-rating consensus. No "min ratings" gate so a fresh deploy
+  // with sparse data still shows something.
   const teasers = await safeQuery<Teaser[]>(
     () =>
       db
@@ -40,7 +42,6 @@ export default async function Home() {
         .from(ratings)
         .innerJoin(songs, eq(songs.id, ratings.songId))
         .groupBy(songs.id)
-        .having(sql`count(${ratings.songId}) >= 2`)
         .orderBy(desc(sql`avg(${ratings.score})`), desc(sql`count(${ratings.songId})`))
         .limit(4),
     [],
