@@ -66,7 +66,13 @@ function primaryArtist(s: string): string {
     .trim();
 }
 
-async function spotifySearch(token: string, query: string): Promise<string | null> {
+// Search returns trackId + first artist id (used downstream to fetch
+// the artist's genre tags). null on miss; failure-tolerant so the
+// caller's fallback chain isn't aborted by a flaky network.
+async function spotifySearch(
+  token: string,
+  query: string,
+): Promise<{ trackId: string; artistId: string | null } | null> {
   try {
     const res = await fetch(
       `${API}/search?type=track&limit=5&q=${encodeURIComponent(query)}`,
@@ -76,8 +82,31 @@ async function spotifySearch(token: string, query: string): Promise<string | nul
       },
     );
     if (!res.ok) return null;
-    const j: { tracks?: { items?: { id: string }[] } } = await res.json();
-    return j.tracks?.items?.[0]?.id ?? null;
+    const j: {
+      tracks?: {
+        items?: { id: string; artists?: { id: string }[] }[];
+      };
+    } = await res.json();
+    const item = j.tracks?.items?.[0];
+    if (!item) return null;
+    return { trackId: item.id, artistId: item.artists?.[0]?.id ?? null };
+  } catch {
+    return null;
+  }
+}
+
+// Look up the primary genre tag for a Spotify artist. Returns null on
+// any error — the genre column on songs is optional and we don't want
+// a transient API hiccup to block the rating-side caching path.
+async function spotifyArtistGenre(token: string, artistId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API}/artists/${encodeURIComponent(artistId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const j: { genres?: string[] } = await res.json();
+    return j.genres?.[0] ?? null;
   } catch {
     return null;
   }
@@ -86,10 +115,12 @@ async function spotifySearch(token: string, query: string): Promise<string | nul
 // Search Spotify for a track matching the given title + artist; return the
 // bare track id ("4cOdK2wGLETKBW3PvgPWqT") or null if nothing matches.
 // Tries progressively looser queries so featured-artist tracks still resolve.
-export async function resolveSpotifyTrackId(
+// Internal: same logic as resolveSpotifyTrackId but returns the
+// artistId too so the genre lookup can chain off the same search.
+async function resolveSpotifyTrackAndArtist(
   title: string,
   artist: string,
-): Promise<string | null> {
+): Promise<{ trackId: string; artistId: string | null } | null> {
   if (!spotifyServerConfigured()) return null;
   const token = await getAppAccessToken();
   const cleanTitle = cleanForSearch(title);
@@ -111,6 +142,14 @@ export async function resolveSpotifyTrackId(
   return null;
 }
 
+export async function resolveSpotifyTrackId(
+  title: string,
+  artist: string,
+): Promise<string | null> {
+  const hit = await resolveSpotifyTrackAndArtist(title, artist);
+  return hit?.trackId ?? null;
+}
+
 // Cache the resolved Spotify track id on the songs row so we don't hit the
 // search API on every page render. Best-effort — failures are swallowed.
 export async function ensureSpotifyTrackIdCached(
@@ -120,18 +159,34 @@ export async function ensureSpotifyTrackIdCached(
 ): Promise<string | null> {
   try {
     const [existing] = await db
-      .select({ id: songs.id, spotifyTrackId: songs.spotifyTrackId })
+      .select({
+        id: songs.id,
+        spotifyTrackId: songs.spotifyTrackId,
+        genre: songs.genre,
+      })
       .from(songs)
       .where(eq(songs.id, songId));
-    if (existing?.spotifyTrackId) return existing.spotifyTrackId;
-    const resolved = await resolveSpotifyTrackId(title, artist);
-    if (resolved) {
-      await db
-        .update(songs)
-        .set({ spotifyTrackId: resolved })
-        .where(eq(songs.id, songId));
+    if (existing?.spotifyTrackId && existing.genre) return existing.spotifyTrackId;
+
+    const hit = await resolveSpotifyTrackAndArtist(title, artist);
+    if (!hit) return existing?.spotifyTrackId ?? null;
+
+    // Fetch the genre off the artist endpoint. Done conditionally so
+    // re-caching a track whose genre is already set doesn't ping the
+    // /artists endpoint twice.
+    let genre: string | null = existing?.genre ?? null;
+    if (!genre && hit.artistId) {
+      const token = await getAppAccessToken();
+      genre = await spotifyArtistGenre(token, hit.artistId);
     }
-    return resolved;
+
+    const patch: Record<string, string | null> = {};
+    if (!existing?.spotifyTrackId) patch.spotifyTrackId = hit.trackId;
+    if (!existing?.genre && genre) patch.genre = genre;
+    if (Object.keys(patch).length > 0) {
+      await db.update(songs).set(patch).where(eq(songs.id, songId));
+    }
+    return hit.trackId;
   } catch {
     return null;
   }

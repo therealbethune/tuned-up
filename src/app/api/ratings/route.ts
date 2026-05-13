@@ -16,6 +16,7 @@ import { encodeBase64Url } from "@/lib/encoding";
 import { extractMentions } from "@/lib/mentions";
 import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 import { reportError } from "@/lib/report-error";
+import { isValidMood } from "@/lib/moods";
 
 export const runtime = "nodejs";
 
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   // Guard against malformed JSON bodies — bare `await req.json()` throws
   // a 500 instead of a 400, which then crashes the route + spams Sentry.
   const body = await req.json().catch(() => null);
-  const { song, score, review } = body ?? {};
+  const { song, score, review, mood: rawMood } = body ?? {};
   if (!song?.id || !song.title || !song.artist) {
     return NextResponse.json({ error: "invalid song" }, { status: 400 });
   }
@@ -141,13 +142,25 @@ export async function POST(req: Request) {
     .limit(1);
   const isNewRating = !prior;
 
+  // Optional mood tag — validated against the constrained palette so
+  // hostile clients can't smuggle arbitrary strings onto rating rows.
+  const mood = isValidMood(rawMood) ? rawMood : null;
+
   const now = new Date();
   await db
     .insert(ratings)
-    .values({ userId, songId: song.id, score: Math.round(s), review: review ?? null, createdAt: now, updatedAt: now })
+    .values({
+      userId,
+      songId: song.id,
+      score: Math.round(s),
+      review: review ?? null,
+      mood,
+      createdAt: now,
+      updatedAt: now,
+    })
     .onConflictDoUpdate({
       target: [ratings.userId, ratings.songId],
-      set: { score: Math.round(s), review: review ?? null, updatedAt: now },
+      set: { score: Math.round(s), review: review ?? null, mood, updatedAt: now },
     });
 
   // Clear the save-for-later bookmark for this song (if one exists) —

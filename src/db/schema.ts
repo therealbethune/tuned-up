@@ -22,6 +22,10 @@ export const users = pgTable("users", {
   // and counts through, so a single missed day doesn't reset the streak.
   // Surfaced as "freezes available" on /me and the streak warning push.
   streakFreezeTokens: integer("streak_freeze_tokens").notNull().default(0),
+  // Cosmetic gradient theme for the profile cover banner. Constrained
+  // to a known palette (see lib/cover-themes.ts) so we don't have to
+  // process user uploads or moderate them. null = default emerald.
+  coverTheme: text("cover_theme"),
   // Per-category push notification preferences. All default true so we
   // don't silently break existing subscriptions on column add. The push
   // helper consults these flags before calling the web-push provider.
@@ -48,6 +52,11 @@ export const songs = pgTable("songs", {
   // Resolved Spotify track id (just the bare id, no `spotify:` prefix). Set
   // once via the Spotify Search API the first time we need a deep link.
   spotifyTrackId: text("spotify_track_id"),
+  // Primary genre tag harvested from Spotify's artist endpoint (first
+  // genre on the artist). Populated lazily alongside spotifyTrackId.
+  // Lower-case, hyphen-separated as Spotify returns ("indie-rock",
+  // "pop", "k-pop"). null when uncached or untagged.
+  genre: text("genre"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -56,6 +65,11 @@ export const ratings = pgTable("ratings", {
   songId: text("song_id").notNull().references(() => songs.id, { onDelete: "cascade" }),
   score: integer("score").notNull(),
   review: text("review"),
+  // Quick "vibe" tag chosen on the rate modal. Constrained client-side
+  // to a known palette (hype / chill / sad / hype-up / nostalgic / fun /
+  // angry / focus) so we can render a colored chip on the feed card +
+  // group by mood on the stats page. null when the user didn't pick one.
+  mood: text("mood"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [

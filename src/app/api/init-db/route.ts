@@ -207,6 +207,10 @@ const STATEMENTS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_taste_matches" boolean NOT NULL DEFAULT true`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_streak" boolean NOT NULL DEFAULT true`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "streak_freeze_tokens" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "genre" text`,
+  `CREATE INDEX IF NOT EXISTS "songs_genre_idx" ON "songs" USING btree ("genre")`,
+  `ALTER TABLE "ratings" ADD COLUMN IF NOT EXISTS "mood" text`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cover_theme" text`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

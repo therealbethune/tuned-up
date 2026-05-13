@@ -25,11 +25,13 @@ import { SaveLaterButton } from "@/components/SaveLaterButton";
 import { TodaysPickCard } from "@/components/TodaysPickCard";
 import { getDailyPick } from "@/lib/daily-pick";
 import { SurpriseMeButton } from "@/components/SurpriseMeButton";
+import { FirstFeedTour } from "@/components/FirstFeedTour";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
 import { encodeBase64Url } from "@/lib/encoding";
 import { renderWithMentions } from "@/lib/mentions";
+import { moodFor } from "@/lib/moods";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +131,7 @@ export default async function FeedPage({
     ratingUserId: string;
     score: number;
     review: string | null;
+    mood: string | null;
     createdAt: Date;
     songId: string;
     title: string;
@@ -150,6 +153,7 @@ export default async function FeedPage({
               ratingUserId: ratings.userId,
               score: ratings.score,
               review: ratings.review,
+              mood: ratings.mood,
               createdAt: ratings.createdAt,
               songId: ratings.songId,
               title: songs.title,
@@ -206,6 +210,7 @@ export default async function FeedPage({
             ratingUserId: ratings.userId,
             score: ratings.score,
             review: ratings.review,
+            mood: ratings.mood,
             createdAt: ratings.createdAt,
             songId: ratings.songId,
             title: songs.title,
@@ -455,6 +460,8 @@ export default async function FeedPage({
 
       {dailyPick && <TodaysPickCard pick={dailyPick} />}
 
+      <FirstFeedTour />
+
       <ConnectMusicBanner />
 
       <FriendRecsRail recs={friendRecs} />
@@ -599,10 +606,27 @@ export default async function FeedPage({
                     </div>
                   </div>
                 </div>
-                {it.review && (
-                  <p className="mt-3 text-sm text-neutral-300 whitespace-pre-wrap break-words">
-                    {renderWithMentions(it.review)}
-                  </p>
+                {(it.mood || it.review) && (
+                  <div className="mt-3 space-y-2">
+                    {(() => {
+                      const m = moodFor(it.mood);
+                      if (!m) return null;
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 border ${m.className}`}
+                          title={`Vibe: ${m.label}`}
+                        >
+                          <span aria-hidden>{m.emoji}</span>
+                          {m.label}
+                        </span>
+                      );
+                    })()}
+                    {it.review && (
+                      <p className="text-sm text-neutral-300 whitespace-pre-wrap break-words">
+                        {renderWithMentions(it.review)}
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {/* "Other friends who rated this" avatar stack — collapsed

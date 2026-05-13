@@ -10,6 +10,7 @@ import { OwnRatingForm } from "@/components/OwnRatingForm";
 import { CommentSection } from "@/components/CommentSection";
 import { scoreLabel } from "@/lib/score-labels";
 import { encodeBase64Url } from "@/lib/encoding";
+import { coverThemeFor } from "@/lib/cover-themes";
 import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
@@ -292,10 +293,16 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     myLikes = new Set(myLikeRows.map((l) => l.songId));
   }
 
+  const cover = coverThemeFor(target.coverTheme);
   return (
     <div className="space-y-6">
+      {/* Cover banner — purely cosmetic gradient backdrop. The avatar
+          and stack of header info sit below; the avatar visually
+          overlaps the banner via -mt-12 to land in the classic
+          "profile picture sits on the cover" position. */}
+      <div className={`relative -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden h-28 sm:h-32 ${cover.css}`} aria-hidden />
       {/* Header: avatar + name + streak + follow */}
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-4 -mt-12">
         <Avatar
           imageUrl={target.imageUrl}
           name={target.displayName || target.username}

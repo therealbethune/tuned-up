@@ -9,6 +9,7 @@ import { AppleMusicAccountCard } from "@/components/AppleMusicAccountCard";
 import { ProfilePictureSection } from "@/components/ProfilePictureSection";
 import { BlockedUsersList } from "@/components/BlockedUsersList";
 import { NotifySettings } from "@/components/NotifySettings";
+import { CoverThemePicker } from "@/components/CoverThemePicker";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,8 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-2">Connected accounts</h2>
         <AppleMusicAccountCard />
       </div>
+
+      <CoverThemePicker initial={me.coverTheme ?? null} />
 
       <NotifySettings
         initial={{

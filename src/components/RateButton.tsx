@@ -12,6 +12,7 @@ import { scoreLabel } from "@/lib/score-labels";
 import { isAlbumId } from "@/lib/songs";
 import { MentionInput } from "@/components/MentionInput";
 import { encodeBase64Url } from "@/lib/encoding";
+import { MOODS } from "@/lib/moods";
 
 type FriendRating = {
   userId: string;
@@ -38,16 +39,19 @@ export function RateButton({
   song,
   initialScore,
   initialReview,
+  initialMood,
 }: {
   song: SongResult;
   initialScore?: number | null;
   initialReview?: string | null;
+  initialMood?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [show, setShow] = useState(false); // controls the slide-in state
   const [scoreText, setScoreText] = useState<string>(String(initialScore ?? ""));
   const [review, setReview] = useState<string>(initialReview ?? "");
+  const [mood, setMood] = useState<string | null>(initialMood ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [friends, setFriends] = useState<FriendRating[] | null>(null);
@@ -156,7 +160,7 @@ export function RateButton({
       const res = await fetch("/api/ratings", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ song, score, review: review.trim() || null }),
+        body: JSON.stringify({ song, score, review: review.trim() || null, mood }),
       });
       if (res.ok) {
         router.refresh();
@@ -326,6 +330,36 @@ export function RateButton({
               ) : (
                 <div className="text-sm text-neutral-500">Type your score</div>
               )}
+            </div>
+          </div>
+
+          {/* Optional vibe / mood tag. Renders as a small chip row;
+              tapping a selected chip clears it. Stored on the rating
+              row + displayed as a colored chip on the feed card. */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] uppercase tracking-wider text-neutral-500">
+              Vibe (optional)
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {MOODS.map((m) => {
+                const active = mood === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setMood(active ? null : m.id)}
+                    aria-pressed={active}
+                    className={`text-xs inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 min-h-7 border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
+                      active
+                        ? m.className
+                        : "border-neutral-800 bg-neutral-900 text-neutral-300 hover:border-neutral-700"
+                    }`}
+                  >
+                    <span aria-hidden>{m.emoji}</span>
+                    {m.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
