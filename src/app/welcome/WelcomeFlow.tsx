@@ -261,7 +261,8 @@ export function WelcomeFlow({
                     </div>
                     <button
                       onClick={() => toggleFollow(u.username)}
-                      className={`rounded-full px-4 py-1.5 text-sm font-medium ${
+                      aria-pressed={isFollowing}
+                      className={`rounded-full px-4 py-1.5 text-sm font-medium active:scale-95 transition-transform ${
                         isFollowing
                           ? "border border-neutral-700 text-neutral-200 hover:bg-neutral-900"
                           : "bg-white text-black hover:bg-neutral-200"
