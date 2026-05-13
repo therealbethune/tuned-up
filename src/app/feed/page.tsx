@@ -462,7 +462,7 @@ export default async function FeedPage({
       {items.length === 0 ? (
         <EmptyFeed userId={userId} followedIds={followedIds} />
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2.5 sm:space-y-3">
           {items.map((it, idx) => {
             const url = ytUrlForSongId(it.songId);
             const myScore = myRatingsMap.get(it.songId) ?? null;

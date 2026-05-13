@@ -74,7 +74,7 @@ export function ShareButton({
     <>
       <button
         onClick={nativeShare}
-        className="text-sm text-neutral-400 hover:text-white inline-flex items-center gap-1.5 -my-1 px-1.5 py-1 rounded-md active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
+        className="text-sm text-neutral-400 hover:text-white inline-flex items-center gap-1.5 min-h-9 px-2 py-1.5 rounded-md active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
         title="Share rating"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>

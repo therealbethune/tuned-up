@@ -69,7 +69,7 @@ export function LikeButton({
         aria-pressed={liked}
         aria-label={liked ? "Unlike" : "Like"}
         title={liked ? "Unlike" : "Like"}
-        className={`inline-flex items-center text-sm transition-all px-1.5 py-1 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
+        className={`inline-flex items-center justify-center text-sm transition-all min-h-9 min-w-9 px-2 py-1.5 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
           liked
             ? "text-rose-400 hover:text-rose-300"
             : "text-neutral-400 hover:text-white"

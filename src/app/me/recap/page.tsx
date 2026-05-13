@@ -105,14 +105,14 @@ export default async function WeeklyRecapPage() {
         </div>
       ) : (
         <>
-          <section className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
+          <section className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-3 sm:p-4">
               <div className="text-3xl font-bold tabular-nums">{total}</div>
               <div className="text-[11px] uppercase tracking-wider text-neutral-500 mt-1">
                 {total === 1 ? "rating" : "ratings"}
               </div>
             </div>
-            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-3 sm:p-4">
               <div className={`text-3xl font-bold tabular-nums ${scoreLabel(avg).color}`}>
                 {avg}
               </div>
@@ -120,7 +120,7 @@ export default async function WeeklyRecapPage() {
                 Avg score
               </div>
             </div>
-            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-3 sm:p-4">
               <div className="text-3xl font-bold tabular-nums">{top5[0]?.score ?? "—"}</div>
               <div className="text-[11px] uppercase tracking-wider text-neutral-500 mt-1">
                 Best

@@ -123,7 +123,7 @@ export function ReportButton({
         className={
           className ??
           (compact
-            ? "inline-flex items-center justify-center h-8 w-8 min-h-8 min-w-8 rounded-full text-neutral-500 hover:text-white hover:bg-neutral-800 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
+            ? "inline-flex items-center justify-center h-9 w-9 min-h-9 min-w-9 rounded-full text-neutral-500 hover:text-white hover:bg-neutral-800 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
             : "inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-red-400 px-2 py-1 rounded-md transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40")
         }
       >
