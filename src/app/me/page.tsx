@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { and, eq, count } from "drizzle-orm";
-import { db, users, recommendations } from "@/db";
+import { db, users, recommendations, savedSongs } from "@/db";
 import UserProfile from "../u/[username]/UserProfile";
 import { PushBanner } from "@/components/PushBanner";
 import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
@@ -55,23 +55,35 @@ export default async function MePage() {
     );
   }
 
-  // Pending-recs count for the toolbar badge. The remaining /me
-  // queries live inside UserProfile (which renders below).
-  const recStatRows = await safeQuery(
-    () =>
-      db
-        .select({ n: count() })
-        .from(recommendations)
-        .where(
-          and(
-            eq(recommendations.toUserId, userId),
-            eq(recommendations.status, "pending"),
+  // Toolbar badges — pending-rec count + saved-songs count. Fan out
+  // in parallel since they're both small + independent.
+  const [recStatRows, savedStatRows] = await Promise.all([
+    safeQuery(
+      () =>
+        db
+          .select({ n: count() })
+          .from(recommendations)
+          .where(
+            and(
+              eq(recommendations.toUserId, userId),
+              eq(recommendations.status, "pending"),
+            ),
           ),
-        ),
-    [] as { n: number }[],
-    "me-pending-recs",
-  );
+      [] as { n: number }[],
+      "me-pending-recs",
+    ),
+    safeQuery(
+      () =>
+        db
+          .select({ n: count() })
+          .from(savedSongs)
+          .where(eq(savedSongs.userId, userId)),
+      [] as { n: number }[],
+      "me-saved-count",
+    ),
+  ]);
   const pendingRecs = Number(recStatRows[0]?.n ?? 0);
+  const savedCount = Number(savedStatRows[0]?.n ?? 0);
 
   return (
     <div className="space-y-6">
@@ -83,12 +95,17 @@ export default async function MePage() {
         <Link
           href="/me/saved"
           aria-label="Saved for later"
-          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
+          className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
             <path d="M6 4h12v17l-6-4-6 4z" />
           </svg>
           Saved
+          {savedCount > 0 && (
+            <span className="ml-1 inline-flex items-center justify-center rounded-full bg-amber-500/20 text-amber-200 text-[10px] font-bold tabular-nums px-1.5 h-4 min-w-4">
+              {savedCount > 99 ? "99+" : savedCount}
+            </span>
+          )}
         </Link>
         <Link
           href="/recommendations"
