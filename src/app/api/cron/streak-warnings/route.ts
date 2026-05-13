@@ -156,40 +156,52 @@ export async function POST(req: Request) {
     }
   }
 
-  for (const c of candidates) {
-    if (ratedTodayBy.has(c.id)) continue;
-    // Skip if cached streak is already 0 — nothing to lose.
-    if (c.cachedStreak < 1) continue;
-    // Guard against the stale-cache case: if they didn't rate yesterday
-    // either, their streak is already broken — don't send a misleading
-    // "your streak is at risk" warning. (currentStreak won't reflect
-    // the break until they rate again; this is the cheapest backstop.)
-    if (!ratedYesterdayBy.has(c.id)) continue;
+  // Filter to the cohort that should actually be warned, then fan out
+  // pushes + DB stamps in parallel. The previous sequential for-loop
+  // burned ~200ms per user × N users (push + DB roundtrip each). At
+  // 100 candidates that was 20s of wall-clock cron time; the cron
+  // budget is bounded so this scaled the function dangerously close
+  // to its timeout. Each user is independent — Promise.allSettled
+  // lets us proceed past flaky push providers without aborting the
+  // batch.
+  const toWarn = candidates.filter(
+    (c) =>
+      !ratedTodayBy.has(c.id) &&
+      c.cachedStreak >= 1 &&
+      // Guard against the stale-cache case: if they didn't rate
+      // yesterday either, their streak is already broken — don't send
+      // a misleading "your streak is at risk" warning.
+      ratedYesterdayBy.has(c.id),
+  );
 
-    try {
+  await Promise.allSettled(
+    toWarn.map(async (c) => {
       const isUrgent = c.stage === "urgent";
-      await sendPushToUser(c.id, {
-        title: isUrgent
-          ? `⏰ 1 hour left — save your ${c.cachedStreak}-day streak`
-          : `🔥 Your ${c.cachedStreak}-day streak is at risk`,
-        body: isUrgent
-          ? "Rate one song before midnight or it resets to 0."
-          : "Rate a song before midnight to keep it going.",
-        url: "/search",
-        tag: `streak-warning:${c.id}:${c.todayStr}:${c.stage}`,
-      });
-      // Stamp the highest stage we've sent today. "primary" → todayStr;
-      // "urgent" → `${todayStr}:urgent` so the dedup check above sees it.
-      const stamp = isUrgent ? `${c.todayStr}:urgent` : c.todayStr;
-      await db
-        .update(users)
-        .set({ lastStreakWarnDate: stamp })
-        .where(eq(users.id, c.id));
-      warned++;
-    } catch (e) {
-      errors.push(`${c.id}: push failed — ${(e as Error).message}`);
-    }
-  }
+      try {
+        await sendPushToUser(c.id, {
+          title: isUrgent
+            ? `⏰ 1 hour left — save your ${c.cachedStreak}-day streak`
+            : `🔥 Your ${c.cachedStreak}-day streak is at risk`,
+          body: isUrgent
+            ? "Rate one song before midnight or it resets to 0."
+            : "Rate a song before midnight to keep it going.",
+          url: "/search",
+          tag: `streak-warning:${c.id}:${c.todayStr}:${c.stage}`,
+        });
+        // Stamp the highest stage we've sent today. "primary" →
+        // todayStr; "urgent" → `${todayStr}:urgent` so the dedup
+        // check above sees it.
+        const stamp = isUrgent ? `${c.todayStr}:urgent` : c.todayStr;
+        await db
+          .update(users)
+          .set({ lastStreakWarnDate: stamp })
+          .where(eq(users.id, c.id));
+        warned++;
+      } catch (e) {
+        errors.push(`${c.id}: push failed — ${(e as Error).message}`);
+      }
+    }),
+  );
 
   return NextResponse.json({
     ok: true,
