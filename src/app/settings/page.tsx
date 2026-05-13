@@ -114,6 +114,17 @@ export default async function SettingsPage({
         />
         <AppleMusicAccountCard />
       </div>
+
+      {/* Legal footer — Apple App Store Connect requires both URLs in
+          the listing, and reviewers expect them to be reachable from
+          inside the app too (Guideline 5.1.1, 5.1.2). Keeping them
+          here puts them one tap from anywhere the user already needs
+          to go (Settings is the most-visited destination from /me). */}
+      <footer className="pt-6 border-t border-neutral-800 flex flex-wrap gap-x-4 gap-y-2 text-xs text-neutral-500">
+        <Link href="/legal/privacy" className="hover:text-white">Privacy</Link>
+        <Link href="/legal/terms" className="hover:text-white">Terms</Link>
+        <a href="mailto:support@tuned-up.com" className="hover:text-white">support@tuned-up.com</a>
+      </footer>
     </div>
   );
 }

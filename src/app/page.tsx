@@ -69,6 +69,16 @@ export default function Home() {
           </div>
         </Show>
       </div>
+
+      {/* Legal footer for logged-out visitors. The App Store reviewer
+          lands here from the App Store Connect "Marketing URL" field,
+          so the privacy + terms links must be reachable from this
+          surface without signing in. Same hygiene as Settings. */}
+      <footer className="pt-10 mt-4 border-t border-neutral-800/60 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
+        <Link href="/legal/privacy" className="hover:text-white">Privacy</Link>
+        <Link href="/legal/terms" className="hover:text-white">Terms</Link>
+        <a href="mailto:support@tuned-up.com" className="hover:text-white">support@tuned-up.com</a>
+      </footer>
     </div>
   );
 }
