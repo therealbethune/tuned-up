@@ -1,18 +1,54 @@
 import { Show, SignUpButton } from "@clerk/nextjs";
 import Link from "next/link";
+import Image from "next/image";
+import { desc, eq, sql } from "drizzle-orm";
+import { db, ratings, songs } from "@/db";
 import { TunedUpMark } from "@/components/icons";
+import { safeQuery } from "@/lib/safe-query";
+import { scoreLabel } from "@/lib/score-labels";
+import { encodeBase64Url } from "@/lib/encoding";
 
-// Logged-out landing page. Until now this was a Tailwind-default
-// stack with a flat <h1> + <p> — it carried zero brand. Now: an
-// emerald radial-gradient hero with the wordmark sized up, the
-// headline rendered as a gradient-clipped text fill, and a teaser
-// "mock card" preview so visitors immediately see what they're
-// signing up for.
-export default function Home() {
+export const revalidate = 600;
+
+// Logged-out landing page. Server-rendered so we can splash real
+// "rated highly recently" content under the hero — gives App Store
+// reviewers + first-time visitors a glimpse of actual taste in the
+// app instead of fake teaser cards. The query is cached for 10
+// minutes (revalidate = 600) so the home page doesn't slam the DB.
+export default async function Home() {
+  type Teaser = {
+    songId: string;
+    title: string;
+    artist: string;
+    thumbnail: string | null;
+    avg: number;
+    n: number;
+  };
+  // 4 highest-average songs/albums with at least 2 ratings — small
+  // enough to keep the home page lean, big enough to suggest range.
+  const teasers = await safeQuery<Teaser[]>(
+    () =>
+      db
+        .select({
+          songId: songs.id,
+          title: songs.title,
+          artist: songs.artist,
+          thumbnail: songs.thumbnail,
+          avg: sql<number>`round(avg(${ratings.score}))::int`,
+          n: sql<number>`count(${ratings.songId})::int`,
+        })
+        .from(ratings)
+        .innerJoin(songs, eq(songs.id, ratings.songId))
+        .groupBy(songs.id)
+        .having(sql`count(${ratings.songId}) >= 2`)
+        .orderBy(desc(sql`avg(${ratings.score})`), desc(sql`count(${ratings.songId})`))
+        .limit(4),
+    [],
+    "home-teaser",
+  );
+
   return (
     <div className="relative isolate">
-      {/* Background glow — clips to body via the parent's overflow.
-          Radial gradient stacks under everything else on the page. */}
       <div
         aria-hidden
         className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,theme(colors.emerald.500/0.18),transparent_55%)]"
@@ -34,9 +70,6 @@ export default function Home() {
           </p>
           <div className="flex gap-3 flex-wrap">
             <Show when="signed-out">
-              {/* Plain string child — see comment in layout.tsx
-                  SignedOutNav. Clerk wraps it in a default button;
-                  the `.clerk-landing-primary` CSS rule styles it. */}
               <span className="clerk-landing-primary inline-flex">
                 <SignUpButton forceRedirectUrl="/welcome">Get started</SignUpButton>
               </span>
@@ -58,15 +91,68 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Teaser stack — three rotated card silhouettes that imply
-            "your feed will look like this". No real data; just enough
-            to set expectations and add visual weight. */}
+        {/* Real top-rated rail. Each card is a small clickable preview of
+            an actual rating page — proves the app is alive to a fresh
+            visitor and gives reviewers a concrete sample to inspect. */}
+        {teasers.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-sm uppercase tracking-wider text-neutral-500">Rated highly on Tuned Up</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {teasers.map((t) => (
+                <Link
+                  key={t.songId}
+                  href={`/album/${encodeBase64Url(t.songId)}`}
+                  className="group rounded-xl border border-neutral-800 bg-neutral-900/60 hover:border-neutral-700 transition-colors overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
+                >
+                  <div className="relative">
+                    {t.thumbnail ? (
+                      <Image
+                        src={t.thumbnail}
+                        alt=""
+                        width={240}
+                        height={240}
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                        className="w-full aspect-square object-cover"
+                      />
+                    ) : (
+                      <div className="w-full aspect-square bg-neutral-800" />
+                    )}
+                    <span
+                      className={`absolute top-2 right-2 rounded-md bg-black/80 backdrop-blur-sm px-2 py-0.5 text-sm font-bold tabular-nums ${scoreLabel(t.avg).color}`}
+                    >
+                      {t.avg}
+                    </span>
+                  </div>
+                  <div className="p-3 space-y-0.5">
+                    <div className="text-sm font-semibold truncate" title={t.title}>{t.title}</div>
+                    <div className="text-xs text-neutral-400 truncate" title={t.artist}>{t.artist}</div>
+                    <div className="text-[10px] text-neutral-500 tabular-nums pt-1">
+                      {t.n} {t.n === 1 ? "rating" : "ratings"}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Tiny brand-positioning row beneath the rail — concrete claims
+            that map to features (no marketing fluff). */}
         <Show when="signed-out">
-          <div className="relative h-48 sm:h-56 max-w-md">
-            <TeaserCard rotate="-rotate-3" offset="left-0 top-2"          score={92} label="Banger"   title="Chase Atlantic" artist="Like a Rockstar" />
-            <TeaserCard rotate="rotate-1"  offset="left-4 top-0"          score={71} label="Solid"    title="Wet Leg"        artist="Catch These Fists" />
-            <TeaserCard rotate="rotate-3"  offset="left-8 top-4"          score={88} label="Loved"    title="Phoebe Bridgers" artist="Funeral" />
-          </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <li className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
+              <div className="text-emerald-300 text-xs uppercase tracking-wider mb-1">Granular</div>
+              <p className="text-neutral-200">Rate every song 1–100. Stars are too blunt; we use the whole keyboard.</p>
+            </li>
+            <li className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
+              <div className="text-emerald-300 text-xs uppercase tracking-wider mb-1">Social</div>
+              <p className="text-neutral-200">Follow friends, recommend songs back and forth, see whose taste lines up with yours.</p>
+            </li>
+            <li className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
+              <div className="text-emerald-300 text-xs uppercase tracking-wider mb-1">Private by default</div>
+              <p className="text-neutral-200">Switch your profile to private and only accepted followers see your ratings.</p>
+            </li>
+          </ul>
         </Show>
       </div>
 
@@ -79,48 +165,6 @@ export default function Home() {
         <Link href="/legal/terms" className="hover:text-white">Terms</Link>
         <a href="mailto:support@tuned-up.com" className="hover:text-white">support@tuned-up.com</a>
       </footer>
-    </div>
-  );
-}
-
-function TeaserCard({
-  rotate,
-  offset,
-  score,
-  label,
-  title,
-  artist,
-}: {
-  rotate: string;
-  offset: string;
-  score: number;
-  label: string;
-  title: string;
-  artist: string;
-}) {
-  // Static color for the teaser — we don't import scoreLabel since these
-  // numbers are fake decoration, not real ratings.
-  const color =
-    score >= 85
-      ? "text-emerald-400"
-      : score >= 60
-        ? "text-lime-400"
-        : "text-yellow-400";
-  return (
-    <div
-      className={`absolute w-72 sm:w-80 rounded-xl border border-neutral-800 bg-neutral-900/70 backdrop-blur p-3 shadow-xl ${rotate} ${offset}`}
-    >
-      <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded bg-gradient-to-br from-neutral-700 to-neutral-800" />
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm truncate">{artist}</div>
-          <div className="text-xs text-neutral-400 truncate">{title}</div>
-        </div>
-        <div className="text-right leading-tight">
-          <div className={`text-2xl font-bold tabular-nums ${color}`}>{score}</div>
-          <div className="text-[10px] uppercase tracking-wider text-neutral-400">{label}</div>
-        </div>
-      </div>
     </div>
   );
 }
