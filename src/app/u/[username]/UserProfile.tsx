@@ -8,6 +8,8 @@ import { FollowButton } from "./FollowButton";
 import { ytUrlForSongId } from "@/lib/songs";
 import { OwnRatingForm } from "@/components/OwnRatingForm";
 import { CommentSection } from "@/components/CommentSection";
+import { scoreLabel } from "@/lib/score-labels";
+import { encodeBase64Url } from "@/lib/encoding";
 import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
@@ -71,6 +73,7 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     taste,
     viewer,
     streakPctRank,
+    targetFollowsViewer,
     blockEdges,
   ] = await Promise.all([
     db
@@ -118,6 +121,23 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     streak > 0
       ? safeQuery(() => streakPercentile(streak), 0, "streak-pct")
       : Promise.resolve(0),
+    // Does the target already follow the viewer? Surfaces a small
+    // "follows you" badge + makes the Follow CTA into "Follow back".
+    // Mutual-discovery moments drive higher stickiness than cold
+    // "X started following you" alone.
+    viewerId && !isOwner
+      ? safeQuery(
+          () =>
+            db
+              .select({ status: follows.status })
+              .from(follows)
+              .where(and(eq(follows.followerId, target.id), eq(follows.followeeId, viewerId)))
+              .limit(1)
+              .then((rows) => rows[0] ?? null),
+          null,
+          "target-follows-viewer",
+        )
+      : Promise.resolve(null),
     // Block edges in either direction between viewer ↔ target. One
     // round-trip returns both rows so we can decide whether to render
     // the "you blocked them" or "they blocked you" state.
@@ -205,6 +225,23 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
       )
     : [];
 
+  // Top 5 highest-rated picks — pinned wall section above the
+  // chronological list. Derived from the already-fetched rows (we
+  // cap profile-ratings at 100 most-recent, which is plenty of
+  // ranked candidates for most users; a fresh user with <5 ratings
+  // simply shows fewer cards). Ties broken by createdAt DESC so
+  // the user's most recent favorites bubble up.
+  const top5 =
+    rows.length === 0
+      ? []
+      : [...rows]
+          .sort((a, b) =>
+            b.score - a.score ||
+            (b.createdAt instanceof Date ? b.createdAt.getTime() : 0) -
+              (a.createdAt instanceof Date ? a.createdAt.getTime() : 0),
+          )
+          .slice(0, 5);
+
   // Comment + like counts for this user's ratings.
   const songIds = rows.map((r) => r.songId);
   let commentCounts: Map<string, number> = new Map();
@@ -271,6 +308,17 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           </h1>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-neutral-400 text-sm">@{target.username}</span>
+            {targetFollowsViewer && (
+              <span
+                className="text-xs inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-sky-500/10 text-sky-300 border border-sky-500/30"
+                title="This user follows you"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+                Follows you
+              </span>
+            )}
             {streak > 0 && (
               <span
                 className="text-xs rounded-full px-2 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-300 border border-orange-500/40 font-medium inline-flex items-center gap-1"
@@ -293,7 +341,11 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         {viewerId && viewerId !== target.id && (
           <div className="pt-1 shrink-0 flex flex-col items-end gap-1.5">
             {!blockedEither && (
-              <FollowButton username={target.username} initialState={followState} />
+              <FollowButton
+                username={target.username}
+                initialState={followState}
+                followsViewer={Boolean(targetFollowsViewer)}
+              />
             )}
             <Link
               href={`/u/${target.username}/recs`}
@@ -379,6 +431,63 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           viewerName={viewer?.displayName || viewer?.username || "You"}
           targetName={target.displayName || target.username}
         />
+      )}
+
+      {canSeeRatings && top5.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">
+              {isOwner ? "Your" : `${target.displayName || target.username}'s`} Top 5
+            </h2>
+            <span className="text-xs text-neutral-500">Highest rated</span>
+          </div>
+          <ol className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {top5.map((r, i) => {
+              const url = ytUrlForSongId(r.songId);
+              const inner = (
+                <div className="relative aspect-square rounded-xl overflow-hidden border border-neutral-800 group">
+                  {r.thumbnail ? (
+                    <Image
+                      src={r.thumbnail}
+                      alt={`${r.title} by ${r.artist}`}
+                      width={200}
+                      height={200}
+                      sizes="(max-width: 640px) 50vw, 20vw"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-neutral-800" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                  <div className="absolute top-1.5 left-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full bg-black/70 text-emerald-300 text-xs font-bold tabular-nums">
+                    {i + 1}
+                  </div>
+                  <div className={`absolute top-1.5 right-1.5 rounded-md bg-black/70 backdrop-blur-sm px-1.5 py-0.5 text-xs font-bold tabular-nums ${scoreLabel(r.score).color}`}>
+                    {r.score}
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 p-2">
+                    <div className="text-[11px] font-medium truncate leading-tight text-white">{r.title}</div>
+                    <div className="text-[10px] text-neutral-300 truncate">{r.artist}</div>
+                  </div>
+                </div>
+              );
+              return (
+                <li key={r.songId} className="min-w-0">
+                  {url ? (
+                    <Link
+                      href={`/album/${encodeBase64Url(r.songId)}`}
+                      className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 rounded-xl"
+                    >
+                      {inner}
+                    </Link>
+                  ) : (
+                    inner
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
       )}
 
       {canSeeRatings && (

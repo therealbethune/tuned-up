@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { encodeBase64Url } from "@/lib/encoding";
 import { auth } from "@clerk/nextjs/server";
-import { desc, sql, gte, eq, ne, and } from "drizzle-orm";
+import { desc, sql, gte, eq, ne, and, or } from "drizzle-orm";
 import { db, ratings, songs, users, follows, blocks } from "@/db";
 import { isAlbumId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
@@ -91,6 +91,64 @@ type TopReviewer = {
   imageUrl: string | null;
   ratingsCount: number;
 };
+
+type WeeklyLeader = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  imageUrl: string | null;
+  weeklyRatings: number;
+};
+
+// People the viewer follows, ranked by how many songs they rated this
+// week. Lightweight competition — "look how active your friends are"
+// → "I want to be on this list too" → drives re-engagement. Returns
+// the viewer too so they always see themselves on the leaderboard
+// even if they're not following anyone yet.
+async function friendLeaderboardThisWeek(viewerId: string | null): Promise<WeeklyLeader[]> {
+  if (!viewerId) return [];
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  return safeQuery(
+    () =>
+      db
+        .select({
+          id: users.id,
+          username: users.username,
+          displayName: users.displayName,
+          imageUrl: users.imageUrl,
+          weeklyRatings: sql<number>`count(${ratings.userId})::int`,
+        })
+        .from(users)
+        .innerJoin(ratings, eq(ratings.userId, users.id))
+        .leftJoin(
+          follows,
+          and(
+            eq(follows.followerId, viewerId),
+            eq(follows.followeeId, users.id),
+            eq(follows.status, "accepted"),
+          ),
+        )
+        .where(
+          and(
+            gte(ratings.createdAt, sevenDaysAgo),
+            // The viewer themselves OR someone they follow (anti-join via
+            // the leftJoin above on a follow with status=accepted).
+            or(eq(users.id, viewerId), sql`${follows.followerId} IS NOT NULL`),
+            // Block-aware exclusion.
+            sql`NOT EXISTS (
+              SELECT 1 FROM blocks b
+              WHERE (b.blocker_id = ${viewerId} AND b.blocked_id = ${users.id})
+                 OR (b.blocker_id = ${users.id} AND b.blocked_id = ${viewerId})
+            )`,
+          ),
+        )
+        .groupBy(users.id)
+        .orderBy(desc(sql`count(${ratings.userId})`))
+        .limit(5),
+    [],
+    "discover-weekly-leaderboard",
+  );
+}
 
 // People with the most ratings in the last 30 days who the viewer
 // isn't already following. Good "who to follow" signal — they're
@@ -342,6 +400,68 @@ function HeroSpotlight({
   );
 }
 
+// Weekly leaderboard — your follows ranked by ratings this week, with
+// you on the list so the comparison is immediate. Tier ribbons on
+// rank 1-3 turn it into a tiny competition without being heavy-handed.
+function WeeklyLeaderboardSection({
+  viewerId,
+  leaders,
+}: {
+  viewerId: string;
+  leaders: WeeklyLeader[];
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-lg font-semibold">This week, with you and your follows</h2>
+        <span className="text-xs text-neutral-500">Last 7 days</span>
+      </div>
+      <ol className="rounded-xl border border-neutral-800 bg-neutral-900/50 divide-y divide-neutral-800/60 overflow-hidden">
+        {leaders.map((u, i) => {
+          const isMe = u.id === viewerId;
+          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+          return (
+            <li key={u.id}>
+              <Link
+                href={`/u/${u.username}`}
+                className={`flex items-center gap-3 p-3 hover:bg-neutral-900 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
+                  isMe ? "bg-emerald-500/5" : ""
+                }`}
+              >
+                <div className="w-6 text-center text-sm tabular-nums text-neutral-500 shrink-0">
+                  {medal ?? `#${i + 1}`}
+                </div>
+                <Avatar
+                  imageUrl={u.imageUrl}
+                  name={u.displayName || u.username}
+                  seed={u.id}
+                  size={36}
+                  ring={false}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate inline-flex items-center gap-1.5">
+                    {u.displayName || u.username}
+                    {isMe && (
+                      <span className="text-[10px] uppercase tracking-wider rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5">
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-neutral-500 truncate">@{u.username}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-xl font-bold tabular-nums">{u.weeklyRatings}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-neutral-500">rated</div>
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 function TopReviewersSection({ reviewers }: { reviewers: TopReviewer[] }) {
   if (reviewers.length === 0) return null;
   return (
@@ -396,13 +516,14 @@ function TopReviewersSection({ reviewers }: { reviewers: TopReviewer[] }) {
 export default async function DiscoverPage() {
   const { userId } = await auth();
 
-  const [friendRecs, trending, top, reviewers] = await Promise.all([
+  const [friendRecs, trending, top, reviewers, weeklyLeaders] = await Promise.all([
     userId
       ? safeQuery(() => recommendedFromFriends(userId, 12), [], "discover-friend-recs")
       : Promise.resolve([]),
     trendingThisWeek(),
     topRated(),
     topReviewers(userId),
+    friendLeaderboardThisWeek(userId),
   ]);
 
   // Pick a hero. Prefer the top friend-rec since it's the most
@@ -481,6 +602,10 @@ export default async function DiscoverPage() {
         </div>
         <DiscoverGrid rows={top} />
       </section>
+
+      {userId && weeklyLeaders.length > 0 && (
+        <WeeklyLeaderboardSection viewerId={userId} leaders={weeklyLeaders} />
+      )}
 
       {userId && <TopReviewersSection reviewers={reviewers} />}
     </div>

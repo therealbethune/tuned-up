@@ -8,9 +8,14 @@ export type FollowState = "none" | "pending" | "accepted";
 export function FollowButton({
   username,
   initialState,
+  followsViewer = false,
 }: {
   username: string;
   initialState: FollowState;
+  /** True when the target already follows the viewer — turns the
+   *  default "Follow" label into "Follow back" so the mutual-discovery
+   *  moment is obvious. Display-only; the underlying action is identical. */
+  followsViewer?: boolean;
 }) {
   const router = useRouter();
   const [state, setState] = useState<FollowState>(initialState);
@@ -67,7 +72,13 @@ export function FollowButton({
   }
 
   const label =
-    state === "accepted" ? "Following" : state === "pending" ? "Requested" : "Follow";
+    state === "accepted"
+      ? "Following"
+      : state === "pending"
+        ? "Requested"
+        : followsViewer
+          ? "Follow back"
+          : "Follow";
 
   return (
     <button

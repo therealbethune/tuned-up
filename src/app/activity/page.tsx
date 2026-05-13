@@ -75,6 +75,7 @@ function destinationFor(
       if (a.songId && ratingOwnerId) return feedFocus(ratingOwnerId, a.songId);
       return `/u/${a.actorUsername}`;
     case "rating_match":
+    case "taste_match":
     case "rec_rated":
       // Actor's rating is the target. Use ratingOwnerId (which is the
       // actorId for these types).
@@ -246,6 +247,12 @@ function activityBadge(type: string): { icon: React.ReactNode; ring: string } {
       icon: <span className="text-[9px] font-bold leading-none tabular-nums">=</span>,
     };
   }
+  if (type === "taste_match") {
+    return {
+      ring: "bg-gradient-to-br from-fuchsia-500 to-emerald-500 text-black ring-2 ring-neutral-900",
+      icon: <span className="text-[10px] leading-none">★</span>,
+    };
+  }
   return {
     ring: "bg-neutral-700 text-neutral-200 ring-2 ring-neutral-900",
     icon: <span className="text-[9px] leading-none">•</span>,
@@ -393,6 +400,21 @@ function ActivityVerb({ a }: { a: ActivityRow }) {
         ) : (
           " a song you rated"
         )}
+      </>
+    );
+  }
+  if (a.type === "taste_match") {
+    return (
+      <>
+        also loved
+        {a.songTitle ? (
+          <>
+            {" "}<span className="text-neutral-200">{a.songTitle}</span>
+          </>
+        ) : (
+          " a song you loved"
+        )}
+        {" "}— taste match
       </>
     );
   }

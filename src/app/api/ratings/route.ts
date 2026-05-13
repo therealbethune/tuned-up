@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq, gte, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, ne, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, songs, ratings, activities, recommendations, users, savedSongs } from "@/db";
+import { db, songs, ratings, activities, recommendations, users, savedSongs, follows } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
 import { ensureSpotifyTrackIdCached } from "@/lib/spotify-server";
@@ -236,7 +236,7 @@ export async function POST(req: Request) {
   // has now rated it too. Only fires the FIRST time this user rates the song.
   if (isNewRating) {
     const others = await db
-      .select({ userId: ratings.userId })
+      .select({ userId: ratings.userId, score: ratings.score })
       .from(ratings)
       .where(and(eq(ratings.songId, song.id), ne(ratings.userId, userId)));
 
@@ -255,6 +255,95 @@ export async function POST(req: Request) {
         await db.insert(activities).values(toInsert);
       } catch {
         /* ignore */
+      }
+
+      // Taste-convergence milestone: when the new rating is 85+ AND the
+      // other rater also scored 85+ AND there's a follow edge in either
+      // direction, fire a stronger "you both loved this" activity for
+      // both users + push the other one. This makes the moment of
+      // taste-convergence visible — the kind of micro-reward that
+      // brings users back to look for more matches.
+      const score = Math.round(s);
+      if (score >= 85) {
+        const matches = others.filter((o) => o.score >= 85);
+        if (matches.length > 0) {
+          const matchIds = matches.map((m) => m.userId);
+          try {
+            const known = await db
+              .select({ otherId: follows.followerId, mine: follows.followeeId })
+              .from(follows)
+              .where(
+                and(
+                  or(
+                    and(eq(follows.followerId, userId), inArray(follows.followeeId, matchIds)),
+                    and(eq(follows.followeeId, userId), inArray(follows.followerId, matchIds)),
+                  ),
+                  eq(follows.status, "accepted"),
+                ),
+              );
+            const knownIds = new Set<string>();
+            for (const k of known) {
+              knownIds.add(k.otherId === userId ? k.mine : k.otherId);
+            }
+            const convergent = matches.filter((m) => knownIds.has(m.userId));
+            if (convergent.length > 0) {
+              // Fire one activity row for the OTHER side (delivered as
+              // their notification) and one for the new rater (visible
+              // in their own /activity later). Use type "taste_match"
+              // so we can style it distinctly in the activity UI.
+              const rows = convergent.flatMap((m) => [
+                {
+                  id: randomUUID(),
+                  userId: m.userId,
+                  actorId: userId,
+                  type: "taste_match",
+                  songId: song.id,
+                  ratingUserId: userId,
+                },
+                {
+                  id: randomUUID(),
+                  userId,
+                  actorId: m.userId,
+                  type: "taste_match",
+                  songId: song.id,
+                  ratingUserId: m.userId,
+                },
+              ]);
+              await db.insert(activities).values(rows);
+
+              // Push the other side so they notice the convergence in
+              // real time. The new rater is at the rate modal so the
+              // toast already serves as their feedback — no double push.
+              try {
+                const [songRow] = await db
+                  .select({ title: songs.title })
+                  .from(songs)
+                  .where(eq(songs.id, song.id))
+                  .limit(1);
+                const [meRow] = await db
+                  .select({ displayName: users.displayName, username: users.username })
+                  .from(users)
+                  .where(eq(users.id, userId))
+                  .limit(1);
+                const actorName = meRow?.displayName || meRow?.username || "Someone";
+                await Promise.allSettled(
+                  convergent.map((m) =>
+                    sendPushToUser(m.userId, {
+                      title: `You and ${actorName} both loved this`,
+                      body: songRow ? `Both rated ${songRow.title} ${Math.min(score, m.score)}+` : "Taste match!",
+                      url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
+                      tag: `taste-match:${userId}:${song.id}:${m.userId}`,
+                    }),
+                  ),
+                );
+              } catch (e) {
+                reportError(e, "ratings POST taste-match push");
+              }
+            }
+          } catch (e) {
+            reportError(e, "ratings POST taste-match");
+          }
+        }
       }
     }
   }
