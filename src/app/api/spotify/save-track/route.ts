@@ -28,7 +28,9 @@ export async function POST(req: Request) {
   }
 
   const { songId } = (await req.json().catch(() => ({}))) ?? {};
-  if (!songId) return NextResponse.json({ error: "songId required" }, { status: 400 });
+  if (!songId || typeof songId !== "string" || songId.length > 256) {
+    return NextResponse.json({ error: "invalid songId" }, { status: 400 });
+  }
 
   // If the songId is already a spotify-prefixed id, use it directly.
   let trackId: string | null = null;
