@@ -78,20 +78,32 @@ export function WelcomeFlow({
       else next.add(username);
       return next;
     });
-    try {
-      await fetch("/api/follows", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, action: isFollowing ? "unfollow" : "follow" }),
-      });
-    } catch {
-      // Roll back on failure
+    function rollback() {
       setFollowing((prev) => {
         const next = new Set(prev);
         if (isFollowing) next.add(username);
         else next.delete(username);
         return next;
       });
+    }
+    try {
+      const res = await fetch("/api/follows", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, action: isFollowing ? "unfollow" : "follow" }),
+      });
+      // Previously rollback fired only on a network throw. A non-2xx
+      // response (e.g. 429 rate-limited because the user is tapping
+      // through suggested follows quickly) silently kept the optimistic
+      // flip even though the server rejected it — the next reload
+      // would then expose the desync as a "huh, why am I not following
+      // them?" surprise.
+      if (!res.ok) {
+        rollback();
+        await toast.fromResponse(res, "Couldn't update follow");
+      }
+    } catch {
+      rollback();
     }
   }
 
