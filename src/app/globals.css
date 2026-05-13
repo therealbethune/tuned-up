@@ -187,6 +187,34 @@ html:not(.dark) input[type="range"].accent-white { accent-color: #171717; }
   z-index: 1;
 }
 
+/* Respect the user's reduced-motion preference. Disables the
+   keyframes-driven decorative animations (bar growth, heart pop,
+   toast slide, the eq bars, the target highlight) but keeps simple
+   opacity/transform transitions so feedback like hover states still
+   reads. The Toaster also fades in via opacity which stays intact.
+
+   This is the standard a11y pattern — applied late in the file so it
+   wins specificity over the rules above. */
+@media (prefers-reduced-motion: reduce) {
+  .bar-grow,
+  .bar-grow-vertical,
+  .heart-pop {
+    animation: none !important;
+  }
+  /* Toaster's animate-[toast-in_0.18s] arbitrary class. */
+  [class*="animate-[toast-in"] {
+    animation: none !important;
+  }
+  /* The equalizer in ProfileSpotifyPanel pulses indefinitely; freeze it. */
+  [style*="animation"][style*="eq"] {
+    animation: none !important;
+  }
+  /* Target-highlight rule from `[data-target-highlight]:target`. */
+  [data-target-highlight]:target {
+    animation: none !important;
+  }
+}
+
 /* Clerk-rendered Sign-in / Sign-up buttons in the top nav. We can't
    pass our own <button> as a child to <SignInButton> any more (Clerk
    6's React.Children.only trips on JSX whitespace under React 19), so
