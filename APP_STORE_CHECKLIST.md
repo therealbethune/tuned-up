@@ -154,3 +154,45 @@ Clerk handles the OAuth dance; we just need to:
 4. **App Store Connect listing**:
    - In the App Information page, list Sign in with Apple as a supported
      authentication method. Apple checks for this during review.
+
+## Future improvements — ideas worth considering
+
+These don't block App Store submission but would meaningfully improve
+the product. Roughly ranked by user-impact / effort ratio.
+
+- **"Save for later" pile**: a `saved_songs` join table + a /me/saved
+  page so users can bookmark songs they hear in the wild and want to
+  rate later. Replaces the (gone) Spotify save-to-library flow with
+  something that lives entirely inside Tuned Up. New table + Save
+  button on the rate flow + a small list page — ~half a day of work.
+
+- **Year-in-review / month-in-review recap**: end-of-year shareable
+  card showing your top 10 songs, distribution, taste shifts. Pure
+  read on existing data; the appeal is in the visual design (gradient
+  cards, downloadable PNG via /api/og/...).
+
+- **Genre + decade filters on /me/stats**: depends on song metadata
+  we don't currently store. Would require enriching `songs` with
+  genre + release-year via a one-time scrape from MusicBrainz or the
+  Spotify API client-credentials flow we kept.
+
+- **Push-notification settings UI**: today's PushBanner is all-or-
+  nothing. Per-category toggles (mentions vs likes vs follows) would
+  let users keep notifications on without dread.
+
+- **Comment threading depth > 1**: currently replies-to-replies flatten
+  to the same parent. The schema already has parentCommentId so this
+  is mostly a UI nesting change.
+
+- **Native Capacitor screens for taste-test onboarding**: a swipe-rate
+  carousel for the first 10 ratings would feel premium on iOS in a
+  way the web search-and-rate flow doesn't. Build it after Capacitor
+  scaffolding lands so the gesture handling can be native.
+
+- **Trust-and-safety dashboards**: a per-user moderation history in
+  /admin (reports filed against them, reports they've filed, blocks
+  against them, etc.) so a moderator can see patterns before banning.
+
+- **Soft-deleting reported content** instead of hard-deleting from
+  the admin queue, with an audit trail. Lets us reverse a bad mod
+  decision; currently delete is permanent.
