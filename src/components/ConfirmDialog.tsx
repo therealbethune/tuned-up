@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 
 // Replacement for `window.confirm` that's actually consistent with the
@@ -41,22 +41,37 @@ export function ConfirmDialog({
   onClose: () => void;
 }) {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
+  // Remember what was focused before open so we can restore it on close —
+  // same a11y pattern as LikersSheet / RateButton.
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const [show, setShow] = useState(false);
 
   useScrollLock(open);
 
-  // Escape key + initial focus. Escape is also guarded against `busy`
-  // so a user can't dismiss the dialog mid-action by tapping Escape.
+  // Mount-then-animate + focus shuffle + Escape-to-close. The slide-up
+  // matches the modal pattern the rest of the app uses (RateButton,
+  // LikersSheet) so this dialog doesn't pop in stiff.
   useEffect(() => {
-    if (!open) return;
-    const id = requestAnimationFrame(() => cancelRef.current?.focus());
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !busy) onClose();
+    if (open) {
+      previouslyFocusedRef.current =
+        (document.activeElement as HTMLElement | null) ?? null;
+      const id = requestAnimationFrame(() => {
+        setShow(true);
+        cancelRef.current?.focus();
+      });
+      function onKey(e: KeyboardEvent) {
+        if (e.key === "Escape" && !busy) onClose();
+      }
+      document.addEventListener("keydown", onKey);
+      return () => {
+        cancelAnimationFrame(id);
+        document.removeEventListener("keydown", onKey);
+      };
+    } else {
+      setShow(false);
+      const prev = previouslyFocusedRef.current;
+      if (prev && document.contains(prev)) prev.focus();
     }
-    document.addEventListener("keydown", onKey);
-    return () => {
-      cancelAnimationFrame(id);
-      document.removeEventListener("keydown", onKey);
-    };
   }, [open, onClose, busy]);
 
   if (!open) return null;
@@ -66,7 +81,9 @@ export function ConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-title"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center transition-opacity duration-200 ${
+        show ? "bg-black/60 backdrop-blur-sm" : "bg-black/0"
+      }`}
       onClick={(e) => {
         // Backdrop close (only if clicked outside the inner card).
         // Guard against `busy`: tapping the backdrop while a
@@ -76,7 +93,9 @@ export function ConfirmDialog({
       }}
     >
       <div
-        className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-xl border border-neutral-800 bg-neutral-950 p-5 space-y-4"
+        className={`w-full sm:max-w-sm rounded-t-2xl sm:rounded-xl border border-neutral-800 bg-neutral-950 p-5 space-y-4 transform transition-transform duration-200 ease-out ${
+          show ? "translate-y-0" : "translate-y-full sm:translate-y-2"
+        }`}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 1.25rem)" }}
       >
         <div>

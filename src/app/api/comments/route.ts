@@ -293,21 +293,28 @@ export async function POST(req: Request) {
   }
 
   // Return the new comment with commenter info to avoid a second round-trip.
-  const [me] = await db
-    .select({
-      id: users.id,
-      username: users.username,
-      displayName: users.displayName,
-      imageUrl: users.imageUrl,
-    })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  const [myRating] = await db
-    .select({ score: ratings.score, review: ratings.review })
-    .from(ratings)
-    .where(and(eq(ratings.userId, userId), eq(ratings.songId, songId)))
-    .limit(1);
+  // Fetch the author row + the author's rating-on-this-song in parallel —
+  // both are needed for the response shape and the two queries are
+  // independent. Trims one DB roundtrip off the POST critical path.
+  const [meRows, myRatingRows] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        username: users.username,
+        displayName: users.displayName,
+        imageUrl: users.imageUrl,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+    db
+      .select({ score: ratings.score, review: ratings.review })
+      .from(ratings)
+      .where(and(eq(ratings.userId, userId), eq(ratings.songId, songId)))
+      .limit(1),
+  ]);
+  const me = meRows[0];
+  const myRating = myRatingRows[0];
 
   return NextResponse.json({
     comment: {

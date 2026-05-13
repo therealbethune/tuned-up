@@ -28,17 +28,33 @@ export default function PeoplePage() {
     }
     setLoading(true);
     const id = ++reqId.current;
+    // AbortController so a fast typist's stale request is actually
+    // cancelled at the network layer, not just dropped by the reqId
+    // guard after the bytes already came back. Matches the
+    // MentionInput pattern.
+    const ac = new AbortController();
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/users/search?q=${encodeURIComponent(term)}`);
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(term)}`, {
+          signal: ac.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (id !== reqId.current) return;
         setResults(data.results ?? []);
+      } catch {
+        // Network error / 4xx — drop results silently. Without this
+        // a transient failure would leave the spinner spinning forever
+        // and surface as an unhandled promise rejection in dev tools.
+        if (id === reqId.current) setResults([]);
       } finally {
         if (id === reqId.current) setLoading(false);
       }
     }, 200);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [q]);
 
   return (

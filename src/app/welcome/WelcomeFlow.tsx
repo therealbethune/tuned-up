@@ -16,10 +16,19 @@ type SuggestedUser = {
   ratingsCount: number;
 };
 
-export function WelcomeFlow({ suggested }: { suggested: SuggestedUser[] }) {
+export function WelcomeFlow({
+  suggested,
+  initialRatedCount,
+}: {
+  suggested: SuggestedUser[];
+  /** Number of ratings this user already has — seeds the gate counter
+   *  so reloads, /import/spotify imports, and re-entries to /welcome
+   *  all count correctly instead of pretending the user has rated 0. */
+  initialRatedCount?: number;
+}) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
-  const [ratingsDone, setRatingsDone] = useState(0);
+  const [ratingsDone, setRatingsDone] = useState(initialRatedCount ?? 0);
   const [following, setFollowing] = useState<Set<string>>(new Set());
   const [finishing, setFinishing] = useState(false);
 

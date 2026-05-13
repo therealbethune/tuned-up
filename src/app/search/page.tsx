@@ -54,11 +54,16 @@ export default function SearchPage() {
     }
     setLoading(true);
     const id = ++reqId.current;
+    // AbortController cancels stale inflight bytes when the user keeps
+    // typing — saves bandwidth and CPU vs just dropping the result via
+    // the reqId check after parsing.
+    const ac = new AbortController();
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}&kind=${kind}`);
-        // Bail before parsing JSON if a newer request has fired — saves
-        // wasted parse cost and prevents stale results clobbering newer ones.
+        const res = await fetch(
+          `/api/search?q=${encodeURIComponent(term)}&kind=${kind}`,
+          { signal: ac.signal },
+        );
         if (id !== reqId.current) return;
         const data = await res.json();
         if (id !== reqId.current) return;
@@ -70,6 +75,9 @@ export default function SearchPage() {
           setRecents(loadRecents());
         }
       } catch (e) {
+        // AbortError fires from ac.abort() — that's the cancel path, not a
+        // real error; the new request will land its own setResults shortly.
+        if ((e as { name?: string })?.name === "AbortError") return;
         if (id !== reqId.current) return;
         setError((e as Error).message);
         setResults([]);
@@ -77,7 +85,10 @@ export default function SearchPage() {
         if (id === reqId.current) setLoading(false);
       }
     }, 250);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [q, kind]);
 
   const top = results[0];
