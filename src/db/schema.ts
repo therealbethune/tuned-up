@@ -141,6 +141,20 @@ export const comments = pgTable("comments", {
   index("comments_parent_idx").on(t.parentCommentId),
 ]);
 
+// Songs the user has bookmarked for later rating. Replaces the
+// removed Spotify save-to-library flow with something that lives
+// entirely inside Tuned Up. When the user rates a saved song, we
+// drop the save row automatically (cleared in /api/ratings POST).
+export const savedSongs = pgTable("saved_songs", {
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  songId: text("song_id").notNull().references(() => songs.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.songId] }),
+  // /me/saved + the "is this saved?" check on the feed hit this.
+  index("saved_songs_user_idx").on(t.userId, t.createdAt),
+]);
+
 // Content reports. UGC moderation flow required by Apple App Store
 // Guideline 1.2 — users must be able to flag offensive content. The
 // targetType + nullable target* columns let one table cover every

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
-import { db, songs, ratings, users, follows, blocks } from "@/db";
+import { db, songs, ratings, users, follows, blocks, savedSongs } from "@/db";
 import { or } from "drizzle-orm";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
@@ -11,6 +11,7 @@ import { scoreLabel } from "@/lib/score-labels";
 import { RateButton } from "@/components/RateButton";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
+import { SaveLaterButton } from "@/components/SaveLaterButton";
 import { Avatar } from "@/components/Avatar";
 import { safeQuery } from "@/lib/safe-query";
 
@@ -48,6 +49,7 @@ export default async function AlbumPage({
     rawRatings,
     followRows,
     blockRows,
+    [savedRow],
   ] = await Promise.all([
     db.select().from(songs).where(eq(songs.id, songId)).limit(1),
     // All ratings for this item, joined to users for the reviewer rail.
@@ -90,7 +92,15 @@ export default async function AlbumPage({
           .from(blocks)
           .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)))
       : Promise.resolve([] as { blockerId: string; blockedId: string }[]),
+    userId
+      ? db
+          .select({ songId: savedSongs.songId })
+          .from(savedSongs)
+          .where(and(eq(savedSongs.userId, userId), eq(savedSongs.songId, songId)))
+          .limit(1)
+      : Promise.resolve([] as { songId: string }[]),
   ]);
+  const isSaved = Boolean(savedRow);
   if (!song) notFound();
 
   const acceptedFollows = new Set(followRows.map((r) => r.followeeId));
@@ -232,6 +242,21 @@ export default async function AlbumPage({
               </div>
               {!isAlbum && (
                 <div className="pt-1 flex flex-wrap items-center gap-2">
+                  {myRow == null && (
+                    <SaveLaterButton
+                      songId={song.id}
+                      initialSaved={isSaved}
+                      song={{
+                        id: song.id,
+                        kind: "song",
+                        title: song.title,
+                        artist: song.artist,
+                        album: song.album,
+                        thumbnail: song.thumbnail,
+                        durationSeconds: song.durationSeconds,
+                      }}
+                    />
+                  )}
                   <SaveToAppleMusicButton songId={song.id} />
                 </div>
               )}

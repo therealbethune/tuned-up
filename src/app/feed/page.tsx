@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { and, desc, eq, inArray, lt, notInArray, sql, count, or } from "drizzle-orm";
-import { db, ratings, songs, users, follows, comments, likes, blocks } from "@/db";
+import { db, ratings, songs, users, follows, comments, likes, blocks, savedSongs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
@@ -21,6 +21,7 @@ import { recommendedFromFriends, type FriendRec } from "@/lib/recs";
 import { Avatar } from "@/components/Avatar";
 import { PlayIcon } from "@/components/icons";
 import { ReportButton } from "@/components/ReportButton";
+import { SaveLaterButton } from "@/components/SaveLaterButton";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
@@ -250,6 +251,7 @@ export default async function FeedPage({
     cCounts,
     lCounts,
     myLikeRows,
+    mySavedRows,
   ] = await Promise.all([
     songIds.length
       ? safeQuery(
@@ -358,7 +360,19 @@ export default async function FeedPage({
           "feed-my-likes",
         )
       : Promise.resolve([] as { ratingUserId: string; songId: string }[]),
+    songIds.length
+      ? safeQuery(
+          () =>
+            db
+              .select({ songId: savedSongs.songId })
+              .from(savedSongs)
+              .where(and(eq(savedSongs.userId, userId), inArray(savedSongs.songId, songIds))),
+          [] as { songId: string }[],
+          "feed-my-saved",
+        )
+      : Promise.resolve([] as { songId: string }[]),
   ]);
+  const mySavedSet = new Set(mySavedRows.map((r) => r.songId));
 
   const myRatingsMap = new Map(myRatingsRows.map((r) => [r.songId, r.score]));
   const otherRatersBySong = new Map<string, OtherRater[]>();
@@ -614,6 +628,21 @@ export default async function FeedPage({
 
                 {!isAlbumId(it.songId) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {myScore == null && it.ratingUserId !== userId && (
+                      <SaveLaterButton
+                        songId={it.songId}
+                        initialSaved={mySavedSet.has(it.songId)}
+                        song={{
+                          id: it.songId,
+                          kind: "song",
+                          title: it.title,
+                          artist: it.artist,
+                          album: it.album,
+                          thumbnail: it.thumbnail,
+                          durationSeconds: null,
+                        }}
+                      />
+                    )}
                     <SaveToAppleMusicButton songId={it.songId} />
                   </div>
                 )}

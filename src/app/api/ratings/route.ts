@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, eq, gte, inArray, ne, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, songs, ratings, activities, recommendations, users } from "@/db";
+import { db, songs, ratings, activities, recommendations, users, savedSongs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
 import { ensureSpotifyTrackIdCached } from "@/lib/spotify-server";
@@ -149,6 +149,17 @@ export async function POST(req: Request) {
       target: [ratings.userId, ratings.songId],
       set: { score: Math.round(s), review: review ?? null, updatedAt: now },
     });
+
+  // Clear the save-for-later bookmark for this song (if one exists) —
+  // a rating supersedes a "rate it later" intent. Fire-and-forget;
+  // worst case the row sticks around and the user manually unsaves.
+  try {
+    await db
+      .delete(savedSongs)
+      .where(and(eq(savedSongs.userId, userId), eq(savedSongs.songId, song.id)));
+  } catch {
+    /* non-critical */
+  }
 
   // Notify mentioned users — anyone @-tagged in the review gets a push +
   // activity row pointing at this rating. Cap at 10 to prevent

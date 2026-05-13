@@ -81,6 +81,16 @@ export default async function MePage() {
           compete with the profile header below. */}
       <div className="flex justify-end gap-2 text-sm">
         <Link
+          href="/me/saved"
+          aria-label="Saved for later"
+          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+            <path d="M6 4h12v17l-6-4-6 4z" />
+          </svg>
+          Saved
+        </Link>
+        <Link
           href="/recommendations"
           aria-label="Recommendations"
           className="relative text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"

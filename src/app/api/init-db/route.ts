@@ -185,6 +185,18 @@ const STATEMENTS = [
   `ALTER TABLE "blocks" ADD CONSTRAINT "blocks_blocker_fk" FOREIGN KEY ("blocker_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   `ALTER TABLE "blocks" ADD CONSTRAINT "blocks_blocked_fk" FOREIGN KEY ("blocked_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   `CREATE INDEX IF NOT EXISTS "blocks_blocked_idx" ON "blocks" USING btree ("blocked_id")`,
+  // Save-for-later pile (Wave BC bookmark feature). Composite PK so a
+  // user can save a given song exactly once; the index supports the
+  // /me/saved list (most-recent first per user).
+  `CREATE TABLE IF NOT EXISTS "saved_songs" (
+    "user_id" text NOT NULL,
+    "song_id" text NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    CONSTRAINT "saved_songs_pk" PRIMARY KEY("user_id","song_id")
+  )`,
+  `ALTER TABLE "saved_songs" ADD CONSTRAINT "saved_songs_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `ALTER TABLE "saved_songs" ADD CONSTRAINT "saved_songs_song_fk" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE INDEX IF NOT EXISTS "saved_songs_user_idx" ON "saved_songs" USING btree ("user_id","created_at")`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).
