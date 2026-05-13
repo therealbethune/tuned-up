@@ -59,6 +59,12 @@ export default function GlobalError({
               error: {error.digest}
             </p>
           )}
+          {/* Plain <a> on purpose — global-error fires when the root
+              layout itself failed to render, so next/link's client
+              router may not be available. We WANT a full document
+              load here, not a soft navigation that might trip the
+              same failure. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
             href="/"
             style={{
