@@ -58,7 +58,10 @@ export async function POST(req: Request) {
   for (const u of all) {
     scanned++;
     try {
-      const streak = await computeStreak(u.id);
+      // Backfill doesn't consume freezes; we want the natural streak
+      // length to be the truth-of-record for milestone announcements,
+      // not a freeze-extended one.
+      const { streak } = await computeStreak(u.id, 0);
       if (streak !== (u.currentStreak ?? 0)) {
         if (!dry) {
           await db

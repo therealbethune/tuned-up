@@ -17,6 +17,21 @@ export const users = pgTable("users", {
   // to make the milestone-activity insert idempotent — only fire when the
   // streak crosses a NEW threshold (7/14/30/60/100/365).
   highestStreakMilestone: integer("highest_streak_milestone").notNull().default(0),
+  // Streak-freeze tokens — earned at each milestone, capped at 3. When
+  // computeStreak finds exactly one missing day, it consumes one token
+  // and counts through, so a single missed day doesn't reset the streak.
+  // Surfaced as "freezes available" on /me and the streak warning push.
+  streakFreezeTokens: integer("streak_freeze_tokens").notNull().default(0),
+  // Per-category push notification preferences. All default true so we
+  // don't silently break existing subscriptions on column add. The push
+  // helper consults these flags before calling the web-push provider.
+  notifyMentions: boolean("notify_mentions").notNull().default(true),
+  notifyComments: boolean("notify_comments").notNull().default(true),
+  notifyLikes: boolean("notify_likes").notNull().default(true),
+  notifyFollows: boolean("notify_follows").notNull().default(true),
+  notifyRecs: boolean("notify_recs").notNull().default(true),
+  notifyTasteMatches: boolean("notify_taste_matches").notNull().default(true),
+  notifyStreak: boolean("notify_streak").notNull().default(true),
 }, (t) => [uniqueIndex("users_username_idx").on(t.username)]);
 
 // 'song' | 'album'. The table name is historical — these are really

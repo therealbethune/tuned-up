@@ -278,6 +278,7 @@ export async function POST(req: Request) {
               body: preview,
               url: mentionRatingPageUrl,
               tag: `mention:${userId}:${songId}:${u.id}`,
+              category: "mention",
             });
           }),
       );
@@ -327,7 +328,28 @@ export async function POST(req: Request) {
   // from being written for ~150-300ms longer than necessary. allSettled
   // so a flaky push provider can't roll back the activity row.
   if (ratingUserId !== userId && !notifyBlocked.has(ratingUserId)) {
-    await Promise.allSettled([
+    // Push batching: if this same commenter posted on this same rating
+    // within the last 5 minutes (i.e. they're typing a thread of
+    // replies), skip the push. The activity row still goes in so the
+    // rating owner sees the new comment on their /activity, but they
+    // don't get a string of pings buzzing their phone for what is
+    // effectively one conversation.
+    const recentWindowMs = 5 * 60 * 1000;
+    const recent = await db
+      .select({ id: activities.id })
+      .from(activities)
+      .where(
+        and(
+          eq(activities.userId, ratingUserId),
+          eq(activities.actorId, userId),
+          eq(activities.type, "comment"),
+          eq(activities.songId, songId),
+          gte(activities.createdAt, new Date(Date.now() - recentWindowMs)),
+        ),
+      )
+      .limit(1);
+    const skipPush = recent.length > 0;
+    const work: Promise<unknown>[] = [
       db.insert(activities).values({
         id: randomUUID(),
         userId: ratingUserId,
@@ -336,15 +358,22 @@ export async function POST(req: Request) {
         songId,
         ratingUserId,
       }),
-      sendPushToUser(ratingUserId, {
-        title: `${actorName} commented on ${song?.title ?? "your rating"}`,
-        body: preview,
-        // Rating owner = recipient: focus-param URL guarantees the card
-        // shows on the feed even if pagination would have hidden it.
-        url: `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
-        tag: `comment:${userId}:${songId}`,
-      }),
-    ]);
+    ];
+    if (!skipPush) {
+      work.push(
+        sendPushToUser(ratingUserId, {
+          title: `${actorName} commented on ${song?.title ?? "your rating"}`,
+          body: preview,
+          // Rating owner = recipient: focus-param URL guarantees the
+          // card shows on the feed even if pagination would have
+          // hidden it.
+          url: `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
+          tag: `comment:${userId}:${songId}`,
+          category: "comment",
+        }),
+      );
+    }
+    await Promise.allSettled(work);
   }
 
   // If this is a reply, additionally notify the parent comment's author —
@@ -373,6 +402,7 @@ export async function POST(req: Request) {
           // can't anchor to their feed — link to the rating's shared page.
           url: fallbackUrl,
           tag: `reply:${userId}:${songId}`,
+          category: "comment",
         }),
       ]);
     } catch (e) {

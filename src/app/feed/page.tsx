@@ -76,7 +76,7 @@ export default async function FeedPage({
   // viewer follow, and who's involved in a block edge with them?
   // Blocks hide content in BOTH directions so an abuser can't just
   // create a new account to dodge a mute.
-  const [followedRows, blockEdges, dailyPick] = await Promise.all([
+  const [followedRows, blockEdges, dailyPick, [meStatus]] = await Promise.all([
     safeQuery(
       () =>
         db
@@ -99,7 +99,25 @@ export default async function FeedPage({
     // viewer is paginating (?before=…) so older pages don't show
     // today's prompt; only the first page of /feed does.
     sp.before ? Promise.resolve(null) : getDailyPick(userId),
+    // Today's rating count for the viewer + cached streak. Drives the
+    // "today: N rated · streak Y" pill in the header. Both come off
+    // /users + a count() on /ratings; counting since 24h ago is good
+    // enough without dragging in the user's timezone here.
+    db
+      .select({
+        streak: users.currentStreak,
+        today: sql<number>`(
+          SELECT count(*)::int FROM ratings
+          WHERE user_id = ${userId}
+            AND created_at >= NOW() - INTERVAL '24 hours'
+        )`,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
   ]);
+  const todayCount = Number(meStatus?.today ?? 0);
+  const currentStreak = Number(meStatus?.streak ?? 0);
   const hiddenIds = new Set<string>();
   for (const b of blockEdges) {
     hiddenIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
@@ -405,7 +423,30 @@ export default async function FeedPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-2xl font-bold">Feed</h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="text-2xl font-bold">Feed</h1>
+          {(todayCount > 0 || currentStreak > 0) && (
+            <span
+              className="text-[11px] inline-flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900/60 px-2.5 py-1 text-neutral-300"
+              title="Your rating activity today and current streak"
+            >
+              {todayCount > 0 && (
+                <span className="inline-flex items-baseline gap-1 tabular-nums">
+                  <span className="text-emerald-300 font-semibold">{todayCount}</span>
+                  <span className="text-neutral-500">today</span>
+                </span>
+              )}
+              {todayCount > 0 && currentStreak > 0 && <span className="text-neutral-700">·</span>}
+              {currentStreak > 0 && (
+                <span className="inline-flex items-baseline gap-1 tabular-nums">
+                  <span aria-hidden>🔥</span>
+                  <span className="font-semibold">{currentStreak}</span>
+                  <span className="text-neutral-500">streak</span>
+                </span>
+              )}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <SurpriseMeButton />
           <Link href="/search" className="text-sm text-neutral-400 hover:text-white">+ Rate a song</Link>

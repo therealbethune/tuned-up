@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { eq, inArray } from "drizzle-orm";
-import { db, pushSubscriptions } from "@/db";
+import { db, pushSubscriptions, users } from "@/db";
 
 const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY ?? "";
@@ -15,18 +15,64 @@ function ensureConfigured(): boolean {
   return true;
 }
 
+// Notification categories — each maps to a column on `users` so the
+// recipient can opt out per category without losing the subscription.
+// Push tag prefixes are matched here so callers pass a meaningful
+// category string instead of relying on string-matching the tag.
+export type PushCategory =
+  | "mention"
+  | "comment"
+  | "like"
+  | "follow"
+  | "rec"
+  | "taste_match"
+  | "streak";
+
 export type PushPayload = {
   title: string;
   body: string;
   url?: string;
   tag?: string;
   icon?: string;
+  /** Category for opt-out checks. Optional so existing callers keep
+   *  working; absent = treat as always-on (cron pings, system msgs). */
+  category?: PushCategory;
 };
 
 // Send a notification to every device a user has registered. Removes any
-// subscription that the push service rejects with 404 / 410.
+// subscription that the push service rejects with 404 / 410. If the
+// recipient has opted out of `payload.category` in their preferences,
+// the call is a silent no-op.
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
   if (!ensureConfigured()) return;
+
+  if (payload.category) {
+    const [prefs] = await db
+      .select({
+        m: users.notifyMentions,
+        c: users.notifyComments,
+        l: users.notifyLikes,
+        f: users.notifyFollows,
+        r: users.notifyRecs,
+        t: users.notifyTasteMatches,
+        s: users.notifyStreak,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (prefs) {
+      const allowed: Record<PushCategory, boolean> = {
+        mention: prefs.m ?? true,
+        comment: prefs.c ?? true,
+        like: prefs.l ?? true,
+        follow: prefs.f ?? true,
+        rec: prefs.r ?? true,
+        taste_match: prefs.t ?? true,
+        streak: prefs.s ?? true,
+      };
+      if (!allowed[payload.category]) return;
+    }
+  }
 
   const subs = await db
     .select()

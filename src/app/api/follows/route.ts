@@ -169,6 +169,7 @@ export async function POST(req: Request) {
       body: status === "pending" ? "Approve them in Activity." : "View their profile in the app.",
       url: status === "pending" ? "/activity" : `/u/${actor?.username ?? ""}`,
       tag: `follow:${userId}`,
+      category: "follow",
     });
   }
 

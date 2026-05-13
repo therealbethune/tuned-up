@@ -247,6 +247,7 @@ export async function POST(req: Request) {
         body: message || `${song.artist} — open Tuned Up to rate it.`,
         url: "/recommendations",
         tag: `rec:${userId}:${song.id}`,
+        category: "rec",
       });
     } catch (e) {
       reportError(e, "recommendations POST push send");
@@ -299,6 +300,7 @@ export async function POST(req: Request) {
                     body: preview,
                     url: actorUsername ? `/u/${actorUsername}` : "/feed",
                     tag: `mention:${userId}:${song.id}:${u.id}`,
+                    category: "mention",
                   }),
                 ]);
               }),

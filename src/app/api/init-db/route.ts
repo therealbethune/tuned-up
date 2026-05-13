@@ -197,6 +197,16 @@ const STATEMENTS = [
   `ALTER TABLE "saved_songs" ADD CONSTRAINT "saved_songs_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   `ALTER TABLE "saved_songs" ADD CONSTRAINT "saved_songs_song_fk" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE cascade ON UPDATE no action`,
   `CREATE INDEX IF NOT EXISTS "saved_songs_user_idx" ON "saved_songs" USING btree ("user_id","created_at")`,
+  // Per-category push notification preferences. All default true so
+  // existing users don't silently lose notifications when this lands.
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_mentions" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_comments" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_likes" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_follows" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_recs" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_taste_matches" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_streak" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "streak_freeze_tokens" integer NOT NULL DEFAULT 0`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

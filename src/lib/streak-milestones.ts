@@ -54,19 +54,26 @@ export async function streakPercentile(streak: number): Promise<number> {
 export async function refreshUserStreak(
   userId: string,
   computedStreak: number,
+  freezesUsed = 0,
 ): Promise<{ before: number; after: number; previousMilestone: number }> {
   const [prev] = await db
     .select({
       currentStreak: users.currentStreak,
       highest: users.highestStreakMilestone,
+      tokens: users.streakFreezeTokens,
     })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
 
+  // Decrement the freeze token pool by however many computeStreak
+  // burned to bridge gaps. Tokens are non-negative so a stale cache
+  // can't drive the count into the negatives.
+  const newTokens = Math.max(0, (prev?.tokens ?? 0) - Math.max(0, freezesUsed));
+
   await db
     .update(users)
-    .set({ currentStreak: computedStreak })
+    .set({ currentStreak: computedStreak, streakFreezeTokens: newTokens })
     .where(eq(users.id, userId));
 
   return {
@@ -94,9 +101,19 @@ export async function maybeAnnounceStreakMilestone(
   const topPct = Math.max(1, 100 - pct);
 
   // Persist that we've announced this milestone so we don't loop.
+  // Also grant a streak-freeze token (capped at 3 so the pool doesn't
+  // grow unbounded across long-running streaks). The freeze acts as a
+  // one-day grace insurance that computeStreak consumes if the user
+  // misses a day in the middle of an otherwise-continuous run.
+  const [cur] = await db
+    .select({ tokens: users.streakFreezeTokens })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const newTokens = Math.min(3, (cur?.tokens ?? 0) + 1);
   await db
     .update(users)
-    .set({ highestStreakMilestone: newMilestone })
+    .set({ highestStreakMilestone: newMilestone, streakFreezeTokens: newTokens })
     .where(eq(users.id, userId));
 
   // Send the celebrating user a push.
@@ -106,6 +123,7 @@ export async function maybeAnnounceStreakMilestone(
       body: `You're in the top ${topPct}% of streak holders. Don't break it now.`,
       url: "/me",
       tag: `streak_milestone:${userId}:${newMilestone}`,
+      category: "streak",
     });
   } catch {
     /* ignore push failures */

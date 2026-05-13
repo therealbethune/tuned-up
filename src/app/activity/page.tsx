@@ -418,6 +418,19 @@ function ActivityVerb({ a }: { a: ActivityRow }) {
       </>
     );
   }
+  if (a.type === "re_rate_nudge") {
+    return (
+      <>
+        Remember{" "}
+        {a.songTitle ? (
+          <span className="text-neutral-200">{a.songTitle}</span>
+        ) : (
+          "this one"
+        )}
+        ? You loved it ages ago — see what&apos;s new.
+      </>
+    );
+  }
   if (a.type === "rec_rated") {
     return (
       <>

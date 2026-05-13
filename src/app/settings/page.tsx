@@ -8,6 +8,7 @@ import { SettingsForm } from "./SettingsForm";
 import { AppleMusicAccountCard } from "@/components/AppleMusicAccountCard";
 import { ProfilePictureSection } from "@/components/ProfilePictureSection";
 import { BlockedUsersList } from "@/components/BlockedUsersList";
+import { NotifySettings } from "@/components/NotifySettings";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,18 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-2">Connected accounts</h2>
         <AppleMusicAccountCard />
       </div>
+
+      <NotifySettings
+        initial={{
+          mentions: me.notifyMentions,
+          comments: me.notifyComments,
+          likes: me.notifyLikes,
+          follows: me.notifyFollows,
+          recs: me.notifyRecs,
+          taste_matches: me.notifyTasteMatches,
+          streak: me.notifyStreak,
+        }}
+      />
 
       <BlockedUsersList initialBlocked={blockedRows} />
 

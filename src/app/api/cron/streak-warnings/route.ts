@@ -179,6 +179,7 @@ export async function POST(req: Request) {
       const isUrgent = c.stage === "urgent";
       try {
         await sendPushToUser(c.id, {
+          category: "streak",
           title: isUrgent
             ? `⏰ 1 hour left — save your ${c.cachedStreak}-day streak`
             : `🔥 Your ${c.cachedStreak}-day streak is at risk`,

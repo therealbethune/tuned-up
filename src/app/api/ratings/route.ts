@@ -222,6 +222,7 @@ export async function POST(req: Request) {
                   // both land here.
                   url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
                   tag: `mention-rating:${userId}:${song.id}:${u.id}`,
+                  category: "mention",
                 }),
               ]);
             }),
@@ -333,6 +334,7 @@ export async function POST(req: Request) {
                       body: songRow ? `Both rated ${songRow.title} ${Math.min(score, m.score)}+` : "Taste match!",
                       url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
                       tag: `taste-match:${userId}:${song.id}:${m.userId}`,
+                      category: "taste_match",
                     }),
                   ),
                 );
@@ -353,8 +355,13 @@ export async function POST(req: Request) {
   // Best-effort — never block the rating save on this.
   if (isNewRating) {
     try {
-      const streak = await computeStreak(userId);
-      const refreshed = await refreshUserStreak(userId, streak);
+      const [me] = await db
+        .select({ tokens: users.streakFreezeTokens })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const { streak, freezesUsed } = await computeStreak(userId, me?.tokens ?? 0);
+      const refreshed = await refreshUserStreak(userId, streak, freezesUsed);
       await maybeAnnounceStreakMilestone(
         userId,
         refreshed.after,
@@ -412,6 +419,7 @@ export async function POST(req: Request) {
               // Focus-param URL — recipient may not follow the rater.
               url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
               tag: `rec_rated:${r.id}`,
+              category: "rec",
             }),
           ]);
         }),
@@ -456,8 +464,13 @@ export async function DELETE(req: Request) {
   // again, and /stats / profile both render that stale number. Best-
   // effort; on failure the cache just remains stale for one cycle.
   try {
-    const fresh = await computeStreak(userId);
-    await refreshUserStreak(userId, fresh);
+    const [me] = await db
+      .select({ tokens: users.streakFreezeTokens })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    const { streak: fresh, freezesUsed } = await computeStreak(userId, me?.tokens ?? 0);
+    await refreshUserStreak(userId, fresh, freezesUsed);
   } catch {
     /* ignore */
   }

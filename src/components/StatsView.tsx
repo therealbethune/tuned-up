@@ -27,6 +27,10 @@ export default async function StatsView({
   // column was specifically introduced to avoid (same comment as the
   // profile page's Wave G fix).
   const streak = target.currentStreak ?? 0;
+  // Streak-freeze token pool — earned at each milestone (capped at 3).
+  // Surfaced as a sub-stat next to the main streak so the user sees
+  // their insurance pile without leaving /me/stats.
+  const freezes = target.streakFreezeTokens ?? 0;
 
   // 90 days back from now (UTC midnight) — drives the heatmap window.
   const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000);
@@ -165,6 +169,16 @@ export default async function StatsView({
           sublabel={streak > 0 ? (streak === 1 ? "day" : "days") : undefined}
         />
       </section>
+
+      {isOwner && freezes > 0 && (
+        <p className="text-xs text-neutral-400 inline-flex items-center gap-2">
+          <span className="rounded-full bg-sky-500/15 text-sky-200 border border-sky-500/40 px-2 py-0.5 inline-flex items-center gap-1 font-medium">
+            <span aria-hidden>❄</span>
+            <span className="tabular-nums">{freezes}</span> freeze{freezes === 1 ? "" : "s"}
+          </span>
+          Each freeze auto-saves your streak if you miss a single day. Earn one with every milestone (capped at 3).
+        </p>
+      )}
 
       <StreakHeatmap days={heatmapDays} />
 
