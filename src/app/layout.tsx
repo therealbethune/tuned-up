@@ -5,6 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { SentryUserSync } from "@/components/SentryUserSync";
 import { Toaster } from "@/components/Toaster";
 import { TunedUpMark } from "@/components/icons";
 import { syncCurrentUser } from "@/lib/sync-user";
@@ -250,6 +251,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8">{children}</main>
           {userId && <MobileTabBar unread={unread} />}
           {userId && <TimezoneSync serverTimezone={synced?.timezone ?? null} />}
+          {/* Tags Sentry events with the signed-in user id so we can
+              answer "which user hit this?" from the issue page. No-op
+              when signed out. PII stays out — see component for why. */}
+          <SentryUserSync />
           <Toaster />
         </body>
       </html>

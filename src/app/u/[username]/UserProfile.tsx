@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { and, desc, eq, count, inArray } from "drizzle-orm";
-import { db, ratings, songs, follows, users, comments, likes, spotifyAccounts } from "@/db";
-import { SpotifyIcon, PlayIcon } from "@/components/icons";
+import { db, ratings, songs, follows, users, comments, likes, blocks } from "@/db";
+import { PlayIcon } from "@/components/icons";
 import { renderWithMentions } from "@/lib/mentions";
 import { FollowButton } from "./FollowButton";
 import { ytUrlForSongId } from "@/lib/songs";
@@ -18,6 +18,9 @@ import { safeQuery } from "@/lib/safe-query";
 import { TasteComparePanel } from "@/components/TasteComparePanel";
 import { Avatar } from "@/components/Avatar";
 import { PaperPlaneIcon } from "@/components/icons";
+import { ReportButton } from "@/components/ReportButton";
+import { BlockButton } from "@/components/BlockButton";
+import { or } from "drizzle-orm";
 
 type User = typeof users.$inferSelect;
 
@@ -66,9 +69,9 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     [ratingsStat],
     followingViewer,
     taste,
-    targetSpotify,
     viewer,
     streakPctRank,
+    blockEdges,
   ] = await Promise.all([
     db
       .select({ n: count() })
@@ -95,19 +98,6 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     viewerId && !isOwner
       ? safeQuery(() => computeTasteDetails(viewerId, target.id), null, "taste")
       : Promise.resolve(null),
-    // Whether the profile owner has linked Spotify — shows a green
-    // Spotify chip in the header. Public info; doesn't expose tokens.
-    safeQuery(
-      () =>
-        db
-          .select({ spotifyUserId: spotifyAccounts.spotifyUserId })
-          .from(spotifyAccounts)
-          .where(eq(spotifyAccounts.userId, target.id))
-          .limit(1)
-          .then((r) => r[0] ?? null),
-      null,
-      "target-spotify",
-    ),
     // Viewer's own display name for the compare panel labels — falls
     // back to "You" if the lookup fails or the user isn't signed in.
     viewerId
@@ -128,7 +118,36 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     streak > 0
       ? safeQuery(() => streakPercentile(streak), 0, "streak-pct")
       : Promise.resolve(0),
+    // Block edges in either direction between viewer ↔ target. One
+    // round-trip returns both rows so we can decide whether to render
+    // the "you blocked them" or "they blocked you" state.
+    viewerId && !isOwner
+      ? safeQuery(
+          () =>
+            db
+              .select({
+                blockerId: blocks.blockerId,
+                blockedId: blocks.blockedId,
+              })
+              .from(blocks)
+              .where(
+                or(
+                  and(eq(blocks.blockerId, viewerId), eq(blocks.blockedId, target.id)),
+                  and(eq(blocks.blockerId, target.id), eq(blocks.blockedId, viewerId)),
+                ),
+              ),
+          [] as { blockerId: string; blockedId: string }[],
+          "profile-blocks",
+        )
+      : Promise.resolve([] as { blockerId: string; blockedId: string }[]),
   ]);
+
+  const viewerBlockedTarget = blockEdges.some(
+    (b) => b.blockerId === viewerId && b.blockedId === target.id,
+  );
+  const targetBlockedViewer = blockEdges.some(
+    (b) => b.blockerId === target.id && b.blockedId === viewerId,
+  );
 
   const followersCount = followerStat?.n ?? 0;
   const followingCount = followingStat?.n ?? 0;
@@ -140,7 +159,13 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
     : followRow.status === "pending"
     ? "pending"
     : "accepted";
-  const canSeeRatings = isOwner || !target.isPrivate || followState === "accepted";
+  // Block gating: viewing a profile you blocked OR that blocked you
+  // hides all content (ratings, comments, likes). Apple Guideline 1.2
+  // wants the abuse barrier to be visible from both sides.
+  const blockedEither = viewerBlockedTarget || targetBlockedViewer;
+  const canSeeRatings =
+    !blockedEither &&
+    (isOwner || !target.isPrivate || followState === "accepted");
 
   type RatingRow = {
     score: number;
@@ -246,15 +271,6 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           </h1>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-neutral-400 text-sm">@{target.username}</span>
-            {targetSpotify && (
-              <span
-                className="text-xs inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/30"
-                title={`Spotify connected${targetSpotify.spotifyUserId ? ` as ${targetSpotify.spotifyUserId}` : ""}`}
-              >
-                <SpotifyIcon size={12} />
-                Spotify
-              </span>
-            )}
             {streak > 0 && (
               <span
                 className="text-xs rounded-full px-2 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-300 border border-orange-500/40 font-medium inline-flex items-center gap-1"
@@ -276,21 +292,44 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         </div>
         {viewerId && viewerId !== target.id && (
           <div className="pt-1 shrink-0 flex flex-col items-end gap-1.5">
-            <FollowButton username={target.username} initialState={followState} />
+            {!blockedEither && (
+              <FollowButton username={target.username} initialState={followState} />
+            )}
             <Link
               href={`/u/${target.username}/recs`}
-              className="text-xs text-neutral-400 hover:text-white inline-flex items-center gap-1"
+              className="text-xs text-neutral-400 hover:text-white inline-flex items-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 rounded"
               title="Rec history with this user"
             >
               <PaperPlaneIcon size={12} />
               Recs
             </Link>
+            {!targetBlockedViewer && (
+              <div className="flex items-center gap-1">
+                <ReportButton target={{ type: "user", targetUserId: target.id }} compact />
+                <BlockButton targetId={target.id} initialBlocked={viewerBlockedTarget} />
+              </div>
+            )}
           </div>
         )}
       </div>
 
+      {blockedEither && (
+        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-6 text-center space-y-2">
+          <div className="text-3xl" aria-hidden>🚫</div>
+          <h2 className="text-lg font-semibold">
+            {viewerBlockedTarget ? "You blocked this user" : "Profile unavailable"}
+          </h2>
+          <p className="text-sm text-neutral-400">
+            {viewerBlockedTarget
+              ? "Their ratings, comments, and profile are hidden from you. Unblock above to undo."
+              : "You can't see this profile right now."}
+          </p>
+        </div>
+      )}
+
       {/* Followers / following / stats — single row, all clickable. The
           stats link is the universal entry to /u/[username]/stats. */}
+      {!blockedEither && (
       <div className="flex items-center gap-5 text-sm border-y border-neutral-800 py-3">
         <Link
           href={`/u/${target.username}/followers`}
@@ -317,8 +356,9 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           </Link>
         )}
       </div>
+      )}
 
-      {target.isPrivate && !canSeeRatings && (
+      {target.isPrivate && !canSeeRatings && !blockedEither && (
         <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-6 text-center text-neutral-400 space-y-2">
           <div className="text-2xl">🔒</div>
           <p className="font-medium text-neutral-200">This account is private.</p>

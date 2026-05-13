@@ -119,7 +119,7 @@ export function PushBanner() {
         <button
           onClick={dismiss}
           aria-label="Dismiss"
-          className="text-neutral-500 hover:text-white px-1"
+          className="inline-flex items-center justify-center h-9 w-9 -my-1 -mr-1 text-neutral-500 hover:text-white rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
         >
           ×
         </button>
@@ -136,7 +136,7 @@ export function PushBanner() {
       <button
         onClick={enable}
         disabled={busy}
-        className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-2.5 py-0.5 disabled:opacity-50"
+        className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-3 py-1 min-h-7 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
       >
         {busy ? "…" : "Turn on"}
       </button>

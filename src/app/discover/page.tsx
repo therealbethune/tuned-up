@@ -3,7 +3,7 @@ import Link from "next/link";
 import { encodeBase64Url } from "@/lib/encoding";
 import { auth } from "@clerk/nextjs/server";
 import { desc, sql, gte, eq, ne, and } from "drizzle-orm";
-import { db, ratings, songs, users, follows } from "@/db";
+import { db, ratings, songs, users, follows, blocks } from "@/db";
 import { isAlbumId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
@@ -131,6 +131,13 @@ async function topReviewers(viewerId: string | null): Promise<TopReviewer[]> {
             // Anti-join: only include rows where the viewer has NO
             // existing follow edge.
             viewerId ? sql`${follows.followerId} IS NULL` : sql`true`,
+            // Block-aware: hide anyone the viewer has blocked, and
+            // anyone who blocked the viewer. Both directions matter
+            // so an abuser can't keep appearing as a recommended
+            // friend after their target hit "Block".
+            viewerId
+              ? sql`NOT EXISTS (SELECT 1 FROM ${blocks} b WHERE (b.blocker_id = ${viewerId} AND b.blocked_id = ${users.id}) OR (b.blocker_id = ${users.id} AND b.blocked_id = ${viewerId}))`
+              : sql`true`,
           ),
         )
         .groupBy(users.id)
@@ -166,6 +173,7 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
               alt=""
               width={240}
               height={240}
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="w-full aspect-square object-cover"
             />
           ) : (

@@ -3,17 +3,16 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
-import { db, songs, ratings, users, follows, spotifyAccounts } from "@/db";
+import { db, songs, ratings, users, follows, blocks } from "@/db";
+import { or } from "drizzle-orm";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { scoreLabel } from "@/lib/score-labels";
 import { RateButton } from "@/components/RateButton";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
-import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
 import { Avatar } from "@/components/Avatar";
 import { safeQuery } from "@/lib/safe-query";
-import { isSpotifyConnected } from "@/lib/cached-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -40,15 +39,15 @@ export default async function AlbumPage({
   const songId = decodeSongId(enc);
   const { userId } = await auth();
 
-  // All four queries are independent — fan out in one Promise.all so
-  // the page renders in ~1 DB roundtrip instead of 4 sequential ones.
-  // The song row is required (notFound on miss); the other three are
-  // best-effort and short-circuit to empty / false on auth state.
+  // All three queries are independent — fan out in one Promise.all so
+  // the page renders in ~1 DB roundtrip instead of 3 sequential ones.
+  // The song row is required (notFound on miss); the other two are
+  // best-effort and short-circuit to empty on auth state.
   const [
     [song],
     rawRatings,
     followRows,
-    spotifyConnected,
+    blockRows,
   ] = await Promise.all([
     db.select().from(songs).where(eq(songs.id, songId)).limit(1),
     // All ratings for this item, joined to users for the reviewer rail.
@@ -85,15 +84,24 @@ export default async function AlbumPage({
             ),
           )
       : Promise.resolve([] as { followeeId: string }[]),
-    // Does the viewer have Spotify connected? Spotify save needs the
-    // OAuth token; Apple Music save handles its own popup auth so it's
-    // shown unconditionally. Skip the query when unauthenticated.
-    userId ? isSpotifyConnected(userId) : Promise.resolve(false),
+    userId
+      ? db
+          .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+          .from(blocks)
+          .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)))
+      : Promise.resolve([] as { blockerId: string; blockedId: string }[]),
   ]);
   if (!song) notFound();
 
   const acceptedFollows = new Set(followRows.map((r) => r.followeeId));
+  // Blocked-out raters disappear from the reviewer rail + the average
+  // score calculation, in both directions (mine of them + theirs of me).
+  const blockedIds = new Set<string>();
+  for (const b of blockRows) {
+    blockedIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
+  }
   const allRatings = rawRatings.filter((r) => {
+    if (blockedIds.has(r.raterId)) return false;
     if (!r.isPrivate) return true;
     if (userId && r.raterId === userId) return true;
     return acceptedFollows.has(r.raterId);
@@ -224,9 +232,6 @@ export default async function AlbumPage({
               </div>
               {!isAlbum && (
                 <div className="pt-1 flex flex-wrap items-center gap-2">
-                  {spotifyConnected && (
-                    <SaveToSpotifyButton songId={song.id} connected={spotifyConnected} />
-                  )}
                   <SaveToAppleMusicButton songId={song.id} />
                 </div>
               )}

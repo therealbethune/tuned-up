@@ -9,11 +9,11 @@ import {
   musicKitErrorMessage,
 } from "@/lib/musickit-client";
 
-// Lives on /me beneath ProfileSpotifyPanel. The Apple Music ecosystem
-// doesn't expose a "now playing on your iPhone" endpoint via MusicKit
-// JS (it only knows what's playing inside its own browser instance),
-// so we surface what we CAN show: heavy-rotation. It's the closest
-// "what you've been listening to" signal available.
+// Lives on /me. The Apple Music ecosystem doesn't expose a "now
+// playing on your iPhone" endpoint via MusicKit JS (it only knows
+// what's playing inside its own browser instance), so we surface what
+// we CAN show: heavy-rotation. It's the closest "what you've been
+// listening to" signal available.
 
 type Track = {
   id: string;

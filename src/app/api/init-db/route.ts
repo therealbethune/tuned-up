@@ -128,17 +128,6 @@ const STATEMENTS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "recommendations_unique" ON "recommendations" USING btree ("from_user_id","to_user_id","song_id")`,
   // Spotify track-id resolution cache on songs (so "Open in Spotify" is direct, not a search).
   `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "spotify_track_id" text`,
-  // Per-user linked Spotify accounts (stores refresh + cached access tokens).
-  `CREATE TABLE IF NOT EXISTS "spotify_accounts" (
-    "user_id" text PRIMARY KEY NOT NULL,
-    "spotify_user_id" text NOT NULL,
-    "refresh_token" text NOT NULL,
-    "access_token" text,
-    "expires_at" timestamp,
-    "scope" text NOT NULL,
-    "connected_at" timestamp DEFAULT now() NOT NULL
-  )`,
-  `ALTER TABLE "spotify_accounts" ADD CONSTRAINT "spotify_accounts_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
   // Streak caching for milestone activities + percentile compute.
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "current_streak" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "highest_streak_milestone" integer NOT NULL DEFAULT 0`,
@@ -163,6 +152,39 @@ const STATEMENTS = [
   // Removed feature: sound_bites / reels. Drop dormant table (idempotent —
   // no-op if it was never created in this environment).
   `DROP TABLE IF EXISTS "sound_bites" CASCADE`,
+  // Removed feature: per-user Spotify account linking. We only use
+  // Spotify's app-credentials (catalog search) flow now, so the
+  // refresh-token table is dead weight. CASCADE wipes the FK
+  // constraint along with the table; idempotent re-runs are no-ops.
+  `DROP TABLE IF EXISTS "spotify_accounts" CASCADE`,
+  // UGC moderation tables. App Store Guideline 1.2 requires:
+  //   - reports: users can flag offensive content (ratings/comments/users)
+  //   - blocks: users can block abusive accounts and stop seeing them
+  // Both tables are idempotent on re-run.
+  `CREATE TABLE IF NOT EXISTS "reports" (
+    "id" text PRIMARY KEY NOT NULL,
+    "reporter_id" text NOT NULL,
+    "target_type" text NOT NULL,
+    "target_user_id" text,
+    "target_song_id" text,
+    "target_comment_id" text,
+    "reason" text NOT NULL,
+    "details" text,
+    "status" text NOT NULL DEFAULT 'open',
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `ALTER TABLE "reports" ADD CONSTRAINT "reports_reporter_fk" FOREIGN KEY ("reporter_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE INDEX IF NOT EXISTS "reports_status_idx" ON "reports" USING btree ("status","created_at")`,
+  `CREATE INDEX IF NOT EXISTS "reports_reporter_target_idx" ON "reports" USING btree ("reporter_id","target_type","target_user_id")`,
+  `CREATE TABLE IF NOT EXISTS "blocks" (
+    "blocker_id" text NOT NULL,
+    "blocked_id" text NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    CONSTRAINT "blocks_pk" PRIMARY KEY("blocker_id","blocked_id")
+  )`,
+  `ALTER TABLE "blocks" ADD CONSTRAINT "blocks_blocker_fk" FOREIGN KEY ("blocker_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `ALTER TABLE "blocks" ADD CONSTRAINT "blocks_blocked_fk" FOREIGN KEY ("blocked_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action`,
+  `CREATE INDEX IF NOT EXISTS "blocks_blocked_idx" ON "blocks" USING btree ("blocked_id")`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

@@ -82,7 +82,7 @@ export function MobileTabBar({ unread }: { unread: number }) {
               <Link
                 href={t.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center justify-center py-2 gap-0.5 min-h-[56px] relative transition-colors ${
+                className={`flex flex-col items-center justify-center py-2 gap-0.5 min-h-[56px] relative transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white/50 ${
                   active ? "text-emerald-400" : "text-neutral-400 active:text-white"
                 }`}
               >

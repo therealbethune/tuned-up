@@ -12,10 +12,10 @@ import { reportError } from "@/lib/report-error";
 // the Sentry tag with the label so we can search for `safe-query:feed-items`
 // in the dashboard.
 //
-//   const link = await safeQuery(
-//     () => db.select().from(spotifyAccounts).where(...),
+//   const rows = await safeQuery(
+//     () => db.select().from(users).where(...),
 //     [],
-//     "spotify-link",
+//     "user-lookup",
 //   );
 export async function safeQuery<T>(
   fn: () => Promise<T>,

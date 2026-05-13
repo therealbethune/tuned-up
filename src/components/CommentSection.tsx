@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
 import { toast } from "@/lib/toast";
 import { RowSkeleton } from "@/components/RowSkeleton";
+import { ReportButton } from "@/components/ReportButton";
 
 type Comment = {
   id: string;
@@ -299,6 +300,8 @@ export function CommentSection({
                   <CommentRow
                     c={c}
                     viewerId={viewerId}
+                    ratingUserId={ratingUserId}
+                    songId={songId}
                     onDelete={() => requestDelete(c.id)}
                     onReply={() => startReply(c)}
                   />
@@ -311,6 +314,8 @@ export function CommentSection({
                           key={r.id}
                           c={r}
                           viewerId={viewerId}
+                          ratingUserId={ratingUserId}
+                          songId={songId}
                           onDelete={() => requestDelete(r.id)}
                           onReply={() => startReply(r)}
                         />
@@ -411,11 +416,15 @@ export function CommentSection({
 function CommentRow({
   c,
   viewerId,
+  ratingUserId,
+  songId,
   onDelete,
   onReply,
 }: {
   c: Comment;
   viewerId: string;
+  ratingUserId: string;
+  songId: string;
   onDelete: () => void;
   onReply: () => void;
 }) {
@@ -449,15 +458,29 @@ function CommentRow({
               rated <span className="text-neutral-200 font-medium tabular-nums">{c.score}</span>
             </span>
           )}
-          {c.commenterId === viewerId && (
+          {c.commenterId === viewerId ? (
             <button
               onClick={onDelete}
-              className="ml-auto -mr-1 -mt-1 -mb-1 text-neutral-500 hover:text-red-400 inline-flex items-center justify-center h-10 w-10"
+              className="ml-auto -mr-1 -mt-1 -mb-1 text-neutral-500 hover:text-red-400 inline-flex items-center justify-center h-10 w-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
               title="Delete"
               aria-label="Delete comment"
             >
               ×
             </button>
+          ) : (
+            !c.pending && (
+              <span className="ml-auto -mr-1 -my-1">
+                <ReportButton
+                  target={{
+                    type: "comment",
+                    targetCommentId: c.id,
+                    targetUserId: ratingUserId,
+                    targetSongId: songId,
+                  }}
+                  compact
+                />
+              </span>
+            )
           )}
         </div>
         <p className="text-sm text-neutral-200 mt-0.5 break-words whitespace-pre-wrap">
@@ -470,7 +493,7 @@ function CommentRow({
         )}
         <button
           onClick={onReply}
-          className="mt-1 text-[11px] text-neutral-500 hover:text-white"
+          className="mt-1 text-[11px] text-neutral-500 hover:text-white px-1 py-0.5 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
         >
           Reply
         </button>

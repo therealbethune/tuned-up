@@ -5,7 +5,7 @@ import type { SongResult } from "@/lib/ytmusic";
 import { SongRow } from "@/components/SongRow";
 import { Avatar } from "@/components/Avatar";
 import { toast } from "@/lib/toast";
-import { SpotifyIconOnGreen, SearchIcon } from "@/components/icons";
+import { SearchIcon } from "@/components/icons";
 import { SCORE_TIERS } from "@/lib/score-labels";
 
 type SuggestedUser = {
@@ -160,34 +160,6 @@ export function WelcomeFlow({
                   <div className="text-xs font-semibold">{b.label}</div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-emerald-700/40 bg-emerald-500/5 p-4 space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-full bg-emerald-500 text-black inline-flex items-center justify-center shrink-0">
-                <SpotifyIconOnGreen size={22} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium">Connect Spotify</div>
-                <p className="text-sm text-neutral-400 mt-0.5">
-                  Save songs to your Liked Songs as you rate them. You can also import your top tracks in seconds.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <a
-                href="/api/spotify/connect?return=/welcome"
-                className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-4 py-1.5 text-sm whitespace-nowrap active:scale-95 transition-transform"
-              >
-                Connect Spotify
-              </a>
-              <a
-                href="/import/spotify"
-                className="text-sm text-neutral-400 hover:text-white"
-              >
-                Import top tracks →
-              </a>
             </div>
           </div>
 

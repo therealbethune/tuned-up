@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, sql, or, notInArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, comments, users, ratings, activities, songs } from "@/db";
+import { db, comments, users, ratings, activities, songs, blocks } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
@@ -36,6 +36,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  // Pull the viewer's block edges in parallel so we can strip out
+  // comments from either side of a block. Blocking is two-way for
+  // visibility per App Store 1.2.
+  const blockEdges = await db
+    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+    .from(blocks)
+    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
+  const hiddenIds = new Set<string>();
+  for (const b of blockEdges) {
+    hiddenIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
+  }
+  const hiddenList = Array.from(hiddenIds);
+
   const rows = await db
     .select({
       id: comments.id,
@@ -55,7 +68,15 @@ export async function GET(req: Request) {
       ratings,
       and(eq(ratings.userId, comments.commenterId), eq(ratings.songId, comments.songId)),
     )
-    .where(and(eq(comments.ratingUserId, ratingUserId), eq(comments.songId, songId)))
+    .where(
+      hiddenList.length
+        ? and(
+            eq(comments.ratingUserId, ratingUserId),
+            eq(comments.songId, songId),
+            notInArray(comments.commenterId, hiddenList),
+          )
+        : and(eq(comments.ratingUserId, ratingUserId), eq(comments.songId, songId)),
+    )
     .orderBy(asc(comments.createdAt))
     .limit(200);
 

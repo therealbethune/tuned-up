@@ -93,6 +93,14 @@ export async function GET(req: Request) {
             SELECT 1 FROM dismissed_suggestions
             WHERE viewer_id = ${userId} AND suggested_id = u.id
           )
+          -- Block-aware: hide anyone the viewer has blocked, or who
+          -- blocked the viewer. Required by App Store 1.2 — a blocked
+          -- user should never resurface as a friend suggestion.
+          AND NOT EXISTS (
+            SELECT 1 FROM blocks b
+            WHERE (b.blocker_id = ${userId} AND b.blocked_id = u.id)
+               OR (b.blocker_id = u.id AND b.blocked_id = ${userId})
+          )
       )
       SELECT *
       FROM candidates

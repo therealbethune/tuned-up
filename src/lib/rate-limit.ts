@@ -28,6 +28,12 @@ export const LIMITS = {
   RATINGS: { max: 120, windowSec: 60, bucket: "ratings" },
   RECOMMENDATIONS: { max: 20, windowSec: 60, bucket: "recommendations" },
   FOLLOWS: { max: 30, windowSec: 60, bucket: "follows" },
+  // Reports are user-initiated abuse flags. Tight cap so a bad actor
+  // can't spam staff queue; legit users rarely report > 1-2 things/day.
+  REPORTS: { max: 10, windowSec: 3600, bucket: "reports" },
+  // Blocks toggle on/off; a few back-and-forth taps is fine but no
+  // floods. Per-hour cap is generous and keeps churn bounded.
+  BLOCKS: { max: 60, windowSec: 3600, bucket: "blocks" },
 } satisfies Record<string, RateLimit>;
 
 // Standard 429 response. The Retry-After header lets clients back off

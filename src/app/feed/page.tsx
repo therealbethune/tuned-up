@@ -2,8 +2,8 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { and, desc, eq, inArray, lt, notInArray, sql, count } from "drizzle-orm";
-import { db, ratings, songs, users, follows, comments, likes, spotifyAccounts } from "@/db";
+import { and, desc, eq, inArray, lt, notInArray, sql, count, or } from "drizzle-orm";
+import { db, ratings, songs, users, follows, comments, likes, blocks } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { ytUrlForSongId } from "@/lib/songs";
 import { RateButton } from "@/components/RateButton";
@@ -12,7 +12,6 @@ import { LikeButton } from "@/components/LikeButton";
 import { ShareButton } from "@/components/ShareButton";
 import { StreamingLinks } from "@/components/StreamingLinks";
 import { RecommendButton } from "@/components/RecommendButton";
-import { SaveToSpotifyButton } from "@/components/SaveToSpotifyButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
 import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { SafeCardBoundary } from "@/components/SafeCardBoundary";
@@ -21,7 +20,7 @@ import { FriendRecsRail } from "@/components/FriendRecsRail";
 import { recommendedFromFriends, type FriendRec } from "@/lib/recs";
 import { Avatar } from "@/components/Avatar";
 import { PlayIcon } from "@/components/icons";
-import { isSpotifyConnected } from "@/lib/cached-queries";
+import { ReportButton } from "@/components/ReportButton";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
@@ -69,16 +68,35 @@ export default async function FeedPage({
   // renders the empty-feed state instead of 500-ing the whole route.
   // The instrumentation.ts hook + console.warn inside safeQuery
   // still log the real error so we can find it in Netlify logs.
-  const followedRows = await safeQuery(
-    () =>
-      db
-        .select({ id: follows.followeeId })
-        .from(follows)
-        .where(and(eq(follows.followerId, userId), eq(follows.status, "accepted"))),
-    [] as { id: string }[],
-    "feed-follows",
-  );
-  const followedIds = followedRows.map((r) => r.id);
+  // Fan out the two upfront lookups in parallel: which users does the
+  // viewer follow, and who's involved in a block edge with them?
+  // Blocks hide content in BOTH directions so an abuser can't just
+  // create a new account to dodge a mute.
+  const [followedRows, blockEdges] = await Promise.all([
+    safeQuery(
+      () =>
+        db
+          .select({ id: follows.followeeId })
+          .from(follows)
+          .where(and(eq(follows.followerId, userId), eq(follows.status, "accepted"))),
+      [] as { id: string }[],
+      "feed-follows",
+    ),
+    safeQuery(
+      () =>
+        db
+          .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+          .from(blocks)
+          .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId))),
+      [] as { blockerId: string; blockedId: string }[],
+      "feed-blocks",
+    ),
+  ]);
+  const hiddenIds = new Set<string>();
+  for (const b of blockEdges) {
+    hiddenIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
+  }
+  const followedIds = followedRows.map((r) => r.id).filter((id) => !hiddenIds.has(id));
   followedIds.push(userId); // include self
 
   type FeedItemRow = {
@@ -191,7 +209,9 @@ export default async function FeedPage({
       const ownerIsPrivate = focused.ratingOwnerIsPrivate;
       const viewerOwnsIt = focused.ratingUserId === userId;
       const viewerFollows = followedIds.includes(focused.ratingUserId);
-      const allowed = !ownerIsPrivate || viewerOwnsIt || viewerFollows;
+      const allowed =
+        !hiddenIds.has(focused.ratingUserId) &&
+        (!ownerIsPrivate || viewerOwnsIt || viewerFollows);
       if (allowed) {
         // Strip the privacy-only field before merging into the items list
         // (the visible row type doesn't include it).
@@ -226,7 +246,6 @@ export default async function FeedPage({
   const [
     myRatingsRows,
     otherRaterRows,
-    spotifyConnected,
     friendRecs,
     cCounts,
     lCounts,
@@ -267,9 +286,6 @@ export default async function FeedPage({
           "feed-other-raters",
         )
       : Promise.resolve([] as OtherRater[]),
-    // Cached per-request so /feed + /me + /album share one roundtrip
-    // when they happen in the same render tree.
-    isSpotifyConnected(userId),
     // "Friends loved" rail — only on the first page (no `before` cursor)
     // so pagination doesn't reshuffle scroll position.
     wantsFriendRecs
@@ -372,7 +388,7 @@ export default async function FeedPage({
         <Link href="/search" className="text-sm text-neutral-400 hover:text-white">+ Rate a song</Link>
       </div>
 
-      <ConnectMusicBanner spotifyConnected={spotifyConnected} />
+      <ConnectMusicBanner />
 
       <FriendRecsRail recs={friendRecs} />
 
@@ -431,6 +447,18 @@ export default async function FeedPage({
                   <span className="text-xs text-neutral-400">
                     {relativeTime(it.createdAt)}
                   </span>
+                  {it.ratingUserId !== userId && (
+                    <span className="ml-auto -my-1">
+                      <ReportButton
+                        target={{
+                          type: "rating",
+                          targetUserId: it.ratingUserId,
+                          targetSongId: it.songId,
+                        }}
+                        compact
+                      />
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   {url ? (
@@ -586,9 +614,6 @@ export default async function FeedPage({
 
                 {!isAlbumId(it.songId) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {spotifyConnected && (
-                      <SaveToSpotifyButton songId={it.songId} connected={spotifyConnected} />
-                    )}
                     <SaveToAppleMusicButton songId={it.songId} />
                   </div>
                 )}

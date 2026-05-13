@@ -2,15 +2,13 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { and, eq, count } from "drizzle-orm";
-import { db, users, recommendations, spotifyAccounts } from "@/db";
+import { db, users, recommendations } from "@/db";
 import UserProfile from "../u/[username]/UserProfile";
 import { PushBanner } from "@/components/PushBanner";
 import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
-import { ProfileSpotifyPanel } from "@/components/ProfileSpotifyPanel";
 import { ProfileAppleMusicPanel } from "@/components/ProfileAppleMusicPanel";
 import { SettingsIcon, PaperPlaneIcon } from "@/components/icons";
 import { safeQuery } from "@/lib/safe-query";
-import { isSpotifyConnected } from "@/lib/cached-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -57,27 +55,22 @@ export default async function MePage() {
     );
   }
 
-  // Pending-recs count + Spotify-link status fan out — both gate UI on
-  // the same page header and neither depends on the other. Same idea as
-  // /feed and the profile page: serial awaits here add up to a visible
-  // hold on every /me visit.
-  const [recStatRows, spotifyConnected] = await Promise.all([
-    safeQuery(
-      () =>
-        db
-          .select({ n: count() })
-          .from(recommendations)
-          .where(
-            and(
-              eq(recommendations.toUserId, userId),
-              eq(recommendations.status, "pending"),
-            ),
+  // Pending-recs count for the toolbar badge. The remaining /me
+  // queries live inside UserProfile (which renders below).
+  const recStatRows = await safeQuery(
+    () =>
+      db
+        .select({ n: count() })
+        .from(recommendations)
+        .where(
+          and(
+            eq(recommendations.toUserId, userId),
+            eq(recommendations.status, "pending"),
           ),
-      [] as { n: number }[],
-      "me-pending-recs",
-    ),
-    isSpotifyConnected(userId),
-  ]);
+        ),
+    [] as { n: number }[],
+    "me-pending-recs",
+  );
   const pendingRecs = Number(recStatRows[0]?.n ?? 0);
 
   return (
@@ -117,8 +110,7 @@ export default async function MePage() {
       {/* Banners + integration panels live below — they're contextual
           additions, not the page's primary purpose. */}
       <PushBanner />
-      <ConnectMusicBanner spotifyConnected={spotifyConnected} />
-      <ProfileSpotifyPanel connected={spotifyConnected} />
+      <ConnectMusicBanner />
       <ProfileAppleMusicPanel />
     </div>
   );

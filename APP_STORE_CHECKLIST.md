@@ -9,6 +9,17 @@ checkboxes as items land.
 - [x] `/legal/terms` page drafted, linked from /, /settings
 - [x] `support@tuned-up.com` mailto on both surfaces
 - [x] Account deletion flow (in-app) — already shipped (Settings → Delete)
+- [x] **Guideline 1.2 — UGC moderation:** Report flow on every UGC
+      surface (ratings, comments, profiles) + Block flow on profiles.
+      Reports table + `/admin/reports` queue for staff action within
+      24h. Blocking is two-way — blocked users disappear from feed,
+      discover, suggestions, profile, comments, and album reviewer rail.
+- [x] **Removed per-user Spotify account linking.** Spotify API still
+      powers anonymous catalog lookups (resolve a YT-Music track id →
+      Spotify track id for the "Open in Spotify" deep link), but the
+      OAuth flow + Connect Spotify cards + Save-to-Spotify buttons are
+      gone. One fewer integration limit to manage; one fewer App Store
+      Connect "data linked to you" disclosure.
 - [ ] **Sign in with Apple via Clerk** — REQUIRED by Guideline 4.8 since we
       also offer Google/etc. Steps:
       1. Apple Developer Program → Certificates → "Services ID"
@@ -93,6 +104,10 @@ checkboxes as items land.
 
 ## Apple App Store Review Guidelines we're most likely to trip on
 
+- **1.2** — User-Generated Content moderation: ✓ Report flow on every
+              UGC surface + Block flow on profiles. Reports queue in
+              `/admin/reports` is the staff action surface. Set
+              `ADMIN_USER_IDS` env var to the Clerk ids of moderators.
 - **2.5.1** — Use only public APIs. ✓ (web app, no private iOS APIs)
 - **4.2.2** — Apps that are just packaged websites get rejected. We need
               demonstrable native value: APNs push, share sheet, MusicKit JS

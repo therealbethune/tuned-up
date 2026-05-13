@@ -36,19 +36,6 @@ export const songs = pgTable("songs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// One row per user who has linked their Spotify account. Stores the
-// long-lived refresh token plus a cached access token; helpers in
-// `lib/spotify-server.ts` auto-refresh expired tokens.
-export const spotifyAccounts = pgTable("spotify_accounts", {
-  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
-  spotifyUserId: text("spotify_user_id").notNull(),
-  refreshToken: text("refresh_token").notNull(),
-  accessToken: text("access_token"),
-  expiresAt: timestamp("expires_at"),
-  scope: text("scope").notNull(),
-  connectedAt: timestamp("connected_at").defaultNow().notNull(),
-});
-
 export const ratings = pgTable("ratings", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   songId: text("song_id").notNull().references(() => songs.id, { onDelete: "cascade" }),
@@ -152,6 +139,50 @@ export const comments = pgTable("comments", {
 }, (t) => [
   index("comments_target_idx").on(t.ratingUserId, t.songId, t.createdAt),
   index("comments_parent_idx").on(t.parentCommentId),
+]);
+
+// Content reports. UGC moderation flow required by Apple App Store
+// Guideline 1.2 — users must be able to flag offensive content. The
+// targetType + nullable target* columns let one table cover every
+// flaggable surface (rating, comment, profile) without separate tables.
+//   targetType: 'rating' | 'comment' | 'user'
+//   reason:     short enum string ('spam' | 'harassment' | 'hate' | ...)
+//   status:     'open' | 'reviewed' | 'dismissed'
+export const reports = pgTable("reports", {
+  id: text("id").primaryKey(),
+  reporterId: text("reporter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  targetType: text("target_type").notNull(),
+  // For 'rating' + 'comment': the rating's owner. For 'user': the
+  // reported account. For all three, useful for triage joins.
+  targetUserId: text("target_user_id"),
+  // Set on 'rating' + 'comment'; deep-links the report to the offending
+  // post when staff review.
+  targetSongId: text("target_song_id"),
+  targetCommentId: text("target_comment_id"),
+  reason: text("reason").notNull(),
+  details: text("details"),
+  status: text("status").notNull().default("open"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  // Triage queries scan newest open reports first.
+  index("reports_status_idx").on(t.status, t.createdAt),
+  // De-dupe: the same reporter can't pile on the same target.
+  index("reports_reporter_target_idx").on(t.reporterId, t.targetType, t.targetUserId),
+]);
+
+// One row per (blocker, blocked) pair. App Store Guideline 1.2 requires
+// users to be able to block abusive accounts. Blocking is one-way: the
+// blocker stops seeing the blocked user's ratings/comments/profile and
+// vice-versa (mirrored in feed/profile/comment filters).
+export const blocks = pgTable("blocks", {
+  blockerId: text("blocker_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  blockedId: text("blocked_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.blockerId, t.blockedId] }),
+  // Reverse-direction lookup for mirrored hiding (blocked user shouldn't
+  // see the blocker's content either).
+  index("blocks_blocked_idx").on(t.blockedId),
 ]);
 
 // Activity / notifications. One row per thing that should appear in

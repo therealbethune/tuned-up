@@ -38,9 +38,9 @@ export async function POST() {
   //    silent identity hijack.
   //
   // Cascade summary on `users.id` delete: ratings, comments, likes,
-  // follows, recommendations, dismissed_suggestions, spotify_accounts,
-  // push_subscriptions, and activities WHERE userId OR actorId match all
-  // cascade-delete automatically. But activities.ratingUserId is a plain
+  // follows, recommendations, dismissed_suggestions, push_subscriptions,
+  // and activities WHERE userId OR actorId match all cascade-delete
+  // automatically. But activities.ratingUserId is a plain
   // text column (no FK), so rows like "Bob commented on this user's
   // rating, mentioning Wendy" survive in Wendy's bell with a dangling
   // ratingUserId pointer that resolves to a now-deleted user — same

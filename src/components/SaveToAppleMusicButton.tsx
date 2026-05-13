@@ -114,7 +114,7 @@ export function SaveToAppleMusicButton({ songId }: { songId: string }) {
       disabled={state === "saving" || state === "saved"}
       title={state === "saved" ? "Added to your Apple Music library" : "Add to your Apple Music library"}
       aria-label={state === "saved" ? "Saved to Apple Music" : "Save to Apple Music"}
-      className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border transition-colors ${
+      className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 min-h-8 rounded-full border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
         state === "saved"
           ? "border-pink-500/60 bg-pink-500/10 text-pink-300"
           : state === "error"

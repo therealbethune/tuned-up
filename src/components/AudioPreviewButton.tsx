@@ -114,7 +114,7 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
       disabled={state === "loading"}
       aria-label={state === "playing" ? "Pause preview" : "Play 30-second preview"}
       title={state === "playing" ? "Pause" : "30-second preview"}
-      className={`inline-flex items-center justify-center h-9 w-9 rounded-full transition-colors active:scale-95 ${
+      className={`inline-flex items-center justify-center h-11 w-11 rounded-full transition-colors active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
         state === "playing"
           ? "bg-emerald-500 text-black"
           : "bg-neutral-800/80 text-neutral-300 hover:bg-neutral-700"

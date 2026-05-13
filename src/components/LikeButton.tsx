@@ -69,7 +69,7 @@ export function LikeButton({
         aria-pressed={liked}
         aria-label={liked ? "Unlike" : "Like"}
         title={liked ? "Unlike" : "Like"}
-        className={`inline-flex items-center text-sm transition-all px-1.5 py-1 rounded-md ${
+        className={`inline-flex items-center text-sm transition-all px-1.5 py-1 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
           liked
             ? "text-rose-400 hover:text-rose-300"
             : "text-neutral-400 hover:text-white"
@@ -96,7 +96,7 @@ export function LikeButton({
         disabled={count === 0}
         aria-label={count > 0 ? `See who liked — ${count}` : "No likes yet"}
         title={count > 0 ? "See who liked this" : undefined}
-        className={`text-sm tabular-nums pl-1 pr-1.5 py-1 rounded-md transition-colors ${
+        className={`text-sm tabular-nums pl-1 pr-1.5 py-1 rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
           count > 0
             ? liked
               ? "text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"

@@ -42,34 +42,6 @@ export function SpotifyIcon({ size = 16, className, ...rest }: IconProps) {
   );
 }
 
-// Spotify mark rendered for placement on a green / brand-color chip.
-// The proper Spotify look on green is just three black wavy bars — no
-// outer circle, since the green container disc IS the icon's body.
-// (The previous version filled the outer circle with currentColor,
-// which on a `text-black` parent made the icon render as a black disc
-// on green with the wavy bars invisible inside it — looked like a
-// random black dot in the welcome flow's "Connect Spotify" card.)
-export function SpotifyIconOnGreen({ size = 22, className, ...rest }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-      className={className}
-      {...rest}
-    >
-      <path
-        d="M7.5 14.4c2.4-1.4 5.7-1.7 9-.8m-9-3.6c2.9-1.6 7-2 10.5-.8m-10.5-3c3.4-1.6 8.5-1.8 12.5-.4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 export function YtMusicIcon({ size = 14, className, ...rest }: IconProps) {
   return (
     <svg
@@ -109,10 +81,9 @@ export function AppleMusicIcon({ size = 14, className, ...rest }: IconProps) {
 
 // --- Generic UI icons ----------------------------------------------------
 
-// Triangular play glyph. Single source of truth — replaces ~7 inline
-// `<path d="M8 5v14l11-7z" />` duplicates spread across SongRow, feed,
-// UserProfile, ProfileSpotifyPanel, and AudioPreviewButton. Inherits
-// color via `fill="currentColor"` so callers control palette.
+// Triangular play glyph. Single source of truth — replaces inline
+// `<path d="M8 5v14l11-7z" />` duplicates across SongRow, feed,
+// and AudioPreviewButton. Inherits color via `fill="currentColor"`.
 export function PlayIcon({ size = 18, className, ...rest }: IconProps) {
   return (
     <svg
