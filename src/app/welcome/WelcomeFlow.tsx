@@ -221,14 +221,18 @@ export function WelcomeFlow({
             )}
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-neutral-800">
+          <div className="flex items-center justify-between pt-4 border-t border-neutral-800 sticky bottom-0 -mx-4 px-4 py-3 bg-neutral-950/95 backdrop-blur" style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}>
             <p className="text-sm text-neutral-400">
-              {ratingsDone === 0 ? "Rate a song to continue." : `${ratingsDone} rated · keep going or move on`}
+              {ratingsDone === 0
+                ? "Rate a song to continue."
+                : ratingsDone === 1
+                  ? "1 rated · keep going or move on"
+                  : `${ratingsDone} rated · nice ✨`}
             </p>
             <button
               onClick={() => setStep(2)}
               disabled={ratingsDone === 0}
-              className="rounded-full bg-white text-black px-4 py-1.5 font-medium disabled:opacity-50 active:scale-95 transition-transform"
+              className="rounded-full bg-white text-black px-4 py-1.5 min-h-9 font-medium disabled:opacity-50 active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
             >
               Next →
             </button>
