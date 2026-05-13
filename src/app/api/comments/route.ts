@@ -137,6 +137,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  // Block guard: refuse a comment from someone who's on either side of
+  // a block edge with the rating owner. Apple Guideline 1.2 wants the
+  // moderation barrier to be real — silently dropping the comment isn't
+  // enough; the write itself must fail.
+  if (ratingUserId !== userId) {
+    const [blockEdge] = await db
+      .select({ blockerId: blocks.blockerId })
+      .from(blocks)
+      .where(
+        or(
+          and(eq(blocks.blockerId, userId), eq(blocks.blockedId, ratingUserId)),
+          and(eq(blocks.blockerId, ratingUserId), eq(blocks.blockedId, userId)),
+        ),
+      )
+      .limit(1);
+    if (blockEdge) {
+      return NextResponse.json({ error: "blocked" }, { status: 403 });
+    }
+  }
+
   // If this is a reply, validate the parent and flatten any reply-to-reply
   // chain (so replies are always at depth 1).
   let parentCommentId: string | null = null;
@@ -174,6 +194,19 @@ export async function POST(req: Request) {
   // owner (who already gets the comment notification a few lines below).
   // Cap at MENTION_LIMIT to prevent comment-spam-as-pingflood: a hostile
   // user can't ping 200 people just by stuffing usernames into a comment.
+  // One block-edge lookup up-front. Used to suppress mention/reply/
+  // comment notifications going to anyone the commenter has blocked
+  // (or who blocked them) — a blocked user shouldn't be able to ping
+  // their target via @mention or by replying to the target's comment.
+  const blockEdges = await db
+    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+    .from(blocks)
+    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
+  const notifyBlocked = new Set<string>();
+  for (const b of blockEdges) {
+    notifyBlocked.add(b.blockerId === userId ? b.blockedId : b.blockerId);
+  }
+
   const MENTION_LIMIT = 10;
   const mentionedUsernames = extractMentions(text).slice(0, MENTION_LIMIT);
   if (mentionedUsernames.length > 0) {
@@ -218,7 +251,7 @@ export async function POST(req: Request) {
       // adding ~200ms × N mentions to the comment-post latency.
       await Promise.allSettled(
         mentionedUsers
-          .filter((u) => u.id !== userId && u.id !== ratingUserId)
+          .filter((u) => u.id !== userId && u.id !== ratingUserId && !notifyBlocked.has(u.id))
           .map(async (u) => {
             // Dedupe a previous mention from the same actor on the same
             // comment target so refreshing doesn't pile up entries.
@@ -293,7 +326,7 @@ export async function POST(req: Request) {
   // a slow web-push roundtrip was previously blocking the activity row
   // from being written for ~150-300ms longer than necessary. allSettled
   // so a flaky push provider can't roll back the activity row.
-  if (ratingUserId !== userId) {
+  if (ratingUserId !== userId && !notifyBlocked.has(ratingUserId)) {
     await Promise.allSettled([
       db.insert(activities).values({
         id: randomUUID(),
@@ -317,7 +350,12 @@ export async function POST(req: Request) {
   // If this is a reply, additionally notify the parent comment's author —
   // unless they're the rating owner (already notified above) or themselves.
   // Same parallel pattern as the rating-owner block above.
-  if (parentCommenterId && parentCommenterId !== userId && parentCommenterId !== ratingUserId) {
+  if (
+    parentCommenterId &&
+    parentCommenterId !== userId &&
+    parentCommenterId !== ratingUserId &&
+    !notifyBlocked.has(parentCommenterId)
+  ) {
     try {
       await Promise.allSettled([
         db.insert(activities).values({

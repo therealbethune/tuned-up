@@ -105,6 +105,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "cannot recommend to yourself" }, { status: 400 });
     }
 
+    // Block guard — neither side can send a recommendation across a
+    // block edge. Same reasoning as follow: refusing the write stops
+    // the abuse path of using "rec" as a notification bomb.
+    const [blockEdge] = await db
+      .select({ blockerId: blocks.blockerId })
+      .from(blocks)
+      .where(
+        or(
+          and(eq(blocks.blockerId, userId), eq(blocks.blockedId, target.id)),
+          and(eq(blocks.blockerId, target.id), eq(blocks.blockedId, userId)),
+        ),
+      )
+      .limit(1);
+    if (blockEdge) {
+      return NextResponse.json({ error: "blocked" }, { status: 403 });
+    }
+
     // Rate-limit: recs are the highest-cost write (push notification +
     // activity row to the recipient). Cap at 20/minute to stop someone
     // from spam-recommending the same song to dozens of people at once.

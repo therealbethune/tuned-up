@@ -158,6 +158,25 @@ export async function POST(req: Request) {
     }
     liked = false;
   } else {
+    // Block guard: refuse the new like entirely if there's a block
+    // edge in either direction. Existing likes can still be unliked
+    // (above branch) since that's only a removal.
+    if (ratingUserId !== userId) {
+      const [blockEdge] = await db
+        .select({ blockerId: blocks.blockerId })
+        .from(blocks)
+        .where(
+          or(
+            and(eq(blocks.blockerId, userId), eq(blocks.blockedId, ratingUserId)),
+            and(eq(blocks.blockerId, ratingUserId), eq(blocks.blockedId, userId)),
+          ),
+        )
+        .limit(1);
+      if (blockEdge) {
+        return NextResponse.json({ error: "blocked" }, { status: 403 });
+      }
+    }
+
     // Use the unique constraint as the single source of truth: if a parallel
     // request beat us to it, onConflictDoNothing returns 0 affected rows and
     // we skip the side-effects (no double activity, no double push).
