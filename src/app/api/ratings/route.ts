@@ -339,5 +339,17 @@ export async function DELETE(req: Request) {
     .delete(ratings)
     .where(and(eq(ratings.userId, userId), eq(ratings.songId, songId)));
 
+  // Refresh the cached streak. Deleting a rating can drop the streak
+  // (most-recent-day was the deleted song) — without this, the user
+  // row's currentStreak stays at its pre-delete value until they rate
+  // again, and /stats / profile both render that stale number. Best-
+  // effort; on failure the cache just remains stale for one cycle.
+  try {
+    const fresh = await computeStreak(userId);
+    await refreshUserStreak(userId, fresh);
+  } catch {
+    /* ignore */
+  }
+
   return NextResponse.json({ ok: true });
 }

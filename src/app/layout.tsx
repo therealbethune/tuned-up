@@ -170,15 +170,18 @@ function SignedOutNav() {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
-  let synced: Awaited<ReturnType<typeof syncCurrentUser>> = null;
-  if (userId) {
-    try {
-      synced = await syncCurrentUser();
-    } catch {
-      /* don't block rendering on a bad sync */
-    }
-  }
-  const unread = await getUnreadForTabBar(userId);
+  // Fan out syncCurrentUser + unread count so the layout-level data
+  // doesn't add two sequential DB roundtrips to every signed-in page
+  // render. They're independent — sync writes/reads the users row,
+  // unread reads from activities — and both gate the layout shell.
+  // syncCurrentUser is wrapped to swallow its own throws (don't block
+  // rendering on a bad sync); unread defaults to 0 on failure.
+  const [synced, unread] = await Promise.all([
+    userId
+      ? syncCurrentUser().catch(() => null)
+      : Promise.resolve(null),
+    getUnreadForTabBar(userId).catch(() => 0),
+  ]);
   return (
     <ClerkProvider>
       <html lang="en" className="dark" suppressHydrationWarning>

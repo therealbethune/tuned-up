@@ -6,10 +6,14 @@ import { dismiss, subscribeToasts, type Toast } from "@/lib/toast";
 // Stack grows downward from bottom-center on mobile, bottom-right on
 // desktop. Each toast slides up + fades out on dismiss.
 //
-// We sit above the MobileTabBar (which is z-20) at z-30 so toasts
-// remain visible if a user triggers an action while the tab bar is
-// up. Position uses the safe-area inset so the toast doesn't end up
-// under the iPhone home indicator.
+// Z-stack rationale: MobileTabBar is z-20, RateButton/LikersSheet
+// modals are z-40, ConfirmDialog is z-50. Toasts need to sit above
+// ALL of them — they're how the app reports outcomes of in-modal
+// actions ("rate-limited", "Couldn't save rating"). Sitting at z-30
+// (the previous value) meant any toast fired from inside a modal
+// rendered hidden behind the modal backdrop. z-[60] keeps toasts
+// reliably topmost. Position uses the safe-area inset so the toast
+// doesn't end up under the iPhone home indicator.
 export function Toaster() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -22,7 +26,7 @@ export function Toaster() {
       // Pointer-events none on the container so toasts don't block
       // anything underneath; only the toast cards themselves receive
       // taps (for manual dismiss).
-      className="fixed inset-x-0 z-30 pointer-events-none flex flex-col items-center sm:items-end gap-2 px-4 sm:pr-6 sm:right-0 sm:left-auto"
+      className="fixed inset-x-0 z-[60] pointer-events-none flex flex-col items-center sm:items-end gap-2 px-4 sm:pr-6 sm:right-0 sm:left-auto"
       style={{
         // Sit above the mobile tab bar (56px + safe-area).
         bottom: "calc(env(safe-area-inset-bottom) + 5rem)",

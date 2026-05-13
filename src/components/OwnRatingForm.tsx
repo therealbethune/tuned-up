@@ -78,16 +78,25 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function del() {
+    if (busy) return;
     setBusy(true);
-    const res = await fetch("/api/ratings", {
-      method: "DELETE",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ songId: rating.songId }),
-    });
-    setBusy(false);
-    setConfirmingDelete(false);
-    if (res.ok) router.refresh();
-    else setError("Delete failed — try again.");
+    setError(null);
+    try {
+      const res = await fetch("/api/ratings", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ songId: rating.songId }),
+      });
+      if (res.ok) router.refresh();
+      else setError("Delete failed — try again.");
+    } catch {
+      // Without try/catch a network throw stranded busy=true and the
+      // ConfirmDialog open forever.
+      setError("Couldn't reach the server. Try again.");
+    } finally {
+      setBusy(false);
+      setConfirmingDelete(false);
+    }
   }
 
   if (!editing) {

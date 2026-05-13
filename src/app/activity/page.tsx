@@ -96,37 +96,46 @@ export default async function ActivityPage() {
   // build /r/<owner>/<songId> URLs without a per-row lookup).
   const ratingOwner = alias(users, "rating_owner");
 
-  // Parallelize: fetch activities + mark unread as read at the same time.
-  // The two queries are independent; running them serially is just
-  // wasted round-trip time on every Activity page load.
-  const [rows] = await Promise.all([
-    db
-      .select({
-        id: activities.id,
-        type: activities.type,
-        songId: activities.songId,
-        createdAt: activities.createdAt,
-        readAt: activities.readAt,
-        actorId: users.id,
-        actorUsername: users.username,
-        actorDisplayName: users.displayName,
-        actorImageUrl: users.imageUrl,
-        songTitle: songs.title,
-        ratingOwnerUsername: ratingOwner.username,
-        ratingOwnerId: activities.ratingUserId,
-      })
-      .from(activities)
-      .innerJoin(users, eq(users.id, activities.actorId))
-      .leftJoin(songs, eq(songs.id, activities.songId))
-      .leftJoin(ratingOwner, eq(ratingOwner.id, activities.ratingUserId))
-      .where(eq(activities.userId, userId))
-      .orderBy(desc(activities.createdAt))
-      .limit(50),
-    db
-      .update(activities)
-      .set({ readAt: new Date() })
-      .where(and(eq(activities.userId, userId), isNull(activities.readAt))),
-  ]);
+  // SELECT-then-UPDATE on purpose. These were previously parallelized,
+  // but that races the "mark everything read" UPDATE against the SELECT
+  // that drives render — if the UPDATE wins, the SELECT returns rows
+  // with readAt already populated and every activity renders without
+  // the "unread" highlight, even on the first time the user sees them.
+  // Sequential costs one extra DB roundtrip but preserves the visual
+  // "new since last visit" cue on the row's first paint.
+  const rows = await db
+    .select({
+      id: activities.id,
+      type: activities.type,
+      songId: activities.songId,
+      createdAt: activities.createdAt,
+      readAt: activities.readAt,
+      actorId: users.id,
+      actorUsername: users.username,
+      actorDisplayName: users.displayName,
+      actorImageUrl: users.imageUrl,
+      songTitle: songs.title,
+      ratingOwnerUsername: ratingOwner.username,
+      ratingOwnerId: activities.ratingUserId,
+    })
+    .from(activities)
+    .innerJoin(users, eq(users.id, activities.actorId))
+    .leftJoin(songs, eq(songs.id, activities.songId))
+    .leftJoin(ratingOwner, eq(ratingOwner.id, activities.ratingUserId))
+    .where(eq(activities.userId, userId))
+    .orderBy(desc(activities.createdAt))
+    .limit(50);
+
+  // Fire-and-forget mark-as-read. We don't await because the user's
+  // already looking at the rendered list; whether the write lands
+  // before or after navigation away doesn't matter for THIS page render.
+  // The next /activity visit will see the updated readAt values.
+  db.update(activities)
+    .set({ readAt: new Date() })
+    .where(and(eq(activities.userId, userId), isNull(activities.readAt)))
+    .catch(() => {
+      /* non-critical — the unread badge will just persist one more visit */
+    });
 
   return (
     <div className="space-y-6">
