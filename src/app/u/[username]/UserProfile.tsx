@@ -301,10 +301,10 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           to land in the classic "profile picture sits on the cover"
           position; the rest of the header info sits BELOW the banner
           so the name + chips don't fight the gradient. */}
-      <div className={`relative -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden h-28 sm:h-32 ${cover.css}`} aria-hidden />
+      <div className={`relative -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden h-28 sm:h-32 shadow-[inset_0_-40px_60px_-40px_rgba(0,0,0,0.65)] ${cover.css}`} aria-hidden />
       {/* Header: avatar + name + streak + follow */}
       <div className="flex items-start gap-4">
-        <div className="-mt-12 shrink-0 rounded-full ring-4 ring-neutral-950">
+        <div className={`-mt-12 shrink-0 rounded-full ring-4 ring-neutral-950 ${streak >= 7 ? "ring-streak" : ""}`}>
           <Avatar
             imageUrl={target.imageUrl}
             name={target.displayName || target.username}

@@ -16,18 +16,18 @@ export function RowSkeleton({
   count?: number;
 }) {
   return (
-    <ul className="space-y-2 animate-pulse">
+    <ul className="space-y-2">
       {Array.from({ length: count }).map((_, i) => (
         <li key={i} className="flex items-center gap-2.5">
           <span
-            className="rounded-full bg-neutral-800 shrink-0"
+            className="rounded-full shimmer shrink-0"
             style={{ width: size, height: size }}
             aria-hidden
           />
           <div className="flex-1 space-y-1.5">
-            <div className="h-2.5 w-2/5 rounded bg-neutral-800" />
+            <div className="h-2.5 w-2/5 rounded shimmer" />
             {lines === 2 && (
-              <div className="h-2 w-1/3 rounded bg-neutral-800/60" />
+              <div className="h-2 w-1/3 rounded shimmer" />
             )}
           </div>
         </li>

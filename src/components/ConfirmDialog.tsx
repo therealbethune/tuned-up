@@ -93,11 +93,15 @@ export function ConfirmDialog({
       }}
     >
       <div
-        className={`w-full sm:max-w-sm rounded-t-2xl sm:rounded-xl border border-neutral-800 bg-neutral-950 p-5 space-y-4 transform transition-transform duration-200 ease-out ${
+        className={`relative w-full sm:max-w-sm rounded-t-2xl sm:rounded-xl border border-neutral-800 bg-neutral-950 p-5 space-y-4 transform transition-transform duration-200 ease-out ${
           show ? "translate-y-0" : "translate-y-full sm:translate-y-2"
         }`}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 1.25rem)" }}
       >
+        {/* Improvement #30: iOS-style grabber bar so the user instinct
+            "swipe me down to dismiss" reads visually. Decorative only;
+            backdrop tap + close button still handle the actual dismiss. */}
+        <span aria-hidden className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-neutral-700 sm:hidden" />
         <div>
           <h2 id="confirm-title" className="text-base font-semibold">{title}</h2>
           {body && <p className="text-sm text-neutral-400 mt-1">{body}</p>}

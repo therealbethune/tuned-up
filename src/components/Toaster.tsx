@@ -42,7 +42,7 @@ export function Toaster() {
           key={t.id}
           role={t.kind === "error" ? "alert" : "status"}
           aria-live={t.kind === "error" ? "assertive" : "polite"}
-          className={`pointer-events-auto rounded-xl border px-3.5 py-2.5 text-sm font-medium shadow-xl backdrop-blur-md max-w-sm flex items-start gap-2.5 animate-[toast-in_0.18s_ease-out] ${
+          className={`pointer-events-auto rounded-xl border px-3.5 py-2.5 text-sm font-medium shadow-xl backdrop-blur-md max-w-sm flex items-start gap-2.5 toast-anim ${
             t.kind === "success"
               ? "border-emerald-500/40 bg-emerald-950/85 text-emerald-100"
               : t.kind === "error"

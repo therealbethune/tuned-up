@@ -26,7 +26,9 @@ export function TodaysPickCard({ pick }: { pick: DailyPick }) {
   return (
     <section
       aria-label="Today's pick"
-      className="relative rounded-2xl border border-emerald-500/40 bg-[radial-gradient(circle_at_top_left,theme(colors.emerald.500/0.18),theme(colors.neutral.950)_70%)] shadow-[0_0_60px_-30px_theme(colors.emerald.500/0.5)] overflow-hidden"
+      className={`relative rounded-2xl border border-emerald-500/40 bg-[radial-gradient(circle_at_top_left,theme(colors.emerald.500/0.18),theme(colors.neutral.950)_70%)] overflow-hidden ${
+        pick.alreadyRated ? "shadow-[0_0_60px_-30px_theme(colors.emerald.500/0.5)]" : "daily-pick-glow"
+      }`}
     >
       <div className="flex items-center gap-3 px-3 sm:px-4 pt-3 pb-2">
         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">

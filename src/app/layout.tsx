@@ -248,7 +248,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </nav>
           </header>
-          <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8">{children}</main>
+          <main className="mx-auto max-w-3xl px-4 py-4 sm:py-8">{children}</main>
           {userId && <MobileTabBar unread={unread} />}
           {userId && <TimezoneSync serverTimezone={synced?.timezone ?? null} />}
           {/* Tags Sentry events with the signed-in user id so we can

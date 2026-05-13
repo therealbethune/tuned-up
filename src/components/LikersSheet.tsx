@@ -108,7 +108,7 @@ export function LikersSheet({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-neutral-800 bg-neutral-950 max-h-[80vh] overflow-y-auto transform transition-transform duration-300 ease-out ${
+        className={`relative w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-neutral-800 bg-neutral-950 max-h-[80vh] overflow-y-auto sheet-scroll transform transition-transform duration-300 ease-out ${
           show ? "translate-y-0" : "translate-y-full sm:translate-y-4"
         }`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}

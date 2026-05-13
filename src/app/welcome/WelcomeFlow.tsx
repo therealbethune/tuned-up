@@ -183,9 +183,15 @@ export function WelcomeFlow({
             </span>
             <input
               autoFocus
+              type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search YouTube Music…"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="search"
+              aria-label="Search YouTube Music"
               className="w-full rounded-full bg-neutral-900 border border-neutral-800 pl-11 pr-12 py-2.5 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
             />
             {searching && (

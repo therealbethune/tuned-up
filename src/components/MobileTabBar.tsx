@@ -82,24 +82,26 @@ export function MobileTabBar({ unread }: { unread: number }) {
               <Link
                 href={t.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center justify-center py-2 gap-0.5 min-h-[56px] relative transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white/50 ${
+                className={`flex flex-col items-center justify-center py-2 gap-1 min-h-[60px] relative transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white/50 ${
                   active ? "text-emerald-400" : "text-neutral-400 active:text-white"
                 }`}
               >
-                {/* Active-tab indicator: 2px emerald top stripe. Subtle
-                    but gives a clear "you are here" cue beyond color
-                    alone (helps when icons are similar at a glance). */}
+                {/* Improvement #39: active indicator is wider + softer
+                    so it reads as a confident "you are here" badge,
+                    not a thin hairline. The icon pill swells to h-10 w-10
+                    so the tap target lands above 40pt regardless of icon
+                    size; the label sits below at text-[11px] for legibility. */}
                 {active && (
                   <span
                     aria-hidden
-                    className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-emerald-400"
+                    className="absolute top-0 left-1/2 -translate-x-1/2 h-1 w-10 rounded-b-full bg-emerald-400 shadow-[0_2px_8px_rgb(16_185_129/0.55)]"
                   />
                 )}
                 <span
-                  className={`relative inline-flex items-center justify-center rounded-full transition-colors ${
+                  className={`relative inline-flex items-center justify-center rounded-full transition-all ${
                     active
-                      ? "bg-emerald-500/10 ring-1 ring-emerald-500/30 h-9 w-9"
-                      : ""
+                      ? "bg-emerald-500/15 ring-1 ring-emerald-500/40 h-10 w-10"
+                      : "h-9 w-9"
                   }`}
                 >
                   {t.icon}
@@ -109,7 +111,7 @@ export function MobileTabBar({ unread }: { unread: number }) {
                     </span>
                   )}
                 </span>
-                <span className="text-[10px] leading-none">{t.label}</span>
+                <span className="text-[11px] leading-none font-medium">{t.label}</span>
               </Link>
             </li>
           );

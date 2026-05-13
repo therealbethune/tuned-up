@@ -154,7 +154,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-2xl sm:rounded-xl border border-neutral-800 bg-neutral-900 p-4 space-y-4 max-h-[85vh] overflow-y-auto"
+            className="w-full sm:max-w-md rounded-t-2xl sm:rounded-xl border border-neutral-800 bg-neutral-900 p-4 space-y-4 max-h-[85vh] overflow-y-auto sheet-scroll"
           >
             <div className="flex items-start justify-between">
               <div>

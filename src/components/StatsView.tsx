@@ -148,7 +148,7 @@ export default async function StatsView({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div>
         <Link href={backHref} className="text-sm text-neutral-400 hover:text-white">← Profile</Link>
         <h1 className="text-2xl font-bold mt-1">{heading}</h1>

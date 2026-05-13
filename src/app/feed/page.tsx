@@ -28,7 +28,7 @@ import { getDailyPick } from "@/lib/daily-pick";
 import { SurpriseMeButton } from "@/components/SurpriseMeButton";
 import { FirstFeedTour } from "@/components/FirstFeedTour";
 import { isAlbumId, relativeTime } from "@/lib/songs";
-import { scoreLabel } from "@/lib/score-labels";
+import { scoreLabel, scoreTierGlow } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
 import { encodeBase64Url } from "@/lib/encoding";
 import { renderWithMentions } from "@/lib/mentions";
@@ -489,7 +489,7 @@ export default async function FeedPage({
               <li
                 id={anchorId}
                 data-target-highlight=""
-                className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4 scroll-mt-[calc(env(safe-area-inset-top)+5rem)] hover:border-neutral-700 hover:bg-neutral-900/80 transition-colors"
+                className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-3 sm:p-4 scroll-mt-[calc(env(safe-area-inset-top)+5rem)] hover:border-neutral-700 hover:bg-neutral-900/80 transition-colors cv-auto"
               >
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Avatar
@@ -548,7 +548,7 @@ export default async function FeedPage({
                           className="rounded h-14 w-14 object-cover"
                         />
                       ) : (
-                        <div className="h-14 w-14 rounded bg-neutral-800" />
+                        <div className="h-14 w-14 rounded shimmer" />
                       )}
                       {/* Play affordance. On mobile: a small badge in
                           the corner shows the thumbnail is tappable
@@ -567,7 +567,7 @@ export default async function FeedPage({
                   ) : it.thumbnail ? (
                     <Image src={it.thumbnail} alt="" width={56} height={56} loading="lazy" className="rounded h-14 w-14 object-cover shrink-0" />
                   ) : (
-                    <div className="h-14 w-14 rounded bg-neutral-800 shrink-0" />
+                    <div className="h-14 w-14 rounded shimmer shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
@@ -591,7 +591,7 @@ export default async function FeedPage({
                         hero weight and color (the tier color, not just
                         plain white) so it reads as the card's verdict
                         at a glance. */}
-                    <div className={`text-4xl font-bold tabular-nums ${scoreLabel(it.score).color}`}>
+                    <div className={`text-4xl sm:text-4xl font-bold tabular-nums ${scoreLabel(it.score).color} ${scoreTierGlow(it.score)}`}>
                       {it.score}
                     </div>
                     <div className="text-[10px] uppercase tracking-wider text-neutral-400 mt-0.5">
@@ -615,7 +615,10 @@ export default async function FeedPage({
                       );
                     })()}
                     {it.review && (
-                      <p className="text-sm text-neutral-300 whitespace-pre-wrap break-words">
+                      <p
+                        className="text-sm text-neutral-300 whitespace-pre-wrap break-words line-clamp-4 sm:line-clamp-none"
+                        title={it.review}
+                      >
                         {renderWithMentions(it.review)}
                       </p>
                     )}

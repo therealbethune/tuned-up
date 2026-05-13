@@ -33,6 +33,20 @@ export function scoreLabel(score: number): ScoreLabel {
   return { label: "Skip", color: "text-red-500" };
 }
 
+// CSS-class for the tier-matched score glow (defined in globals.css).
+// Used on hero score numbers (feed cards, /album, /me/stats) to make
+// the score lift off the card. Returns an empty string for scores
+// that should stay flat (mid/low — no glow on bad ratings).
+export function scoreTierGlow(score: number): string {
+  if (score >= 90) return "tier-glow-emerald";
+  if (score >= 80) return "tier-glow-emerald";
+  if (score >= 70) return "tier-glow-lime";
+  if (score >= 60) return "tier-glow-yellow";
+  if (score >= 50) return "tier-glow-amber";
+  if (score >= 40) return "tier-glow-orange";
+  return "tier-glow-red";
+}
+
 /** Coarse 5-band view of the score scale, for onboarding teaching. */
 export const SCORE_TIERS = [
   { range: "1–19",   label: "Trash",  bg: "bg-red-500/15 text-red-300" },

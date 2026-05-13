@@ -7,7 +7,7 @@ import { db, songs, ratings, users, follows, savedSongs } from "@/db";
 import { getBlockEdges } from "@/lib/block-edges";
 import { ytUrlForSongId, isAlbumId, relativeTime } from "@/lib/songs";
 import { StreamingLinks } from "@/components/StreamingLinks";
-import { scoreLabel } from "@/lib/score-labels";
+import { scoreLabel, scoreTierGlow } from "@/lib/score-labels";
 import { RateButton } from "@/components/RateButton";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
@@ -168,7 +168,7 @@ export default async function AlbumPage({
         ← Back
       </Link>
 
-      <header className="flex items-start gap-4 sm:gap-6">
+      <header className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
         {song.thumbnail ? (
           url ? (
             <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
@@ -273,8 +273,7 @@ export default async function AlbumPage({
                   rating. Used to be text-5xl; the extra weight reads as
                   more confident and matches the bigger label beside it. */}
               <span
-                className="text-6xl sm:text-7xl font-extrabold tabular-nums tracking-tight text-emerald-400 leading-none"
-                style={{ textShadow: "0 0 32px rgba(16, 185, 129, 0.35)" }}
+                className={`text-6xl sm:text-7xl font-extrabold tabular-nums tracking-tight leading-none ${avg != null ? scoreLabel(avg).color : "text-neutral-500"} ${avg != null ? scoreTierGlow(avg) : ""}`}
               >
                 {avg}
               </span>
