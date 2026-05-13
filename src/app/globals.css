@@ -31,6 +31,26 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Default keyboard-focus indicator for interactive elements. Apple
+   App Store reviewers test on Mac with a keyboard during web review,
+   and WCAG 2.5.5 requires a visible focus ring. Individual components
+   can override this with their own focus-visible:outline-* utilities
+   when they need a different color (e.g. inverted on white buttons).
+   Pointer/mouse focus stays clean via :focus-visible (mouse clicks
+   don't trigger this — only Tab navigation). */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+html:not(.dark) button:focus-visible,
+html:not(.dark) a:focus-visible,
+html:not(.dark) [role="button"]:focus-visible {
+  outline-color: rgba(0, 0, 0, 0.5);
+}
+
 /* Class-based theme. SSR ships <html class="dark"> by default; an inline
    script in layout.tsx flips it to light if the user has chosen light
    (or no preference + light system). All Tailwind utility colors below

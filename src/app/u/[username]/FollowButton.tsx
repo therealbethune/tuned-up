@@ -73,7 +73,7 @@ export function FollowButton({
     <button
       onClick={toggle}
       disabled={busy}
-      className={`rounded-full px-4 py-1.5 text-sm font-medium active:scale-95 transition-transform ${
+      className={`rounded-full px-4 py-1.5 min-h-9 text-sm font-medium active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 ${
         state === "none"
           ? "bg-white text-black hover:bg-neutral-200"
           : "border border-neutral-700 text-neutral-200 hover:bg-neutral-900"
