@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { desc, eq, ne, sql, count } from "drizzle-orm";
-import { db, users, ratings } from "@/db";
+import { and, desc, eq, ne, sql, count } from "drizzle-orm";
+import { db, users, ratings, follows } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { WelcomeFlow } from "./WelcomeFlow";
 
@@ -14,17 +14,30 @@ export default async function WelcomePage() {
   if (!me) redirect("/");
   if (me.onboardedAt) redirect("/feed");
 
-  // Pre-load suggested users (top raters that aren't us) + count any
-  // ratings the user already has on file. The "rate at least one song"
-  // counter in WelcomeFlow used to be incremented only via a window
-  // `song-rated` event — which meant:
-  //   - rating through /import/spotify (no event) didn't count
-  //   - refreshing /welcome reset the counter to 0
-  //   - already-rated users coming back to onboarding (they bounced
-  //     to /welcome via redirect) saw "Rate a song to continue" even
-  //     though they had ratings
-  // Seeding the counter from the DB makes the gate honest.
-  const [suggested, [ratingStat]] = await Promise.all([
+  // Pre-load the page in three parallel queries:
+  //
+  //   - ratingsCount: seeds the "rate at least one song" gate so
+  //     rating via /import/spotify or coming back to /welcome with
+  //     existing ratings doesn't reset the counter to 0.
+  //   - existingFollows: lets us filter suggested users to people the
+  //     viewer doesn't already follow. Before this, a user who'd
+  //     followed Alice yesterday would still see Alice in step 2's
+  //     suggested list with a "Follow" button — tapping it would
+  //     no-op server-side (onConflictDoNothing) but the UI lied
+  //     about state.
+  //   - suggested: top raters excluding self.
+  //
+  // existingFollows must come back before we can filter the suggested
+  // list, so we do that filter in JS after both resolve.
+  const [followingRows, [ratingStat], rawSuggested] = await Promise.all([
+    db
+      .select({ id: follows.followeeId })
+      .from(follows)
+      .where(eq(follows.followerId, userId)),
+    db
+      .select({ n: count() })
+      .from(ratings)
+      .where(eq(ratings.userId, userId)),
     db
       .select({
         id: users.id,
@@ -35,19 +48,22 @@ export default async function WelcomePage() {
       })
       .from(users)
       .leftJoin(ratings, eq(ratings.userId, users.id))
-      .where(ne(users.id, userId))
+      .where(and(ne(users.id, userId), eq(users.isPrivate, false)))
       .groupBy(users.id)
       .orderBy(desc(sql`count(${ratings.userId})`))
-      .limit(8),
-    db
-      .select({ n: count() })
-      .from(ratings)
-      .where(eq(ratings.userId, userId)),
+      .limit(16),
   ]);
+
+  // We over-fetched to 16 above so we still have 8 to show even when
+  // some of the top raters are already followed and get filtered out.
+  const alreadyFollowing = new Set(followingRows.map((r) => r.id));
+  const suggested = rawSuggested
+    .filter((u) => u.ratingsCount > 0 && !alreadyFollowing.has(u.id))
+    .slice(0, 8);
 
   return (
     <WelcomeFlow
-      suggested={suggested.filter((u) => u.ratingsCount > 0)}
+      suggested={suggested}
       initialRatedCount={ratingStat?.n ?? 0}
     />
   );
