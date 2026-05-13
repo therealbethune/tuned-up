@@ -11,6 +11,7 @@ import type { SongResult } from "@/lib/ytmusic";
 import { scoreLabel } from "@/lib/score-labels";
 import { isAlbumId } from "@/lib/songs";
 import { MentionInput } from "@/components/MentionInput";
+import { encodeBase64Url } from "@/lib/encoding";
 
 type FriendRating = {
   userId: string;
@@ -19,6 +20,18 @@ type FriendRating = {
   imageUrl: string | null;
   score: number;
   review: string | null;
+};
+
+type SimilarSuggestion = {
+  id: string;
+  kind: "song" | "album";
+  title: string;
+  artist: string;
+  album: string | null;
+  thumbnail: string | null;
+  durationSeconds: number | null;
+  avg: number | null;
+  n: number;
 };
 
 export function RateButton({
@@ -39,6 +52,11 @@ export function RateButton({
   const [error, setError] = useState<string | null>(null);
   const [friends, setFriends] = useState<FriendRating[] | null>(null);
   const numberRef = useRef<HTMLInputElement | null>(null);
+  // Post-rate "What's next" panel: once a rating saves successfully,
+  // we swap the modal body for 3 collaborative-filtering suggestions.
+  // Stays open until the user dismisses or picks one, so a rating
+  // session can chain into the next pick without leaving the sheet.
+  const [postRate, setPostRate] = useState<null | { score: number; suggestions: SimilarSuggestion[] | null }>(null);
 
   // Animate in. We mount with open=true and translate-y-full, then flip to
   // translate-y-0 on the next frame to trigger the CSS transition.
@@ -108,8 +126,12 @@ export function RateButton({
   function close() {
     setShow(false);
     // Wait for the slide-out before unmounting.
-    setTimeout(() => setOpen(false), 200);
+    setTimeout(() => {
+      setOpen(false);
+      setPostRate(null);
+    }, 200);
   }
+
 
   // Escape-to-close while the dialog is open. Bound on document so it works
   // regardless of focus location.
@@ -137,13 +159,30 @@ export function RateButton({
         body: JSON.stringify({ song, score, review: review.trim() || null }),
       });
       if (res.ok) {
-        close();
         router.refresh();
         toast.success(`Rated ${song.title} — ${score}/100`);
         if (typeof window !== "undefined") {
           window.dispatchEvent(
             new CustomEvent("song-rated", { detail: { songId: song.id } }),
           );
+        }
+        // Switch the modal body to the "What's next?" panel. We fetch
+        // suggestions in parallel — render the panel immediately with
+        // a small skeleton so the user gets instant feedback that the
+        // rating saved.
+        setPostRate({ score, suggestions: null });
+        try {
+          const sugRes = await fetch(
+            `/api/suggestions/similar?songId=${encodeURIComponent(song.id)}&score=${score}`,
+          );
+          if (sugRes.ok) {
+            const j = await sugRes.json();
+            setPostRate({ score, suggestions: j.suggestions ?? [] });
+          } else {
+            setPostRate({ score, suggestions: [] });
+          }
+        } catch {
+          setPostRate({ score, suggestions: [] });
         }
       } else {
         const j = await res.json().catch(() => ({}));
@@ -197,7 +236,9 @@ export function RateButton({
         <div className="sticky top-0 z-10 bg-neutral-950 border-b border-neutral-800">
           <div className="flex items-center justify-between px-4 pt-3 pb-3">
             <div className="w-10 h-1 rounded-full bg-neutral-700 sm:hidden mx-auto absolute left-0 right-0 top-1.5" />
-            <h2 className="text-base font-semibold">Rate this</h2>
+            <h2 className="text-base font-semibold">
+              {postRate ? "What's next?" : "Rate this"}
+            </h2>
             <button
               onClick={close}
               aria-label="Close"
@@ -207,6 +248,15 @@ export function RateButton({
             </button>
           </div>
         </div>
+
+        {postRate ? (
+          <PostRatePanel
+            score={postRate.score}
+            song={song}
+            suggestions={postRate.suggestions}
+            onClose={close}
+          />
+        ) : (
 
         <div className="p-4 space-y-5">
           {/* Song header */}
@@ -376,6 +426,119 @@ export function RateButton({
             </button>
           </div>
         </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Renders the "What's next?" sheet after a successful rating: a short
+// confirmation header for the rating that just landed, plus up to 3
+// collaborative-filter suggestions. Each suggestion deep-links to the
+// dedicated /album/<id> page where the same rate flow is one tap away,
+// so the user can chain into the next pick without leaving Tuned Up.
+function PostRatePanel({
+  score,
+  song,
+  suggestions,
+  onClose,
+}: {
+  score: number;
+  song: SongResult;
+  suggestions: SimilarSuggestion[] | null;
+  onClose: () => void;
+}) {
+  const tier = scoreLabel(score);
+  return (
+    <div className="p-4 space-y-5">
+      <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4 flex items-center gap-3">
+        {song.thumbnail ? (
+          <Image
+            src={song.thumbnail}
+            alt=""
+            width={48}
+            height={48}
+            className="rounded h-12 w-12 object-cover shrink-0"
+          />
+        ) : (
+          <div className="h-12 w-12 rounded bg-neutral-800 shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="text-xs uppercase tracking-wider text-emerald-300/80">
+            Saved
+          </div>
+          <div className="font-medium truncate">{song.title}</div>
+          <div className="text-xs text-neutral-400 truncate">{song.artist}</div>
+        </div>
+        <div className="text-right leading-tight">
+          <div className={`text-3xl font-bold tabular-nums ${tier.color}`}>{score}</div>
+          <div className="text-[10px] uppercase tracking-wider text-neutral-400">
+            {tier.label}
+          </div>
+        </div>
+      </div>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold">Similar to your taste</h3>
+        <p className="text-xs text-neutral-400 -mt-1">
+          Based on what other people who rated this song similarly also liked.
+        </p>
+        {suggestions == null ? (
+          <ul className="space-y-2">
+            <RowSkeleton />
+            <RowSkeleton />
+            <RowSkeleton />
+          </ul>
+        ) : suggestions.length === 0 ? (
+          <p className="text-sm text-neutral-500">
+            We&apos;ll have suggestions once more people rate this song. Keep rating!
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {suggestions.map((s) => (
+              <li key={s.id}>
+                <Link
+                  href={`/album/${encodeBase64Url(s.id)}`}
+                  onClick={onClose}
+                  className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900 hover:border-neutral-700 transition-colors p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
+                >
+                  {s.thumbnail ? (
+                    <Image
+                      src={s.thumbnail}
+                      alt=""
+                      width={44}
+                      height={44}
+                      className="rounded h-11 w-11 object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="h-11 w-11 rounded bg-neutral-800 shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{s.title}</div>
+                    <div className="text-xs text-neutral-400 truncate">{s.artist}</div>
+                  </div>
+                  {s.avg != null && (
+                    <div className="text-right shrink-0 leading-tight">
+                      <div className={`text-xl font-bold tabular-nums ${scoreLabel(s.avg).color}`}>
+                        {s.avg}
+                      </div>
+                      <div className="text-[10px] text-neutral-500">avg</div>
+                    </div>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <div className="flex justify-end pt-1">
+        <button
+          onClick={onClose}
+          className="rounded-full bg-white text-black px-5 py-2 font-medium active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
+        >
+          Done
+        </button>
       </div>
     </div>
   );

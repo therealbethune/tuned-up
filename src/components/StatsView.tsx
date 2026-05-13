@@ -1,9 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, gte, sql, and } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
 import { ytUrlForSongId } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
+import { StreakHeatmap, type HeatmapDay } from "@/components/StreakHeatmap";
 
 type User = typeof users.$inferSelect;
 
@@ -27,7 +28,9 @@ export default async function StatsView({
   // profile page's Wave G fix).
   const streak = target.currentStreak ?? 0;
 
-  const [aggResult, topSongs, topArtists, monthly] = await Promise.all([
+  // 90 days back from now (UTC midnight) — drives the heatmap window.
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000);
+  const [aggResult, topSongs, topArtists, monthly, heatmapRows] = await Promise.all([
     db.execute(sql`
       SELECT
         COUNT(*)::int AS total,
@@ -80,7 +83,23 @@ export default async function StatsView({
       .where(eq(ratings.userId, target.id))
       .groupBy(sql`date_trunc('month', ${ratings.createdAt})`)
       .orderBy(sql`date_trunc('month', ${ratings.createdAt})`),
+    // 90-day heatmap: one row per active day. Uses to_char so the
+    // returned string lines up 1:1 with the YYYY-MM-DD keys the
+    // client component fills against.
+    db
+      .select({
+        date: sql<string>`to_char(date_trunc('day', ${ratings.createdAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`,
+        n: sql<number>`count(*)::int`,
+      })
+      .from(ratings)
+      .where(and(eq(ratings.userId, target.id), gte(ratings.createdAt, ninetyDaysAgo)))
+      .groupBy(sql`date_trunc('day', ${ratings.createdAt} AT TIME ZONE 'UTC')`),
   ]);
+
+  const heatmapDays: HeatmapDay[] = heatmapRows.map((r) => ({
+    date: r.date,
+    n: Number(r.n) || 0,
+  }));
 
   // Drizzle's neon-http `db.execute` returns either an array or
   // { rows: [...] }; tolerate both.
@@ -146,6 +165,8 @@ export default async function StatsView({
           sublabel={streak > 0 ? (streak === 1 ? "day" : "days") : undefined}
         />
       </section>
+
+      <StreakHeatmap days={heatmapDays} />
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Score distribution</h2>

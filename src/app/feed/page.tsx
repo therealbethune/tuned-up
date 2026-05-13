@@ -22,6 +22,9 @@ import { Avatar } from "@/components/Avatar";
 import { PlayIcon } from "@/components/icons";
 import { ReportButton } from "@/components/ReportButton";
 import { SaveLaterButton } from "@/components/SaveLaterButton";
+import { TodaysPickCard } from "@/components/TodaysPickCard";
+import { getDailyPick } from "@/lib/daily-pick";
+import { SurpriseMeButton } from "@/components/SurpriseMeButton";
 import { isAlbumId, relativeTime } from "@/lib/songs";
 import { scoreLabel } from "@/lib/score-labels";
 import { safeQuery } from "@/lib/safe-query";
@@ -73,7 +76,7 @@ export default async function FeedPage({
   // viewer follow, and who's involved in a block edge with them?
   // Blocks hide content in BOTH directions so an abuser can't just
   // create a new account to dodge a mute.
-  const [followedRows, blockEdges] = await Promise.all([
+  const [followedRows, blockEdges, dailyPick] = await Promise.all([
     safeQuery(
       () =>
         db
@@ -92,6 +95,10 @@ export default async function FeedPage({
       [] as { blockerId: string; blockedId: string }[],
       "feed-blocks",
     ),
+    // Daily-pick card pinned to top of /feed. Suppressed when the
+    // viewer is paginating (?before=…) so older pages don't show
+    // today's prompt; only the first page of /feed does.
+    sp.before ? Promise.resolve(null) : getDailyPick(userId),
   ]);
   const hiddenIds = new Set<string>();
   for (const b of blockEdges) {
@@ -397,10 +404,15 @@ export default async function FeedPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold">Feed</h1>
-        <Link href="/search" className="text-sm text-neutral-400 hover:text-white">+ Rate a song</Link>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <SurpriseMeButton />
+          <Link href="/search" className="text-sm text-neutral-400 hover:text-white">+ Rate a song</Link>
+        </div>
       </div>
+
+      {dailyPick && <TodaysPickCard pick={dailyPick} />}
 
       <ConnectMusicBanner />
 

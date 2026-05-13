@@ -9,6 +9,8 @@ import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { ProfileAppleMusicPanel } from "@/components/ProfileAppleMusicPanel";
 import { SettingsIcon, PaperPlaneIcon } from "@/components/icons";
 import { safeQuery } from "@/lib/safe-query";
+import { TasteTwinsPanel } from "@/components/TasteTwinsPanel";
+import { findTasteTwins } from "@/lib/taste";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +59,7 @@ export default async function MePage() {
 
   // Toolbar badges — pending-rec count + saved-songs count. Fan out
   // in parallel since they're both small + independent.
-  const [recStatRows, savedStatRows] = await Promise.all([
+  const [recStatRows, savedStatRows, tasteTwins] = await Promise.all([
     safeQuery(
       () =>
         db
@@ -81,6 +83,7 @@ export default async function MePage() {
       [] as { n: number }[],
       "me-saved-count",
     ),
+    safeQuery(() => findTasteTwins(userId), [], "me-taste-twins"),
   ]);
   const pendingRecs = Number(recStatRows[0]?.n ?? 0);
   const savedCount = Number(savedStatRows[0]?.n ?? 0);
@@ -92,6 +95,17 @@ export default async function MePage() {
           on the Recs link. Keep the link weights low so they don't
           compete with the profile header below. */}
       <div className="flex justify-end gap-2 text-sm">
+        <Link
+          href="/me/recap"
+          aria-label="Your week in music"
+          className="text-neutral-400 hover:text-white inline-flex items-center gap-1.5 rounded-full hover:bg-neutral-900 px-3 py-1.5 active:scale-95 transition-all"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="17" rx="2" />
+            <path d="M3 10h18M8 2v4M16 2v4" />
+          </svg>
+          Recap
+        </Link>
         <Link
           href="/me/saved"
           aria-label="Saved for later"
@@ -133,6 +147,8 @@ export default async function MePage() {
       {/* Profile is the actual content. Render before any banners so
           users see THEIR face before any interruption nag-cards. */}
       <UserProfile target={me} viewerId={userId} />
+
+      <TasteTwinsPanel twins={tasteTwins} />
 
       {/* Banners + integration panels live below — they're contextual
           additions, not the page's primary purpose. */}

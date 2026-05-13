@@ -1,4 +1,4 @@
-import { db, ratings, songs } from "@/db";
+import { db, ratings, songs, users, blocks } from "@/db";
 import { sql, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -108,3 +108,86 @@ export async function computeTasteDetails(
   };
 }
 
+
+// Top N users who agree most with the viewer's taste. "Taste twins"
+// surface on /me as a follow-suggestion alternative — instead of who
+// rates the most, we surface who *thinks like you*. Each row needs
+// at least `minShared` ratings in common to qualify so a single
+// matching score doesn't crown someone as a soulmate.
+export type TasteTwin = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  imageUrl: string | null;
+  shared: number;
+  agreement: number;
+};
+
+export async function findTasteTwins(
+  viewerId: string,
+  limit = 3,
+  minShared = 5,
+): Promise<TasteTwin[]> {
+  type Row = {
+    id: string;
+    username: string;
+    display_name: string | null;
+    image_url: string | null;
+    shared: number;
+    agreement: number;
+  };
+
+  // Cross-join the viewer's ratings against other users' ratings on
+  // the same song, then aggregate the diff. Filter out: viewer self,
+  // private users (their content opt-out implies "don't surface me as
+  // a recommendation"), and anyone in a block edge with the viewer.
+  const result = await db.execute(sql`
+    WITH viewer_ratings AS (
+      SELECT song_id, score FROM ratings WHERE user_id = ${viewerId}
+    ),
+    overlap AS (
+      SELECT
+        r.user_id,
+        COUNT(*)::int AS shared,
+        ROUND(AVG(100 - ABS(vr.score - r.score)))::int AS agreement
+      FROM ratings r
+      INNER JOIN viewer_ratings vr ON vr.song_id = r.song_id
+      WHERE r.user_id <> ${viewerId}
+        AND r.user_id NOT IN (
+          SELECT blocked_id FROM blocks WHERE blocker_id = ${viewerId}
+          UNION
+          SELECT blocker_id FROM blocks WHERE blocked_id = ${viewerId}
+        )
+      GROUP BY r.user_id
+      HAVING COUNT(*) >= ${minShared}
+    )
+    SELECT
+      u.id, u.username, u.display_name, u.image_url,
+      o.shared, o.agreement
+    FROM overlap o
+    INNER JOIN users u ON u.id = o.user_id
+    WHERE u.is_private = false
+    ORDER BY o.agreement DESC, o.shared DESC
+    LIMIT ${limit}
+  `);
+
+  const raw = result as unknown;
+  const rows: Row[] = Array.isArray(raw)
+    ? (raw as Row[])
+    : Array.isArray((raw as { rows?: Row[] })?.rows)
+      ? ((raw as { rows: Row[] }).rows)
+      : [];
+
+  return rows.map((r) => ({
+    id: r.id,
+    username: r.username,
+    displayName: r.display_name,
+    imageUrl: r.image_url,
+    shared: Number(r.shared) || 0,
+    agreement: Number(r.agreement) || 0,
+  }));
+}
+
+// silence unused-import in case neither helper above is called.
+void users;
+void blocks;
