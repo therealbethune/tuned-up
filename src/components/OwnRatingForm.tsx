@@ -155,7 +155,9 @@ export function OwnRatingForm({ rating }: { rating: OwnRating }) {
           }}
           aria-label="Score from 1 to 100"
           placeholder="1–100"
-          className="w-24 rounded-md bg-neutral-950 border border-neutral-800 px-3 py-2 text-2xl font-bold tabular-nums text-center placeholder:text-neutral-700 focus:outline-none focus:border-neutral-600"
+          className={`w-24 rounded-md bg-neutral-950 border border-neutral-800 px-3 py-2 text-2xl font-bold tabular-nums text-center placeholder:text-neutral-700 focus:outline-none focus:border-neutral-600 transition-colors ${
+            label ? label.color : ""
+          }`}
         />
         <div className="flex-1">
           {label ? (

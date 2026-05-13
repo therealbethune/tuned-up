@@ -238,7 +238,10 @@ export function RateButton({
             </div>
           </div>
 
-          {/* Numeric input + live label */}
+          {/* Numeric input + live label. The number itself tier-colors
+              live as the user types — 35 reads red, 75 lime, 95
+              emerald. Immediate visual feedback for the verdict they
+              just committed to, before they even tap Save. */}
           <div className="flex items-end gap-4">
             <input
               ref={numberRef}
@@ -260,7 +263,9 @@ export function RateButton({
               }}
               aria-label="Score from 1 to 100"
               placeholder="1–100"
-              className="w-32 rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-3 text-4xl font-bold tabular-nums text-center placeholder:text-neutral-700 focus:outline-none focus:border-neutral-600"
+              className={`w-32 rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-3 text-4xl font-bold tabular-nums text-center placeholder:text-neutral-700 focus:outline-none focus:border-neutral-600 transition-colors ${
+                label ? label.color : ""
+              }`}
             />
             <div className="flex-1 pb-1.5">
               {label ? (
