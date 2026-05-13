@@ -251,45 +251,55 @@ export async function POST(req: Request) {
     ? ratingPageUrl
     : `/u/${actor?.username ?? ""}`;
 
+  // Rating-owner activity + push (skipped for self-comments). Fire the
+  // DB insert and the push send in parallel — they're independent, and
+  // a slow web-push roundtrip was previously blocking the activity row
+  // from being written for ~150-300ms longer than necessary. allSettled
+  // so a flaky push provider can't roll back the activity row.
   if (ratingUserId !== userId) {
-    await db.insert(activities).values({
-      id: randomUUID(),
-      userId: ratingUserId,
-      actorId: userId,
-      type: "comment",
-      songId,
-      ratingUserId,
-    });
-    await sendPushToUser(ratingUserId, {
-      title: `${actorName} commented on ${song?.title ?? "your rating"}`,
-      body: preview,
-      // Rating owner = recipient: focus-param URL guarantees the card
-      // shows on the feed even if pagination would have hidden it.
-      url: `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
-      tag: `comment:${userId}:${songId}`,
-    });
+    await Promise.allSettled([
+      db.insert(activities).values({
+        id: randomUUID(),
+        userId: ratingUserId,
+        actorId: userId,
+        type: "comment",
+        songId,
+        ratingUserId,
+      }),
+      sendPushToUser(ratingUserId, {
+        title: `${actorName} commented on ${song?.title ?? "your rating"}`,
+        body: preview,
+        // Rating owner = recipient: focus-param URL guarantees the card
+        // shows on the feed even if pagination would have hidden it.
+        url: `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`,
+        tag: `comment:${userId}:${songId}`,
+      }),
+    ]);
   }
 
   // If this is a reply, additionally notify the parent comment's author —
   // unless they're the rating owner (already notified above) or themselves.
+  // Same parallel pattern as the rating-owner block above.
   if (parentCommenterId && parentCommenterId !== userId && parentCommenterId !== ratingUserId) {
     try {
-      await db.insert(activities).values({
-        id: randomUUID(),
-        userId: parentCommenterId,
-        actorId: userId,
-        type: "reply",
-        songId,
-        ratingUserId,
-      });
-      await sendPushToUser(parentCommenterId, {
-        title: `${actorName} replied to your comment`,
-        body: preview,
-        // Parent commenter isn't necessarily the rating owner, so we
-        // can't anchor to their feed — link to the rating's shared page.
-        url: fallbackUrl,
-        tag: `reply:${userId}:${songId}`,
-      });
+      await Promise.allSettled([
+        db.insert(activities).values({
+          id: randomUUID(),
+          userId: parentCommenterId,
+          actorId: userId,
+          type: "reply",
+          songId,
+          ratingUserId,
+        }),
+        sendPushToUser(parentCommenterId, {
+          title: `${actorName} replied to your comment`,
+          body: preview,
+          // Parent commenter isn't necessarily the rating owner, so we
+          // can't anchor to their feed — link to the rating's shared page.
+          url: fallbackUrl,
+          tag: `reply:${userId}:${songId}`,
+        }),
+      ]);
     } catch (e) {
       reportError(e, "comments POST reply notify");
     }
