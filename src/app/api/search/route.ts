@@ -13,6 +13,12 @@ export async function GET(req: Request) {
   const kindParam = (url.searchParams.get("kind") ?? "song").trim();
   const kind: ItemKind = kindParam === "album" ? "album" : "song";
   if (!q) return NextResponse.json({ results: [] });
+  // Cap query length so a misbehaving client can't push multi-KB
+  // queries to YouTube Music through us. 200 chars is well above any
+  // real "title artist album" search; YTM rejects long queries anyway.
+  if (q.length > 200) {
+    return NextResponse.json({ error: "query too long" }, { status: 400 });
+  }
 
   try {
     const results = await search(q, kind);
