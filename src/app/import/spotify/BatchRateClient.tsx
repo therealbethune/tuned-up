@@ -157,7 +157,11 @@ export function BatchRateClient({
                 </div>
                 {s != null && (
                   <div className="shrink-0 flex flex-col items-end leading-tight">
-                    <span className="text-lg font-bold tabular-nums text-emerald-400">
+                    {/* Tier-color the number too, not just the label.
+                        Was emerald-400 regardless of score, so a 35
+                        "Pass" displayed in the same green as an 88
+                        "Love". Now matches /discover + /album + /feed. */}
+                    <span className={`text-lg font-bold tabular-nums ${scoreLabel(s).color}`}>
                       {s}
                     </span>
                     <span className={`text-[10px] font-medium ${scoreLabel(s).color}`}>

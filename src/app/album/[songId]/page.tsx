@@ -216,7 +216,9 @@ export default async function AlbumPage({
                     title="Your rating"
                   >
                     <span className="text-neutral-400">You:</span>
-                    <span className="font-bold tabular-nums text-emerald-400">{myRow.score}</span>
+                    <span className={`font-bold tabular-nums ${scoreLabel(myRow.score).color}`}>
+                      {myRow.score}
+                    </span>
                   </span>
                 )}
               </div>

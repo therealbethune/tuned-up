@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { FriendRec } from "@/lib/recs";
 import { encodeBase64Url } from "@/lib/encoding";
 import { isAlbumId } from "@/lib/songs";
+import { scoreLabel } from "@/lib/score-labels";
 import { RateButton } from "@/components/RateButton";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { Avatar } from "@/components/Avatar";
@@ -59,7 +60,13 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
                   ) : (
                     <div className="w-full aspect-square bg-neutral-800" />
                   )}
-                  <span className="absolute top-2 right-2 rounded-md bg-black/80 backdrop-blur-sm px-2 py-0.5 text-sm font-bold tabular-nums text-emerald-400 shadow-md">
+                  {/* Tier-color the friend-avg chip so the rail's
+                      quality spread reads at a glance — was always
+                      emerald-400 regardless of value. Matches the
+                      /discover grid chip pattern. */}
+                  <span
+                    className={`absolute top-2 right-2 rounded-md bg-black/80 backdrop-blur-sm px-2 py-0.5 text-sm font-bold tabular-nums shadow-md ${scoreLabel(r.friendAvg).color}`}
+                  >
                     {r.friendAvg}
                   </span>
                 </Link>
