@@ -112,29 +112,37 @@ export async function POST(req: Request) {
     .returning({ followerId: follows.followerId });
 
   if (inserted.length > 0) {
-    // Dedup any prior matching activity.
-    await db
-      .delete(activities)
-      .where(
-        and(
-          eq(activities.userId, target.id),
-          eq(activities.actorId, userId),
-          status === "pending" ? eq(activities.type, "follow_request") : eq(activities.type, "follow"),
-        ),
-      );
-    await db.insert(activities).values({
-      id: randomUUID(),
-      userId: target.id,
-      actorId: userId,
-      type: status === "pending" ? "follow_request" : "follow",
-    });
+    // Run the activity replacement (delete-then-insert) and the actor
+    // lookup in parallel — the activity work doesn't depend on the
+    // actor's display name and the actor lookup doesn't depend on the
+    // activity row. We need actor.username for the push URL, so the
+    // push waits for that branch.
+    const activityType = status === "pending" ? "follow_request" : "follow";
+    const [, [actor]] = await Promise.all([
+      (async () => {
+        await db
+          .delete(activities)
+          .where(
+            and(
+              eq(activities.userId, target.id),
+              eq(activities.actorId, userId),
+              eq(activities.type, activityType),
+            ),
+          );
+        await db.insert(activities).values({
+          id: randomUUID(),
+          userId: target.id,
+          actorId: userId,
+          type: activityType,
+        });
+      })(),
+      db
+        .select({ displayName: users.displayName, username: users.username })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1),
+    ]);
 
-    // Push notification to the followee — actor's display name as title.
-    const [actor] = await db
-      .select({ displayName: users.displayName, username: users.username })
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
     const actorName = actor?.displayName || actor?.username || "Someone";
     await sendPushToUser(target.id, {
       title: status === "pending" ? `${actorName} wants to follow you` : `${actorName} followed you`,
