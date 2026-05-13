@@ -24,24 +24,28 @@ export async function GET(
   // contains a literal `%XX` byte (e.g. encoded spaces inside synthetic
   // ids). Use the param as-is.
   const { songId: decoded } = await params;
+  if (decoded.length > 256) {
+    return NextResponse.json({ error: "invalid songId" }, { status: 400 });
+  }
 
-  // Whom does this user follow?
-  const followed = await db
-    .select({ id: follows.followeeId })
-    .from(follows)
-    .where(and(eq(follows.followerId, userId), eq(follows.status, "accepted")));
+  // Fan out the two independent lookups: the viewer's own follows + the
+  // viewer's own rating on this song. Used to be sequential. Once
+  // followed resolves we can issue the friend-ratings query.
+  const [followed, [mine]] = await Promise.all([
+    db
+      .select({ id: follows.followeeId })
+      .from(follows)
+      .where(and(eq(follows.followerId, userId), eq(follows.status, "accepted"))),
+    db
+      .select({
+        score: ratings.score,
+        review: ratings.review,
+      })
+      .from(ratings)
+      .where(and(eq(ratings.userId, userId), eq(ratings.songId, decoded)))
+      .limit(1),
+  ]);
   const ids = followed.map((f) => f.id);
-
-  // The viewer's own rating (so the sheet can pre-fill, even if the caller
-  // didn't pass it through props).
-  const [mine] = await db
-    .select({
-      score: ratings.score,
-      review: ratings.review,
-    })
-    .from(ratings)
-    .where(and(eq(ratings.userId, userId), eq(ratings.songId, decoded)))
-    .limit(1);
 
   // Friends' ratings.
   const friendRatings = ids.length
