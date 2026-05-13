@@ -112,7 +112,7 @@ export default function SearchPage() {
           role="tab"
           aria-selected={kind === "song"}
           onClick={() => setKind("song")}
-          className={`px-4 py-1 rounded-full transition-colors ${
+          className={`px-4 py-1.5 rounded-full transition-colors active:scale-95 ${
             kind === "song" ? "bg-white text-black" : "text-neutral-400 hover:text-white"
           }`}
         >
@@ -122,7 +122,7 @@ export default function SearchPage() {
           role="tab"
           aria-selected={kind === "album"}
           onClick={() => setKind("album")}
-          className={`px-4 py-1 rounded-full transition-colors ${
+          className={`px-4 py-1.5 rounded-full transition-colors active:scale-95 ${
             kind === "album" ? "bg-white text-black" : "text-neutral-400 hover:text-white"
           }`}
         >
