@@ -7,14 +7,21 @@ export function DismissRec({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
 
   async function dismiss() {
+    if (busy) return;
     setBusy(true);
-    const res = await fetch("/api/recommendations", {
-      method: "DELETE",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    setBusy(false);
-    if (res.ok) router.refresh();
+    try {
+      const res = await fetch("/api/recommendations", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) router.refresh();
+    } catch {
+      // Network throw — silently fail. Without try/finally the button
+      // would stay stuck at "…" forever on a network blip.
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

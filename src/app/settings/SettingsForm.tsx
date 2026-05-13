@@ -37,18 +37,26 @@ export function SettingsForm({
       setSavingProfile(false);
       return;
     }
-    const res = await fetch("/api/account/profile", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const j = await res.json();
-    setSavingProfile(false);
-    if (res.ok) {
-      setProfileMsg("Saved.");
-      router.refresh();
-    } else {
-      setProfileMsg(j.error || "Save failed");
+    try {
+      const res = await fetch("/api/account/profile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      // Bare `await res.json()` would throw if the server returned an
+      // HTML error page (proxy timeout, 502 from CDN, etc.), stranding
+      // the "Saving…" state. Tolerate non-JSON.
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setProfileMsg("Saved.");
+        router.refresh();
+      } else {
+        setProfileMsg(j.error || `Save failed (HTTP ${res.status}).`);
+      }
+    } catch {
+      setProfileMsg("Couldn't reach the server. Try again.");
+    } finally {
+      setSavingProfile(false);
     }
   }
 
@@ -57,19 +65,29 @@ export function SettingsForm({
     setPrivacyMsg(null);
     const prev = isPrivate;
     setIsPrivate(next);
-    const res = await fetch("/api/account/privacy", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ isPrivate: next }),
-    });
-    setSavingPrivacy(false);
-    if (!res.ok) {
+    try {
+      const res = await fetch("/api/account/privacy", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ isPrivate: next }),
+      });
+      if (!res.ok) {
+        // Roll back the optimistic flip so the toggle reflects reality.
+        setIsPrivate(prev);
+        const j = await res.json().catch(() => ({}));
+        setPrivacyMsg(j.error || "Save failed");
+      } else {
+        setPrivacyMsg(next ? "Profile is private." : "Profile is public.");
+        router.refresh();
+      }
+    } catch {
+      // Network throw — also roll back. Previously fetch errors left
+      // savingPrivacy stuck true and the optimistic isPrivate value
+      // pointing the wrong direction.
       setIsPrivate(prev);
-      const j = await res.json().catch(() => ({}));
-      setPrivacyMsg(j.error || "Save failed");
-    } else {
-      setPrivacyMsg(next ? "Profile is private." : "Profile is public.");
-      router.refresh();
+      setPrivacyMsg("Couldn't reach the server. Try again.");
+    } finally {
+      setSavingPrivacy(false);
     }
   }
 
@@ -88,16 +106,26 @@ export function SettingsForm({
     }
     setDeletingAccount(true);
     setDeleteError(null);
-    const res = await fetch("/api/account/delete", { method: "POST" });
-    if (res.ok) {
-      try {
-        await clerk.signOut({ redirectUrl: "/" });
-      } catch {
-        window.location.href = "/";
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      if (res.ok) {
+        try {
+          await clerk.signOut({ redirectUrl: "/" });
+        } catch {
+          window.location.href = "/";
+        }
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setDeleteError(j.error || "Delete failed");
+        setDeletingAccount(false);
       }
-    } else {
-      const j = await res.json().catch(() => ({}));
-      setDeleteError(j.error || "Delete failed");
+    } catch (e) {
+      // Network throw — without this, the button stays stuck at
+      // "Deleting…" forever because deletingAccount never gets reset.
+      setDeleteError(
+        (e as Error)?.message ||
+          "Couldn't reach the server. Try again in a moment.",
+      );
       setDeletingAccount(false);
     }
   }

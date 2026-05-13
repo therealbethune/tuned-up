@@ -17,33 +17,52 @@ export function FollowButton({
   const [busy, setBusy] = useState(false);
 
   async function toggle() {
+    if (busy) return;
     setBusy(true);
     const action = state === "none" ? "follow" : "unfollow";
-    const res = await fetch("/api/follows", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username, action }),
-    });
-    setBusy(false);
-    if (res.ok) {
-      const j = await res.json().catch(() => ({}));
-      if (action === "unfollow") {
-        setState("none");
+    // Optimistic flip — the button visibly reacts immediately instead
+    // of sitting in its old state for 100-500ms while the request
+    // resolves. We don't know yet whether the new state is "pending"
+    // (private target) or "accepted" (public target); guess "accepted"
+    // and reconcile from the response. The unfollow case is unambiguous.
+    const prevState = state;
+    setState(action === "unfollow" ? "none" : "accepted");
+    try {
+      const res = await fetch("/api/follows", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, action }),
+      });
+      if (res.ok) {
+        const j = await res.json().catch(() => ({}));
+        if (action === "unfollow") {
+          setState("none");
+        } else {
+          setState(j.status === "pending" ? "pending" : "accepted");
+          // Success feedback — for private accounts it's "request sent"
+          // not "now following", so disambiguate.
+          toast.success(
+            j.status === "pending"
+              ? `Follow request sent to @${username}`
+              : `Now following @${username}`,
+          );
+        }
+        router.refresh();
       } else {
-        setState(j.status === "pending" ? "pending" : "accepted");
-        // Success feedback — for private accounts it's "request sent"
-        // not "now following", so disambiguate.
-        toast.success(
-          j.status === "pending"
-            ? `Follow request sent to @${username}`
-            : `Now following @${username}`,
-        );
+        // Roll back the optimistic flip; the click did nothing.
+        setState(prevState);
+        // 429 (rate-limited) and other failures surface via the toast
+        // bus so the user knows the click did nothing.
+        await toast.fromResponse(res, "Couldn't update follow");
       }
-      router.refresh();
-    } else {
-      // 429 (rate-limited) and other failures surface via the toast
-      // bus so the user knows the click did nothing.
-      await toast.fromResponse(res, "Couldn't update follow");
+    } catch {
+      // Network throw — also roll back, otherwise the button shows the
+      // wrong state. Previously the `setBusy(false)` was outside any
+      // try/catch so this branch also stranded the button as disabled.
+      setState(prevState);
+      toast.error("Couldn't reach the server. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
 

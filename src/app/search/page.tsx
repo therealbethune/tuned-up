@@ -103,8 +103,14 @@ export default function SearchPage() {
         </p>
       </div>
 
-      <div className="inline-flex rounded-full border border-neutral-800 p-1 text-sm">
+      <div
+        role="tablist"
+        aria-label="Search type"
+        className="inline-flex rounded-full border border-neutral-800 p-1 text-sm"
+      >
         <button
+          role="tab"
+          aria-selected={kind === "song"}
           onClick={() => setKind("song")}
           className={`px-4 py-1 rounded-full transition-colors ${
             kind === "song" ? "bg-white text-black" : "text-neutral-400 hover:text-white"
@@ -113,6 +119,8 @@ export default function SearchPage() {
           Songs
         </button>
         <button
+          role="tab"
+          aria-selected={kind === "album"}
           onClick={() => setKind("album")}
           className={`px-4 py-1 rounded-full transition-colors ${
             kind === "album" ? "bg-white text-black" : "text-neutral-400 hover:text-white"
@@ -128,9 +136,14 @@ export default function SearchPage() {
         </span>
         <input
           autoFocus
+          type="search"
+          aria-label={kind === "album" ? "Search albums" : "Search songs"}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={kind === "album" ? "Album, artist…" : "Song, artist, album…"}
+          autoCapitalize="none"
+          autoCorrect="off"
+          enterKeyHint="search"
           className="w-full rounded-full bg-neutral-900 border border-neutral-800 pl-11 pr-12 py-2.5 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
         />
         {loading ? (

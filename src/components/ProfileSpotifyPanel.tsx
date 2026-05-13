@@ -87,11 +87,38 @@ export function ProfileSpotifyPanel({ connected }: { connected: boolean }) {
         if (!cancelled) setNowChecked(true);
       }
     }
+    // Visibility-aware polling. Browsers already throttle background
+    // setInterval to ~1/min, but pausing entirely is cleaner: we don't
+    // hit the Spotify API on a stale tab in someone's background, and
+    // the user gets a fresh poll the moment they refocus instead of
+    // possibly-stale data. Also avoids racking up needless DB lookups
+    // for the access-token refresh inside fetchUserNowPlaying.
     load();
-    const t = setInterval(load, 20_000);
+    let timer: ReturnType<typeof setInterval> | null = null;
+    function start() {
+      if (timer != null) return;
+      timer = setInterval(load, 20_000);
+    }
+    function stop() {
+      if (timer != null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }
+    function onVisibility() {
+      if (document.hidden) {
+        stop();
+      } else {
+        load();
+        start();
+      }
+    }
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [connected]);
 
