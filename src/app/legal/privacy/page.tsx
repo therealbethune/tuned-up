@@ -44,7 +44,9 @@ export default function PrivacyPage() {
         <li>
           <strong>What you create in the app</strong>: ratings (1–100 with an
           optional review), comments, likes, follows, recommendations you send
-          and receive, and which suggestions you dismiss.
+          and receive, which suggestions you dismiss, and any reports or
+          blocks you submit (we keep these to act on moderation issues and
+          to enforce that blocked users stay hidden from your view).
         </li>
         <li>
           <strong>Timezone</strong>: a best-effort read of your browser&rsquo;s
@@ -100,8 +102,10 @@ export default function PrivacyPage() {
           stack traces are sent without your email/IP attached.
         </li>
         <li>
-          <strong>Spotify</strong> — only when you&rsquo;ve connected it, and
-          only to read tracks / save to your library on your behalf.
+          <strong>Spotify Web API</strong> — anonymous title-artist lookups
+          (app-credentials only) so we can show an &ldquo;Open in Spotify&rdquo;
+          deep link on songs you rate. No account data is sent and Tuned Up
+          does not connect to or read from your personal Spotify account.
         </li>
         <li>
           <strong>Apple iTunes Search</strong> — anonymous title-artist lookups
@@ -134,12 +138,22 @@ export default function PrivacyPage() {
         </li>
       </ul>
 
+      <h2 className="text-xl font-semibold pt-4">Reports &amp; moderation</h2>
+      <p>
+        You can flag offensive ratings, comments, or profiles via the
+        in-app Report button, and you can block another user from your
+        profile or theirs. Reports go to Tuned Up&rsquo;s moderation
+        queue and are reviewed by humans within 24 hours. Blocking
+        hides the blocked user&rsquo;s content from you and yours from
+        them. You can see + undo your blocks any time in Settings.
+      </p>
+
       <h2 className="text-xl font-semibold pt-4">How to delete your data</h2>
       <p>
         Go to Settings → Delete account. This permanently removes your account
         from both Clerk and our database, including all ratings, reviews,
-        comments, likes, follows, recommendations, push subscriptions, and
-        Spotify connection. Other users&rsquo; data referring to yours (e.g.
+        comments, likes, follows, recommendations, blocks, reports, and push
+        subscriptions. Other users&rsquo; data referring to yours (e.g.
         notifications about your activity) is removed in the same operation.
       </p>
       <p>
