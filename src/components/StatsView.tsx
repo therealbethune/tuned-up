@@ -3,7 +3,6 @@ import Link from "next/link";
 import { desc, eq, sql } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
 import { ytUrlForSongId } from "@/lib/songs";
-import { computeStreak } from "@/lib/streak";
 import { scoreLabel } from "@/lib/score-labels";
 
 type User = typeof users.$inferSelect;
@@ -19,7 +18,16 @@ export default async function StatsView({
   // (total/avg/min/max + the 10 score-bin counts) instead of fetching every
   // rating row and computing histogram in JS. For users with 1000+ ratings
   // this drops the page from "load 1000 rows" to "load 1 row".
-  const [aggResult, topSongs, topArtists, monthly, streak] = await Promise.all([
+  //
+  // Streak is sourced from target.currentStreak (cached on the user row,
+  // refreshed on every rating insert via refreshUserStreak) — not a live
+  // computeStreak() call. The live version re-fetched every rating the
+  // user has ever made just to count consecutive days, which the cached
+  // column was specifically introduced to avoid (same comment as the
+  // profile page's Wave G fix).
+  const streak = target.currentStreak ?? 0;
+
+  const [aggResult, topSongs, topArtists, monthly] = await Promise.all([
     db.execute(sql`
       SELECT
         COUNT(*)::int AS total,
@@ -72,7 +80,6 @@ export default async function StatsView({
       .where(eq(ratings.userId, target.id))
       .groupBy(sql`date_trunc('month', ${ratings.createdAt})`)
       .orderBy(sql`date_trunc('month', ${ratings.createdAt})`),
-    computeStreak(target.id),
   ]);
 
   // Drizzle's neon-http `db.execute` returns either an array or
