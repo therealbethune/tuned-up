@@ -42,7 +42,7 @@ export function Toaster() {
           key={t.id}
           role={t.kind === "error" ? "alert" : "status"}
           aria-live={t.kind === "error" ? "assertive" : "polite"}
-          className={`pointer-events-auto rounded-xl border px-4 py-2.5 text-sm font-medium shadow-xl backdrop-blur-md max-w-sm flex items-start gap-2 animate-[toast-in_0.18s_ease-out] ${
+          className={`pointer-events-auto rounded-xl border px-3.5 py-2.5 text-sm font-medium shadow-xl backdrop-blur-md max-w-sm flex items-start gap-2.5 animate-[toast-in_0.18s_ease-out] ${
             t.kind === "success"
               ? "border-emerald-500/40 bg-emerald-950/85 text-emerald-100"
               : t.kind === "error"
@@ -50,6 +50,29 @@ export function Toaster() {
                 : "border-neutral-700 bg-neutral-900/90 text-neutral-100"
           }`}
         >
+          {/* Lead icon — visual cue for the kind so a flash-glance
+              succeeds even when the user can't process the text in
+              time. aria-hidden because the live-region role already
+              announces the type to screen readers. */}
+          <span aria-hidden className="shrink-0 mt-0.5">
+            {t.kind === "success" ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            ) : t.kind === "error" ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="13" />
+                <circle cx="12" cy="16.5" r="0.5" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="11" x2="12" y2="16" />
+                <circle cx="12" cy="7.5" r="0.5" fill="currentColor" />
+              </svg>
+            )}
+          </span>
           <span className="flex-1 leading-snug">{t.message}</span>
           <button
             type="button"

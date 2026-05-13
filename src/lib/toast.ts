@@ -16,7 +16,15 @@ export type Toast = {
 
 const listeners = new Set<(toasts: Toast[]) => void>();
 let active: Toast[] = [];
-const TTL_MS = 3500;
+// Per-kind TTL. Errors need more dwell time than success messages —
+// a 3.5s flash isn't enough for a user to read "rate-limited because
+// you're tapping follow too fast" and decide what to do, especially
+// on mobile where the toast slides up above the tab bar.
+const TTL_BY_KIND: Record<Toast["kind"], number> = {
+  success: 3500,
+  info: 3500,
+  error: 6000,
+};
 
 function emit() {
   // Hand callers a fresh copy so they can use Object.is to detect
@@ -31,7 +39,7 @@ function push(kind: Toast["kind"], message: string): string {
   emit();
   // Auto-dismiss. The Toaster also handles manual dismiss via dismiss().
   if (typeof window !== "undefined") {
-    window.setTimeout(() => dismiss(id), TTL_MS);
+    window.setTimeout(() => dismiss(id), TTL_BY_KIND[kind] ?? 3500);
   }
   return id;
 }
