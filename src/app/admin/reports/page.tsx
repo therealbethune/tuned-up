@@ -166,7 +166,7 @@ export default async function AdminReportsPage() {
                   </p>
                 )}
                 <div className="pt-1">
-                  <ReportActions reportId={r.id} />
+                  <ReportActions reportId={r.id} targetType={r.targetType} />
                 </div>
               </li>
             );
