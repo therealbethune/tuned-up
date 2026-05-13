@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 import { db, ratings, spotifyAccounts } from "@/db";
 import { fetchUserTopTracks } from "@/lib/spotify-server";
 import { SpotifyIconOnGreen } from "@/components/icons";
@@ -59,17 +59,21 @@ export default async function SpotifyImportPage({
       ? rawRange
       : "medium_term";
 
-  // Fetch up to 50 top tracks, then load MY existing ratings on those
-  // tracks. Showing existing scores prevents re-rating the same songs
-  // and gives a nice "already rated" state.
-  const tracks = await fetchUserTopTracks(userId, range, 50);
-  const songIds = tracks.map((t) => `spotify:${t.id}`);
-  const myRatings = songIds.length === 0
-    ? []
-    : await db
-        .select({ songId: ratings.songId, score: ratings.score })
-        .from(ratings)
-        .where(and(eq(ratings.userId, userId), inArray(ratings.songId, songIds)));
+  // Fetch the Spotify top tracks AND the viewer's Spotify-prefixed
+  // ratings in parallel. Previously these were sequential: the rating
+  // lookup needed songIds derived from `tracks`. But we can sidestep
+  // that dependency by fetching ALL ratings with songId LIKE 'spotify:%'
+  // — the index on (user_id, updated_at) + the LIKE prefix is cheap
+  // enough that we're not over-fetching meaningfully, and the Spotify
+  // top-tracks fetch can take 300-800ms over the wire, so running them
+  // concurrently saves the full DB roundtrip from the critical path.
+  const [tracks, myRatings] = await Promise.all([
+    fetchUserTopTracks(userId, range, 50),
+    db
+      .select({ songId: ratings.songId, score: ratings.score })
+      .from(ratings)
+      .where(and(eq(ratings.userId, userId), like(ratings.songId, "spotify:%"))),
+  ]);
 
   // Build a {bareSpotifyId -> score} map for the client. The client
   // tracks tracks by bare Spotify id; the DB stores them prefixed.
