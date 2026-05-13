@@ -59,11 +59,6 @@ export default function PrivacyPage() {
           token. We never read or send anything else through these channels.
         </li>
         <li>
-          <strong>Spotify (only if you connect it)</strong>: an OAuth token
-          scoped to your top tracks, now-playing, and the ability to save songs
-          to your Liked Songs. You can disconnect at any time from Settings.
-        </li>
-        <li>
           <strong>Apple Music (only if you connect it)</strong>: a MusicKit
           user token your browser holds locally, used so you can add songs to
           your library from inside Tuned Up. We do not store this token on our

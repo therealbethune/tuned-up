@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, desc, eq, gte, count, sql } from "drizzle-orm";
+import { and, desc, eq, gte, count, sql, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, likes, ratings, activities, users, songs } from "@/db";
+import { db, likes, ratings, activities, users, songs, blocks } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
@@ -38,6 +38,17 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  // Block-aware: strip likers on either side of a block edge so the
+  // viewer doesn't see (and isn't visible to) anyone they've muted.
+  const blockEdges = await db
+    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+    .from(blocks)
+    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
+  const hiddenIds: string[] = [];
+  for (const b of blockEdges) {
+    hiddenIds.push(b.blockerId === userId ? b.blockedId : b.blockerId);
+  }
+
   const rows = await db
     .select({
       id: users.id,
@@ -48,7 +59,15 @@ export async function GET(req: Request) {
     })
     .from(likes)
     .innerJoin(users, eq(users.id, likes.likerId))
-    .where(and(eq(likes.ratingUserId, ratingUserId), eq(likes.songId, songId)))
+    .where(
+      hiddenIds.length
+        ? and(
+            eq(likes.ratingUserId, ratingUserId),
+            eq(likes.songId, songId),
+            notInArray(likes.likerId, hiddenIds),
+          )
+        : and(eq(likes.ratingUserId, ratingUserId), eq(likes.songId, songId)),
+    )
     .orderBy(desc(likes.createdAt))
     .limit(200);
 

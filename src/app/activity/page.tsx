@@ -2,10 +2,10 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, notInArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { encodeBase64Url } from "@/lib/encoding";
-import { db, activities, users, songs } from "@/db";
+import { db, activities, users, songs, blocks } from "@/db";
 import { relativeTime } from "@/lib/songs";
 import { FollowRequestActions } from "./FollowRequestActions";
 
@@ -103,6 +103,19 @@ export default async function ActivityPage() {
   // the "unread" highlight, even on the first time the user sees them.
   // Sequential costs one extra DB roundtrip but preserves the visual
   // "new since last visit" cue on the row's first paint.
+  // Block-aware: any activity row whose actor is on either side of a
+  // block edge with the viewer is hidden. Without this, a blocked user
+  // can still notify you (e.g. by liking your rating) — defeats the
+  // point of blocking per App Store Guideline 1.2.
+  const blockEdges = await db
+    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+    .from(blocks)
+    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
+  const hiddenIds: string[] = [];
+  for (const b of blockEdges) {
+    hiddenIds.push(b.blockerId === userId ? b.blockedId : b.blockerId);
+  }
+
   const rows = await db
     .select({
       id: activities.id,
@@ -122,7 +135,11 @@ export default async function ActivityPage() {
     .innerJoin(users, eq(users.id, activities.actorId))
     .leftJoin(songs, eq(songs.id, activities.songId))
     .leftJoin(ratingOwner, eq(ratingOwner.id, activities.ratingUserId))
-    .where(eq(activities.userId, userId))
+    .where(
+      hiddenIds.length
+        ? and(eq(activities.userId, userId), notInArray(activities.actorId, hiddenIds))
+        : eq(activities.userId, userId),
+    )
     .orderBy(desc(activities.createdAt))
     .limit(50);
 

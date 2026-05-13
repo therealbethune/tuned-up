@@ -105,10 +105,12 @@ export default function TermsPage() {
 
       <h2 className="text-xl font-semibold pt-4">Third-party music services</h2>
       <p>
-        Connecting Spotify or Apple Music is optional. When you do, you&rsquo;re
-        also bound by their terms of service. Tuned Up doesn&rsquo;t pay for
-        your music subscription or guarantee any specific Spotify/Apple Music
-        feature will keep working — they control their APIs.
+        Connecting Apple Music is optional. When you do, you&rsquo;re also
+        bound by Apple&rsquo;s terms of service. Tuned Up doesn&rsquo;t pay
+        for your music subscription or guarantee any Apple Music feature
+        will keep working — they control their APIs. Streaming links to
+        Spotify and YouTube Music are deep links only; we don&rsquo;t hold
+        any account credentials for those services.
       </p>
 
       <h2 className="text-xl font-semibold pt-4">No warranties</h2>

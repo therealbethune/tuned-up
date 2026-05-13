@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, recommendations, users, songs, activities } from "@/db";
+import { db, recommendations, users, songs, activities, blocks } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
@@ -17,6 +17,16 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Block-aware: hide recs from anyone on either side of a block edge.
+  const blockEdges = await db
+    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+    .from(blocks)
+    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
+  const hiddenIds: string[] = [];
+  for (const b of blockEdges) {
+    hiddenIds.push(b.blockerId === userId ? b.blockedId : b.blockerId);
+  }
 
   const rows = await db
     .select({
@@ -39,7 +49,15 @@ export async function GET() {
     .from(recommendations)
     .innerJoin(users, eq(users.id, recommendations.fromUserId))
     .innerJoin(songs, eq(songs.id, recommendations.songId))
-    .where(and(eq(recommendations.toUserId, userId), eq(recommendations.status, "pending")))
+    .where(
+      hiddenIds.length
+        ? and(
+            eq(recommendations.toUserId, userId),
+            eq(recommendations.status, "pending"),
+            notInArray(recommendations.fromUserId, hiddenIds),
+          )
+        : and(eq(recommendations.toUserId, userId), eq(recommendations.status, "pending")),
+    )
     .orderBy(desc(recommendations.createdAt))
     .limit(50);
 

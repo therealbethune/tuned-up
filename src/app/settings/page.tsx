@@ -1,12 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { db, users } from "@/db";
+import { desc, eq } from "drizzle-orm";
+import { db, users, blocks } from "@/db";
 import { safeQuery } from "@/lib/safe-query";
 import { SettingsForm } from "./SettingsForm";
 import { AppleMusicAccountCard } from "@/components/AppleMusicAccountCard";
 import { ProfilePictureSection } from "@/components/ProfilePictureSection";
+import { BlockedUsersList } from "@/components/BlockedUsersList";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +15,30 @@ export default async function SettingsPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  const meRows = await safeQuery(
-    () => db.select().from(users).where(eq(users.id, userId)).limit(1),
-    [] as (typeof users.$inferSelect)[],
-    "settings-user-lookup",
-  );
+  const [meRows, blockedRows] = await Promise.all([
+    safeQuery(
+      () => db.select().from(users).where(eq(users.id, userId)).limit(1),
+      [] as (typeof users.$inferSelect)[],
+      "settings-user-lookup",
+    ),
+    safeQuery(
+      () =>
+        db
+          .select({
+            id: users.id,
+            username: users.username,
+            displayName: users.displayName,
+            imageUrl: users.imageUrl,
+          })
+          .from(blocks)
+          .innerJoin(users, eq(users.id, blocks.blockedId))
+          .where(eq(blocks.blockerId, userId))
+          .orderBy(desc(blocks.createdAt))
+          .limit(200),
+      [] as { id: string; username: string; displayName: string | null; imageUrl: string | null }[],
+      "settings-blocked-list",
+    ),
+  ]);
   const me = meRows[0] ?? null;
   if (!me) {
     return (
@@ -60,6 +80,8 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-2">Connected accounts</h2>
         <AppleMusicAccountCard />
       </div>
+
+      <BlockedUsersList initialBlocked={blockedRows} />
 
       {/* Legal footer — Apple App Store Connect requires both URLs in
           the listing, and reviewers expect them to be reachable from
