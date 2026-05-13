@@ -1,7 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db, users } from "@/db";
+import { db, users, activities } from "@/db";
 
 export const runtime = "nodejs";
 
@@ -36,6 +36,23 @@ export async function POST() {
   // 2) Local DB cleanup. Now that Clerk is gone the user is permanently
   //    signed out anyway; orphaning this row is a recoverable state, not a
   //    silent identity hijack.
+  //
+  // Cascade summary on `users.id` delete: ratings, comments, likes,
+  // follows, recommendations, dismissed_suggestions, spotify_accounts,
+  // push_subscriptions, and activities WHERE userId OR actorId match all
+  // cascade-delete automatically. But activities.ratingUserId is a plain
+  // text column (no FK), so rows like "Bob commented on this user's
+  // rating, mentioning Wendy" survive in Wendy's bell with a dangling
+  // ratingUserId pointer that resolves to a now-deleted user — same
+  // ghost-notification class we fixed for the single-rating DELETE in
+  // Wave S. Sweep those before the user-row delete (best-effort).
+  try {
+    await db
+      .delete(activities)
+      .where(eq(activities.ratingUserId, userId));
+  } catch {
+    /* non-critical — proceed with the user-row delete either way */
+  }
   try {
     await db.delete(users).where(eq(users.id, userId));
   } catch (e) {

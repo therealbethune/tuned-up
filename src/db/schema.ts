@@ -180,4 +180,8 @@ export const activities = pgTable("activities", {
   readAt: timestamp("read_at"),
 }, (t) => [
   index("activities_user_idx").on(t.userId, t.createdAt),
+  // Speeds up the rating-delete + account-delete cleanup sweeps that
+  // remove activity rows pointing at a now-deleted rating. Without it,
+  // both sweeps fall back to a sequential scan of the activities table.
+  index("activities_rating_user_idx").on(t.ratingUserId),
 ]);

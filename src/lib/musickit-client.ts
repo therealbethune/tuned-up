@@ -17,7 +17,7 @@ let setupPromise: Promise<MusicKitInstance> | null = null;
 
 export async function setupMusicKit(): Promise<MusicKitInstance> {
   if (setupPromise) return setupPromise;
-  setupPromise = (async () => {
+  const attempt = (async () => {
     if (!window.MusicKit) {
       await new Promise<void>((resolve, reject) => {
         const existing = document.querySelector(`script[src="${MUSICKIT_JS_URL}"]`);
@@ -51,7 +51,16 @@ export async function setupMusicKit(): Promise<MusicKitInstance> {
     });
     return window.MusicKit.getInstance();
   })();
-  return setupPromise;
+  setupPromise = attempt;
+  // Clear the cached promise on FAILURE so the next caller (e.g. a
+  // user retrying Connect after a transient network blip) gets a
+  // fresh attempt rather than the rejection-cached promise. The
+  // success path keeps the cache so deduped callers share one
+  // configured MusicKitInstance.
+  attempt.catch(() => {
+    if (setupPromise === attempt) setupPromise = null;
+  });
+  return attempt;
 }
 
 // Centralized read/write for the "user has connected Apple Music" flag.

@@ -156,6 +156,10 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS "ratings_user_updated_idx" ON "ratings" USING btree ("user_id","updated_at")`,
   `CREATE INDEX IF NOT EXISTS "likes_liker_idx" ON "likes" USING btree ("liker_id")`,
   `CREATE INDEX IF NOT EXISTS "activities_unread_idx" ON "activities" USING btree ("user_id") WHERE "read_at" IS NULL`,
+  // Speeds up the rating-delete + account-delete cleanup sweeps (Wave S
+  // + Wave BA) that DELETE activity rows by ratingUserId. Without this,
+  // those sweeps scan the whole activities table.
+  `CREATE INDEX IF NOT EXISTS "activities_rating_user_idx" ON "activities" USING btree ("rating_user_id")`,
   // Removed feature: sound_bites / reels. Drop dormant table (idempotent —
   // no-op if it was never created in this environment).
   `DROP TABLE IF EXISTS "sound_bites" CASCADE`,
