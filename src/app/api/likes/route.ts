@@ -26,7 +26,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const ratingUserId = url.searchParams.get("u");
   const songId = url.searchParams.get("s");
-  if (!ratingUserId || !songId) {
+  if (
+    !ratingUserId ||
+    !songId ||
+    ratingUserId.length > 64 ||
+    songId.length > 256
+  ) {
     return NextResponse.json({ error: "u and s required" }, { status: 400 });
   }
   if (!(await canViewRatingsFrom(userId, ratingUserId))) {
@@ -60,6 +65,14 @@ export async function POST(req: Request) {
   const { ratingUserId, songId } = (await req.json().catch(() => ({}))) ?? {};
   if (!ratingUserId || !songId) {
     return NextResponse.json({ error: "ratingUserId and songId required" }, { status: 400 });
+  }
+  // Length-bound so a hostile client can't punch through to DB lookups
+  // with megabyte garbage.
+  if (
+    typeof ratingUserId !== "string" || ratingUserId.length > 64 ||
+    typeof songId !== "string" || songId.length > 256
+  ) {
+    return NextResponse.json({ error: "invalid fields" }, { status: 400 });
   }
 
   // Rate-limit toggle traffic. Likes can be spammed by holding down a
