@@ -12,9 +12,12 @@ export default async function UserStatsPage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
-  const { userId } = await auth();
-
-  const [target] = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  // auth() + target lookup are independent — fan them out so the page
+  // doesn't pay two sequential roundtrips before rendering.
+  const [{ userId }, [target]] = await Promise.all([
+    auth(),
+    db.select().from(users).where(eq(users.username, username)).limit(1),
+  ]);
   if (!target) notFound();
 
   // Honor private profiles for stats too.

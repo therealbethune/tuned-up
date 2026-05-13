@@ -149,10 +149,14 @@ export default async function SharedRatingPage({
   params: Promise<{ username: string; songId: string }>;
 }) {
   const { username, songId } = await params;
-  const r = await loadRating(username, songId);
+  // loadRating and auth() are independent — run them concurrently so
+  // we save the round-trip cost of the smaller branch. Both are needed
+  // before the privacy gate / redirect decision.
+  const [r, { userId }] = await Promise.all([
+    loadRating(username, songId),
+    auth(),
+  ]);
   if (!r) notFound();
-
-  const { userId } = await auth();
 
   // Privacy gate: a private user's share URLs should still resolve for
   // the owner and for accepted followers, but for everyone else (incl.
