@@ -16,15 +16,29 @@ type SuggestedUser = {
   ratingsCount: number;
 };
 
+type PopularSong = {
+  id: string;
+  title: string;
+  artist: string;
+  thumbnail: string | null;
+  durationSeconds: number | null;
+  kind: "song" | "album";
+};
+
 export function WelcomeFlow({
   suggested,
   initialRatedCount,
+  popularSongs = [],
 }: {
   suggested: SuggestedUser[];
   /** Number of ratings this user already has — seeds the gate counter
-   *  so reloads, /import/spotify imports, and re-entries to /welcome
-   *  all count correctly instead of pretending the user has rated 0. */
+   *  so reloads and re-entries to /welcome count correctly instead of
+   *  pretending the user has rated 0. */
   initialRatedCount?: number;
+  /** Most-rated catalog songs the viewer hasn't rated yet — used to
+   *  populate a tap-to-rate rail at the top of step 1 so brand-new
+   *  users don't have to guess what to search for. */
+  popularSongs?: PopularSong[];
 }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
@@ -180,6 +194,23 @@ export function WelcomeFlow({
               </div>
             )}
           </div>
+
+          {/* Popular ideas — only show while the search input is empty,
+              so we don't fight the search results for attention once
+              the user starts typing. Each row is a real SongRow that
+              opens the rate flow, so the first rating is one tap away. */}
+          {q.trim().length === 0 && popularSongs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[11px] uppercase tracking-wider text-neutral-400">
+                Need ideas? Popular on Tuned Up
+              </p>
+              <div className="space-y-2">
+                {popularSongs.map((s) => (
+                  <SongRow key={s.id} song={{ ...s, album: null }} />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             {results.map((s) => (

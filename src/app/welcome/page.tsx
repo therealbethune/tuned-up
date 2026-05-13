@@ -1,9 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { and, desc, eq, ne, sql, count } from "drizzle-orm";
-import { db, users, ratings, follows } from "@/db";
+import { and, desc, eq, ne, sql, count, notInArray } from "drizzle-orm";
+import { db, users, ratings, follows, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { WelcomeFlow } from "./WelcomeFlow";
+import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function WelcomePage() {
   //
   // existingFollows must come back before we can filter the suggested
   // list, so we do that filter in JS after both resolve.
-  const [followingRows, [ratingStat], rawSuggested] = await Promise.all([
+  const [followingRows, [ratingStat], rawSuggested, myRatedRows] = await Promise.all([
     db
       .select({ id: follows.followeeId })
       .from(follows)
@@ -52,7 +53,50 @@ export default async function WelcomePage() {
       .groupBy(users.id)
       .orderBy(desc(sql`count(${ratings.userId})`))
       .limit(16),
+    // Songs the viewer has already rated — used to filter the
+    // "popular ideas" rail so we don't show them a song they've
+    // already scored.
+    db
+      .select({ songId: ratings.songId })
+      .from(ratings)
+      .where(eq(ratings.userId, userId)),
   ]);
+
+  // Six most-rated songs (any kind) that the viewer hasn't rated yet.
+  // Surfaced as a tap-to-rate rail in WelcomeFlow step 1 so new users
+  // who don't know what to search for can get to a first rating in two
+  // taps instead of hunting through search.
+  const ratedSongIds = myRatedRows.map((r) => r.songId);
+  const popularSongs = await safeQuery(
+    () =>
+      db
+        .select({
+          songId: songs.id,
+          title: songs.title,
+          artist: songs.artist,
+          thumbnail: songs.thumbnail,
+          durationSeconds: songs.durationSeconds,
+          kind: songs.kind,
+          n: sql<number>`count(${ratings.songId})::int`,
+        })
+        .from(ratings)
+        .innerJoin(songs, eq(songs.id, ratings.songId))
+        .where(ratedSongIds.length ? notInArray(songs.id, ratedSongIds) : undefined)
+        .groupBy(songs.id)
+        .having(sql`count(${ratings.songId}) >= 2`)
+        .orderBy(desc(sql`count(${ratings.songId})`))
+        .limit(6),
+    [] as Array<{
+      songId: string;
+      title: string;
+      artist: string;
+      thumbnail: string | null;
+      durationSeconds: number | null;
+      kind: string;
+      n: number;
+    }>,
+    "welcome-popular",
+  );
 
   // We over-fetched to 16 above so we still have 8 to show even when
   // some of the top raters are already followed and get filtered out.
@@ -65,6 +109,14 @@ export default async function WelcomePage() {
     <WelcomeFlow
       suggested={suggested}
       initialRatedCount={ratingStat?.n ?? 0}
+      popularSongs={popularSongs.map((p) => ({
+        id: p.songId,
+        title: p.title,
+        artist: p.artist,
+        thumbnail: p.thumbnail,
+        durationSeconds: p.durationSeconds,
+        kind: (p.kind === "album" ? "album" : "song") as "song" | "album",
+      }))}
     />
   );
 }
