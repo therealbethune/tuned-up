@@ -5,6 +5,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { db, reports, users, comments } from "@/db";
 import { safeQuery } from "@/lib/safe-query";
 import { encodeBase64Url } from "@/lib/encoding";
+import { ReportActions } from "./ReportActions";
 
 export const dynamic = "force-dynamic";
 
@@ -164,6 +165,9 @@ export default async function AdminReportsPage() {
                     Note: <span className="text-neutral-200">{r.details}</span>
                   </p>
                 )}
+                <div className="pt-1">
+                  <ReportActions reportId={r.id} />
+                </div>
               </li>
             );
           })}
@@ -171,10 +175,10 @@ export default async function AdminReportsPage() {
       )}
 
       <p className="pt-4 text-xs text-neutral-500">
-        Reports are kept open until a moderator marks them otherwise.
-        Action a report by handling the underlying content directly
-        (delete comment, suspend user via the dashboard), then mark the
-        row reviewed in the DB.
+        Apple expects we act on reports within 24 hours. Use the
+        per-row action buttons to mark the row reviewed (action taken)
+        or dismissed (false alarm) once you&apos;ve handled the
+        underlying content.
       </p>
     </div>
   );
