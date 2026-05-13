@@ -155,11 +155,12 @@ export default async function StatsView({
               <div key={i} className="flex-1 flex flex-col items-center justify-end">
                 <div className="text-[10px] text-neutral-500 mb-1 tabular-nums">{n || ""}</div>
                 <div
-                  className="w-full rounded-t-sm transition-colors"
+                  className="w-full rounded-t-sm transition-colors bar-grow-vertical"
                   style={{
                     height: `${(n / maxBin) * 100}%`,
                     minHeight: n > 0 ? "4px" : "0",
                     background: `linear-gradient(180deg, ${binColor(i)} 0%, ${binColor(i)}99 100%)`,
+                    animationDelay: `${i * 40}ms`,
                   }}
                   title={`${i * 10 + 1}-${(i + 1) * 10}: ${n}`}
                 />
@@ -181,15 +182,19 @@ export default async function StatsView({
           <h2 className="text-lg font-semibold">Ratings over time</h2>
           <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
             <div className="flex items-end gap-1 h-32">
-              {monthly.map((m) => (
+              {monthly.map((m, i) => (
                 <div
                   key={m.month}
                   className="flex-1 flex flex-col items-center justify-end"
                   title={`${m.month}: ${m.n}`}
                 >
                   <div
-                    className="w-full bg-sky-500/80 rounded-t-sm"
-                    style={{ height: `${(m.n / maxMonth) * 100}%`, minHeight: m.n > 0 ? "4px" : "0" }}
+                    className="w-full bg-sky-500/80 rounded-t-sm bar-grow-vertical"
+                    style={{
+                      height: `${(m.n / maxMonth) * 100}%`,
+                      minHeight: m.n > 0 ? "4px" : "0",
+                      animationDelay: `${i * 25}ms`,
+                    }}
                   />
                 </div>
               ))}

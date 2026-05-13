@@ -42,25 +42,28 @@ export function SpotifyIcon({ size = 16, className, ...rest }: IconProps) {
   );
 }
 
-// Same shape as SpotifyIcon but with a black stroke — looks right when
-// placed on a green/Spotify-brand chip background.
+// Spotify mark rendered for placement on a green / brand-color chip.
+// The proper Spotify look on green is just three black wavy bars — no
+// outer circle, since the green container disc IS the icon's body.
+// (The previous version filled the outer circle with currentColor,
+// which on a `text-black` parent made the icon render as a black disc
+// on green with the wavy bars invisible inside it — looked like a
+// random black dot in the welcome flow's "Connect Spotify" card.)
 export function SpotifyIconOnGreen({ size = 22, className, ...rest }: IconProps) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="currentColor"
+      fill="none"
       aria-hidden
       className={className}
       {...rest}
     >
-      <circle cx="12" cy="12" r="10" />
       <path
         d="M7.5 14.4c2.4-1.4 5.7-1.7 9-.8m-9-3.6c2.9-1.6 7-2 10.5-.8m-10.5-3c3.4-1.6 8.5-1.8 12.5-.4"
-        stroke="#000"
-        strokeWidth="1.6"
-        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
         strokeLinecap="round"
       />
     </svg>
