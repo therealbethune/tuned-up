@@ -9,18 +9,26 @@ export function FollowRequestActions({ followerUsername }: { followerUsername: s
   const [done, setDone] = useState<"accepted" | "rejected" | null>(null);
 
   async function act(action: "accept" | "reject") {
+    if (busy) return;
     setBusy(true);
-    const res = await fetch("/api/follows", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: followerUsername, action }),
-    });
-    setBusy(false);
-    if (res.ok) {
-      setDone(action === "accept" ? "accepted" : "rejected");
-      router.refresh();
-    } else {
-      await toast.fromResponse(res, "Couldn't update follow request");
+    try {
+      const res = await fetch("/api/follows", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username: followerUsername, action }),
+      });
+      if (res.ok) {
+        setDone(action === "accept" ? "accepted" : "rejected");
+        router.refresh();
+      } else {
+        await toast.fromResponse(res, "Couldn't update follow request");
+      }
+    } catch {
+      // Network throw — without try/finally a blip stranded the buttons
+      // disabled forever.
+      toast.error("Couldn't reach the server. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
 

@@ -23,6 +23,12 @@ async function searchItunes(params: {
     const res = await fetch(url, {
       headers: { "user-agent": "TunedUp/1.0 (https://tuned-up.com)" },
       signal: AbortSignal.timeout(5000),
+      // Day-long Next data cache so repeat lookups for the same title +
+      // artist (popular tracks getting rated by multiple users) don't
+      // hit iTunes more than once a day. Matches /api/preview-url's
+      // approach. iTunes rate-limits aggressively; this collapses
+      // duplicate requests at the platform level.
+      next: { revalidate: 86400 },
     });
     if (!res.ok) return null;
     const data: { results?: ITunesResult[] } = await res.json();

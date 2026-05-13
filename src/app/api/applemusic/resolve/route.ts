@@ -18,7 +18,12 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const songId = url.searchParams.get("songId");
-  if (!songId) return NextResponse.json({ error: "songId required" }, { status: 400 });
+  // Length-bound the param so an attacker can't punch through to the
+  // DB lookup with a megabyte of garbage. 256 matches the song.id cap
+  // used in /api/ratings input validation.
+  if (!songId || typeof songId !== "string" || songId.length > 256) {
+    return NextResponse.json({ error: "invalid songId" }, { status: 400 });
+  }
 
   const [s] = await db
     .select({ title: songs.title, artist: songs.artist, kind: songs.kind })

@@ -220,26 +220,29 @@ export async function POST(req: Request) {
   // 'comment'. For replies, the rating owner still gets one but typed as
   // 'comment' (same UX) — the reply-specific notification goes to the
   // parent comment author below.
-  const [actor] = await db
-    .select({ displayName: users.displayName, username: users.username })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  const [song] = await db
-    .select({ title: songs.title })
-    .from(songs)
-    .where(eq(songs.id, songId))
-    .limit(1);
+  //
+  // Fan out actor + song + ratingOwner lookups in parallel — three
+  // sequential awaits previously, all independent. Trims 2 DB
+  // roundtrips off the POST critical path.
+  const [[actor], [song], [ratingOwner]] = await Promise.all([
+    db
+      .select({ displayName: users.displayName, username: users.username })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+    db
+      .select({ title: songs.title })
+      .from(songs)
+      .where(eq(songs.id, songId))
+      .limit(1),
+    db
+      .select({ username: users.username })
+      .from(users)
+      .where(eq(users.id, ratingUserId))
+      .limit(1),
+  ]);
   const actorName = actor?.displayName || actor?.username || "Someone";
   const preview = text.length > 80 ? text.slice(0, 77) + "…" : text;
-
-  // Look up the rating owner's username so push URLs can deep-link to
-  // /r/<owner>/<songId> (the shared rating page where the comment lives).
-  const [ratingOwner] = await db
-    .select({ username: users.username })
-    .from(users)
-    .where(eq(users.id, ratingUserId))
-    .limit(1);
   // Feed-focus URL — works whether or not the recipient follows the
   // rating owner. The ?focus=<userId>:<songId> param forces inclusion.
   const ratingPageUrl = `/feed?focus=${ratingUserId}:${encodeURIComponent(songId)}#rating-${ratingUserId}-${encodeBase64Url(songId)}`;
