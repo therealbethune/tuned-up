@@ -70,15 +70,14 @@ export function NotifySettings({ initial }: { initial: Prefs }) {
                 aria-label={`${row.label} notifications`}
                 disabled={busy === row.key}
                 onClick={() => toggle(row.key)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
-                  on ? "bg-emerald-500" : "bg-neutral-700"
+                className={`shrink-0 inline-flex items-center h-7 w-12 cursor-pointer rounded-full p-0.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
+                  on ? "bg-emerald-500 justify-end" : "bg-neutral-700 justify-start"
                 } disabled:opacity-50`}
+                style={{ transform: "none" }}
               >
                 <span
                   aria-hidden
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                    on ? "translate-x-5" : "translate-x-0"
-                  }`}
+                  className="h-6 w-6 rounded-full bg-white shadow-md transition-all"
                 />
               </button>
             </li>

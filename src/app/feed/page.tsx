@@ -17,8 +17,6 @@ import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
 import { ConnectMusicBanner } from "@/components/ConnectMusicBanner";
 import { SafeCardBoundary } from "@/components/SafeCardBoundary";
 import { AudioPreviewButton } from "@/components/AudioPreviewButton";
-import { FriendRecsRail } from "@/components/FriendRecsRail";
-import { recommendedFromFriends, type FriendRec } from "@/lib/recs";
 import { Avatar } from "@/components/Avatar";
 import { PlayIcon } from "@/components/icons";
 import { ReportButton } from "@/components/ReportButton";
@@ -262,12 +260,10 @@ export default async function FeedPage({
   const songIds = Array.from(new Set(items.map((i) => i.songId)));
   const ratingUserIds = Array.from(new Set(items.map((i) => i.ratingUserId)));
   const hasItems = items.length > 0;
-  const wantsFriendRecs = followedIds.length > 0 && !sp.before;
 
   const [
     myRatingsRows,
     otherRaterRows,
-    friendRecs,
     cCounts,
     lCounts,
     myLikeRows,
@@ -308,15 +304,6 @@ export default async function FeedPage({
           "feed-other-raters",
         )
       : Promise.resolve([] as OtherRater[]),
-    // "Friends loved" rail — only on the first page (no `before` cursor)
-    // so pagination doesn't reshuffle scroll position.
-    wantsFriendRecs
-      ? safeQuery(
-          () => recommendedFromFriends(userId, 8),
-          [] as FriendRec[],
-          "feed-friend-recs",
-        )
-      : Promise.resolve([] as FriendRec[]),
     hasItems
       ? safeQuery(
           () =>
@@ -456,8 +443,6 @@ export default async function FeedPage({
       <FirstFeedTour />
 
       <ConnectMusicBanner />
-
-      <FriendRecsRail recs={friendRecs} />
 
       {items.length === 0 ? (
         <EmptyFeed userId={userId} followedIds={followedIds} />

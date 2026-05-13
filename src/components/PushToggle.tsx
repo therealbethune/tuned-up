@@ -141,20 +141,27 @@ export function PushToggle() {
             New followers, likes, and comments on your ratings.
           </span>
         </span>
+        {/* Switch implemented as a flex row so the knob slides via
+            justify-content, not absolute+transform. The old version
+            fought with the global `button:active { scale(0.97) }`
+            rule because composing two transforms on the same element
+            broke the knob's visible position briefly on tap. */}
         <button
           type="button"
           onClick={() => (enabled ? disable() : enable())}
           disabled={status === "saving"}
-          className={`relative h-6 w-11 rounded-full transition-colors ${
-            enabled ? "bg-emerald-500" : "bg-neutral-700"
+          className={`shrink-0 inline-flex items-center h-7 w-12 rounded-full p-0.5 transition-colors ${
+            enabled ? "bg-emerald-500 justify-end" : "bg-neutral-700 justify-start"
           } disabled:opacity-50`}
+          style={{ transform: "none" }}
           aria-pressed={enabled}
           aria-label="Toggle push notifications"
+          role="switch"
+          aria-checked={enabled}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-              enabled ? "translate-x-5" : "translate-x-0.5"
-            }`}
+            className="h-6 w-6 rounded-full bg-white shadow-md transition-all"
+            aria-hidden
           />
         </button>
       </div>
