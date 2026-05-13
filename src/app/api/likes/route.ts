@@ -140,30 +140,33 @@ export async function POST(req: Request) {
     // Activity for the rating owner — skip self-likes and skip if this was
     // a duplicate insert (race lost).
     if (ratingUserId !== userId && wasFirstInsert) {
-      // Dedup any prior 'like' activity from this actor on this rating, so
-      // unlike→relike doesn't pile up entries.
-      await db
-        .delete(activities)
-        .where(
-          and(
-            eq(activities.userId, ratingUserId),
-            eq(activities.actorId, userId),
-            eq(activities.type, "like"),
-            eq(activities.songId, songId),
-          ),
-        );
-      await db.insert(activities).values({
-        id: randomUUID(),
-        userId: ratingUserId,
-        actorId: userId,
-        type: "like",
-        songId,
-        ratingUserId,
-      });
-
-      // Push to the rating owner. Batch the actor + song lookups (they're
-      // independent) instead of awaiting them serially.
-      const [actor, song] = await Promise.all([
+      // Fan out: replace the like-activity row (dedup-by-delete then
+      // insert) AND look up the actor + song the push needs. All three
+      // branches are independent of each other; previously they
+      // chained for 4 sequential DB roundtrips before we sent the push.
+      const [, actor, song] = await Promise.all([
+        (async () => {
+          // Dedup any prior 'like' activity from this actor on this
+          // rating, so unlike→relike doesn't pile up entries.
+          await db
+            .delete(activities)
+            .where(
+              and(
+                eq(activities.userId, ratingUserId),
+                eq(activities.actorId, userId),
+                eq(activities.type, "like"),
+                eq(activities.songId, songId),
+              ),
+            );
+          await db.insert(activities).values({
+            id: randomUUID(),
+            userId: ratingUserId,
+            actorId: userId,
+            type: "like",
+            songId,
+            ratingUserId,
+          });
+        })(),
         db
           .select({ displayName: users.displayName, username: users.username })
           .from(users)
