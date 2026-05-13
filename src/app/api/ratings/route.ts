@@ -178,34 +178,41 @@ export async function POST(req: Request) {
           mUsers
             .filter((u) => u.id !== userId)
             .map(async (u) => {
-              await db
-                .delete(activities)
-                .where(
-                  and(
-                    eq(activities.userId, u.id),
-                    eq(activities.actorId, userId),
-                    eq(activities.type, "mention"),
-                    eq(activities.songId, song.id),
-                  ),
-                );
-              await db.insert(activities).values({
-                id: randomUUID(),
-                userId: u.id,
-                actorId: userId,
-                type: "mention",
-                songId: song.id,
-                // Author of the rating is the rating owner. We're the actor.
-                ratingUserId: userId,
-              });
-              await sendPushToUser(u.id, {
-                title: `${authorName} mentioned you in a rating`,
-                body: `${song.title} — ${finalScore}/100${preview ? `: ${preview}` : ""}`,
-                // Feed focus URL forces the rating's card to render even
-                // if the mentioned user doesn't follow the author — the
-                // notification + activity destinations both land here.
-                url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
-                tag: `mention-rating:${userId}:${song.id}:${u.id}`,
-              });
+              // Activity replacement and push can land in parallel —
+              // push doesn't need the activity row to have been written.
+              await Promise.allSettled([
+                (async () => {
+                  await db
+                    .delete(activities)
+                    .where(
+                      and(
+                        eq(activities.userId, u.id),
+                        eq(activities.actorId, userId),
+                        eq(activities.type, "mention"),
+                        eq(activities.songId, song.id),
+                      ),
+                    );
+                  await db.insert(activities).values({
+                    id: randomUUID(),
+                    userId: u.id,
+                    actorId: userId,
+                    type: "mention",
+                    songId: song.id,
+                    // Author of the rating is the rating owner. We're the actor.
+                    ratingUserId: userId,
+                  });
+                })(),
+                sendPushToUser(u.id, {
+                  title: `${authorName} mentioned you in a rating`,
+                  body: `${song.title} — ${finalScore}/100${preview ? `: ${preview}` : ""}`,
+                  // Feed focus URL forces the rating's card to render
+                  // even if the mentioned user doesn't follow the
+                  // author — the notification + activity destinations
+                  // both land here.
+                  url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
+                  tag: `mention-rating:${userId}:${song.id}:${u.id}`,
+                }),
+              ]);
             }),
         );
       } catch (e) {
@@ -287,22 +294,26 @@ export async function POST(req: Request) {
 
       await Promise.allSettled(
         ratedRecs.map(async (r) => {
-          await db.insert(activities).values({
-            id: randomUUID(),
-            userId: r.fromUserId,
-            actorId: userId,
-            type: "rec_rated",
-            songId: song.id,
-            // The rating that was just made — owned by the rater (actor).
-            ratingUserId: userId,
-          });
-          await sendPushToUser(r.fromUserId, {
-            title: `🎯 ${myName} rated your rec`,
-            body: `${song.title} — ${finalScore}/100`,
-            // Focus-param URL — recipient may not follow the rater.
-            url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
-            tag: `rec_rated:${r.id}`,
-          });
+          // Activity insert + push fan out — push doesn't need the
+          // activity row to have landed first.
+          await Promise.allSettled([
+            db.insert(activities).values({
+              id: randomUUID(),
+              userId: r.fromUserId,
+              actorId: userId,
+              type: "rec_rated",
+              songId: song.id,
+              // The rating that was just made — owned by the rater (actor).
+              ratingUserId: userId,
+            }),
+            sendPushToUser(r.fromUserId, {
+              title: `🎯 ${myName} rated your rec`,
+              body: `${song.title} — ${finalScore}/100`,
+              // Focus-param URL — recipient may not follow the rater.
+              url: `/feed?focus=${userId}:${encodeURIComponent(song.id)}#rating-${userId}-${encodeBase64Url(song.id)}`,
+              tag: `rec_rated:${r.id}`,
+            }),
+          ]);
         }),
       );
     } catch {

@@ -236,29 +236,36 @@ export async function POST(req: Request) {
             mUsers
               .filter((u) => u.id !== userId && u.id !== target.id)
               .map(async (u) => {
-                await db
-                  .delete(activities)
-                  .where(
-                    and(
-                      eq(activities.userId, u.id),
-                      eq(activities.actorId, userId),
-                      eq(activities.type, "mention"),
-                      eq(activities.songId, song.id),
-                    ),
-                  );
-                await db.insert(activities).values({
-                  id: randomUUID(),
-                  userId: u.id,
-                  actorId: userId,
-                  type: "mention",
-                  songId: song.id,
-                });
-                await sendPushToUser(u.id, {
-                  title: `${actorName} mentioned you on ${song.title}`,
-                  body: preview,
-                  url: actorUsername ? `/u/${actorUsername}` : "/feed",
-                  tag: `mention:${userId}:${song.id}:${u.id}`,
-                });
+                // Activity replacement (delete-then-insert) doesn't gate
+                // the push — both can land in parallel. Saves one
+                // roundtrip-equivalent of wait per mentioned user.
+                await Promise.allSettled([
+                  (async () => {
+                    await db
+                      .delete(activities)
+                      .where(
+                        and(
+                          eq(activities.userId, u.id),
+                          eq(activities.actorId, userId),
+                          eq(activities.type, "mention"),
+                          eq(activities.songId, song.id),
+                        ),
+                      );
+                    await db.insert(activities).values({
+                      id: randomUUID(),
+                      userId: u.id,
+                      actorId: userId,
+                      type: "mention",
+                      songId: song.id,
+                    });
+                  })(),
+                  sendPushToUser(u.id, {
+                    title: `${actorName} mentioned you on ${song.title}`,
+                    body: preview,
+                    url: actorUsername ? `/u/${actorUsername}` : "/feed",
+                    tag: `mention:${userId}:${song.id}:${u.id}`,
+                  }),
+                ]);
               }),
           );
         }
