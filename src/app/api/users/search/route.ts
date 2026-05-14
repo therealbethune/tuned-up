@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, ilike, or, sql, desc, eq, count, inArray } from "drizzle-orm";
+import { and, ilike, or, sql, desc, eq, count, inArray, notInArray } from "drizzle-orm";
 import { db, users, ratings, follows } from "@/db";
 import { getBlockEdges } from "@/lib/block-edges";
 
@@ -17,25 +17,34 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") ?? "").trim();
-  // Accept single-char searches now — useful for short handles like
-  // "j" or "kc". Still gates empty/long.
-  if (q.length < 1) return NextResponse.json({ results: [] });
-  if (q.length > 64) return NextResponse.json({ results: [] });
+  // Single-char searches are useful for short handles like "j".
+  if (q.length < 1 || q.length > 64) return NextResponse.json({ results: [] });
 
   // Escape LIKE wildcards so a user typing "ab_c" doesn't match "abXc"
-  // (where X is any char). Backslash is the default escape in Postgres.
+  // (where X is any char). Backslash is Postgres' default escape.
   const safe = q.replace(/[\\%_]/g, (c) => `\\${c}`);
   const pattern = `%${safe}%`;
-  // Prefix-match pattern — rows that START with the query rank
-  // higher than rows that only contain it somewhere in the middle.
-  const prefix = `${safe}%`;
+  const lowerQ = q.toLowerCase();
+  const lowerPrefix = `${safe.toLowerCase()}%`;
 
   // Hide anyone on either side of a block edge with the viewer so
-  // the search bar can't be used to circumvent a block.
+  // the search bar can't circumvent a block.
   const { hiddenIds } = await getBlockEdges(userId);
 
-  // Score order: exact match first (1), then prefix match (2), then
-  // generic match (3); break ties by rating count desc.
+  // Sort by match quality:
+  //   0 = exact-match on username (rare; gets to top)
+  //   1 = prefix-match on username or displayName
+  //   2 = contains-only match
+  // Then by ratings count desc. We compute the sort key in SQL so
+  // pagination + LIMIT 20 still picks the most relevant rows.
+  const baseWhere = and(
+    or(ilike(users.username, pattern), ilike(users.displayName, pattern)),
+    // Hide private users from search results — but always keep the
+    // viewer themselves discoverable for self-@-mention.
+    or(eq(users.isPrivate, false), eq(users.id, userId)),
+    hiddenIds.length > 0 ? notInArray(users.id, hiddenIds) : undefined,
+  );
+
   const rows = await db
     .select({
       id: users.id,
@@ -43,28 +52,24 @@ export async function GET(req: Request) {
       displayName: users.displayName,
       imageUrl: users.imageUrl,
       ratingsCount: count(ratings.userId),
-      matchScore: sql<number>`
-        CASE
-          WHEN lower(${users.username}) = lower(${q}) THEN 1
-          WHEN lower(${users.username}) LIKE lower(${prefix}) THEN 2
-          WHEN lower(${users.displayName}) LIKE lower(${prefix}) THEN 2
-          ELSE 3
-        END
-      `,
     })
     .from(users)
     .leftJoin(ratings, eq(ratings.userId, users.id))
-    .where(
-      and(
-        or(ilike(users.username, pattern), ilike(users.displayName, pattern)),
-        // Hide private users from search results — but always keep
-        // the viewer themselves discoverable for self-@-mention.
-        or(eq(users.isPrivate, false), eq(users.id, userId)),
-        hiddenIds.length > 0 ? sql`${users.id} NOT IN ${hiddenIds}` : sql`true`,
-      ),
-    )
+    .where(baseWhere)
     .groupBy(users.id)
-    .orderBy(sql`match_score asc`, desc(sql`count(${ratings.userId})`))
+    .orderBy(
+      // Inline the CASE in the ORDER BY rather than referencing an
+      // alias — Drizzle's select-side camelCase aliases get quoted
+      // ("matchScore") which breaks unquoted column references in
+      // the ORDER BY clause.
+      sql`CASE
+            WHEN LOWER(${users.username}) = ${lowerQ} THEN 0
+            WHEN LOWER(${users.username}) LIKE ${lowerPrefix} THEN 1
+            WHEN LOWER(COALESCE(${users.displayName}, '')) LIKE ${lowerPrefix} THEN 1
+            ELSE 2
+          END`,
+      desc(sql`count(${ratings.userId})`),
+    )
     .limit(20);
 
   // Resolve the viewer's follow status against each result in one
