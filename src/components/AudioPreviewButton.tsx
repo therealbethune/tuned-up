@@ -11,6 +11,13 @@ const PREVIEW_EVENT = "tu:preview-active";
 // audio contexts. iOS Safari blocks autoplay; the first user gesture
 // unlocks it.
 let sharedAudio: HTMLAudioElement | null = null;
+// Each "play session" gets a unique id. We can't identify the owning
+// button by HTMLAudioElement reference because every button shares the
+// same element — so we tag ownership with a number that's unique per
+// click.
+let nextOwnerId = 1;
+let activeOwnerId: number | null = null;
+
 function getSharedAudio(): HTMLAudioElement {
   if (typeof window === "undefined") {
     throw new Error("preview audio is browser-only");
@@ -29,22 +36,16 @@ function getSharedAudio(): HTMLAudioElement {
 export function AudioPreviewButton({ songId }: { songId: string }) {
   const [state, setState] = useState<"idle" | "loading" | "playing" | "unavailable">("idle");
   const previewUrlRef = useRef<string | null>(null);
-  const myAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ownerIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     // If another preview button starts playing, ours should stop. We
-    // identify "ours" via the audio element identity check.
-    //
-    // Critical: also CLEAR myAudioRef when the shared audio is taken
-    // over by someone else, so when *this* component unmounts later
-    // it doesn't pause an audio element that another button is now
-    // playing. The previous version kept ownership forever, which
-    // meant scrolling away from a card whose preview had been
-    // superseded would cut off whoever was actually playing.
+    // compare session ids rather than audio-element identity because
+    // every button shares the same <audio>.
     function onActive(e: Event) {
-      const detail = (e as CustomEvent<{ source: HTMLAudioElement }>).detail;
-      if (myAudioRef.current && detail.source !== myAudioRef.current) {
-        myAudioRef.current = null;
+      const detail = (e as CustomEvent<{ ownerId: number }>).detail;
+      if (ownerIdRef.current !== null && detail.ownerId !== ownerIdRef.current) {
+        ownerIdRef.current = null;
         setState("idle");
       }
     }
@@ -53,14 +54,14 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
   }, []);
 
   // Stop our playback when the component unmounts so previews don't
-  // outlive the rating card scrolling out of view. By this point
-  // myAudioRef is null whenever someone else owns the shared audio
-  // (see the listener above), so we never pause a stranger's track.
+  // outlive the rating card scrolling out of view. Only pause if we're
+  // still the active owner — otherwise we'd cut off another button
+  // that took over the shared audio after us.
   useEffect(() => {
     return () => {
-      const audio = myAudioRef.current;
-      if (audio && !audio.paused) {
-        audio.pause();
+      if (ownerIdRef.current !== null && ownerIdRef.current === activeOwnerId) {
+        activeOwnerId = null;
+        if (sharedAudio && !sharedAudio.paused) sharedAudio.pause();
       }
     };
   }, []);
@@ -70,6 +71,8 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
     const audio = getSharedAudio();
     if (state === "playing") {
       audio.pause();
+      if (activeOwnerId === ownerIdRef.current) activeOwnerId = null;
+      ownerIdRef.current = null;
       setState("idle");
       return;
     }
@@ -92,13 +95,21 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
       if (audio.src !== url) {
         audio.src = url;
       }
-      myAudioRef.current = audio;
+      const myId = nextOwnerId++;
+      ownerIdRef.current = myId;
+      activeOwnerId = myId;
       // Notify other buttons that we're taking over.
       window.dispatchEvent(
-        new CustomEvent(PREVIEW_EVENT, { detail: { source: audio } }),
+        new CustomEvent(PREVIEW_EVENT, { detail: { ownerId: myId } }),
       );
       // Re-attach an "ended" handler each click — easier than tracking it.
-      audio.onended = () => setState("idle");
+      audio.onended = () => {
+        if (activeOwnerId === myId) activeOwnerId = null;
+        if (ownerIdRef.current === myId) {
+          ownerIdRef.current = null;
+          setState("idle");
+        }
+      };
       await audio.play();
       setState("playing");
     } catch {
