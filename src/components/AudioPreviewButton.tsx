@@ -91,9 +91,19 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
         setState("unavailable");
         return;
       }
-      // If the shared audio is currently a different track, switch source.
+      // If the shared audio is currently a different track, switch
+      // source. Always pause + load before reassigning src — on iOS
+      // Safari, swapping audio.src mid-playback can leave the old
+      // track audible while the new one buffers (which manifests as
+      // "I tapped song B but I'm still hearing song A").
       if (audio.src !== url) {
+        audio.pause();
         audio.src = url;
+        audio.load();
+      } else if (audio.ended) {
+        // Same track that previously played to completion — rewind so
+        // the next play() starts from the beginning instead of no-op.
+        audio.currentTime = 0;
       }
       const myId = nextOwnerId++;
       ownerIdRef.current = myId;
