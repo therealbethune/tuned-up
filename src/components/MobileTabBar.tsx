@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const TAB_ICON = {
   feed: (
@@ -59,6 +59,33 @@ const TABS = [
 
 export function MobileTabBar({ unread }: { unread: number }) {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
+
+  // Aggressively warm the router cache for every tab on mount so the
+  // first tap on any tab feels instant. Next's Link prefetches what's
+  // in the viewport, but the tab bar is sticky-bottom so the icons
+  // are always there; we don't need to wait for individual hover.
+  // requestIdleCallback so we don't fight first-paint for resources.
+  useEffect(() => {
+    const tabs = TABS.map((t) => t.href);
+    const warm = () => {
+      for (const href of tabs) {
+        try {
+          router.prefetch(href);
+        } catch {
+          /* prefetch is best-effort */
+        }
+      }
+    };
+    const win = window as typeof window & {
+      requestIdleCallback?: (cb: () => void) => number;
+    };
+    if (typeof win.requestIdleCallback === "function") {
+      win.requestIdleCallback(warm);
+    } else {
+      setTimeout(warm, 200);
+    }
+  }, [router]);
   // Hide the tab bar when the iOS software keyboard is up — otherwise
   // it floats on top of inputs (comment composer, search box, etc.).
   // visualViewport.height shrinks when the keyboard slides in; we
@@ -81,7 +108,10 @@ export function MobileTabBar({ unread }: { unread: number }) {
             <li key={t.href} className="flex-1">
               <Link
                 href={t.href}
+                prefetch
                 aria-current={active ? "page" : undefined}
+                onTouchStart={() => router.prefetch(t.href)}
+                onMouseEnter={() => router.prefetch(t.href)}
                 className={`flex flex-col items-center justify-center py-2 gap-1 min-h-[60px] relative transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white/50 ${
                   active ? "text-emerald-400" : "text-neutral-400 active:text-white"
                 }`}

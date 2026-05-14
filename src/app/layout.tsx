@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { SentryUserSync } from "@/components/SentryUserSync";
 import { Toaster } from "@/components/Toaster";
+import { RouteProgress } from "@/components/RouteProgress";
 import { TunedUpMark } from "@/components/icons";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { TimezoneSync } from "@/components/TimezoneSync";
@@ -255,6 +256,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               answer "which user hit this?" from the issue page. No-op
               when signed out. PII stays out — see component for why. */}
           <SentryUserSync />
+          <RouteProgress />
           <Toaster />
         </body>
       </html>
