@@ -304,9 +304,14 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           visible gap — that's the "banner overflow" bug. */}
       <div>
         <div className={`relative -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden h-28 sm:h-32 shadow-[inset_0_-40px_60px_-40px_rgba(0,0,0,0.65)] ${cover.css}`} aria-hidden />
-        {/* Header: avatar + name + streak + follow */}
-        <div className="flex items-start gap-4 px-0">
-          <div className={`-mt-10 shrink-0 rounded-full ring-4 ring-neutral-950 ${streak >= 7 ? "ring-streak" : ""}`}>
+        {/* Header: avatar + name + streak + follow.
+            The avatar wrapper NEEDS `relative z-10` — the banner above
+            has `position: relative` which makes it a stacking context,
+            and CSS stacks positioned elements above non-positioned
+            siblings regardless of DOM order. Without z-10 here, the
+            green gradient renders on top of the avatar's upper half. */}
+        <div className="relative flex items-start gap-4 px-0">
+          <div className={`relative z-10 -mt-10 shrink-0 rounded-full ring-4 ring-neutral-950 ${streak >= 7 ? "ring-streak" : ""}`}>
             <Avatar
               imageUrl={target.imageUrl}
               name={target.displayName || target.username}
