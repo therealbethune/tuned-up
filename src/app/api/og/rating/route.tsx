@@ -4,7 +4,13 @@ import { db, ratings, songs, users } from "@/db";
 import { scoreLabel } from "@/lib/score-labels";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+// Removed `export const dynamic = "force-dynamic"` — it was forcing
+// Next to emit `cache-control: max-age=0, must-revalidate` on the
+// response, overriding the s-maxage=3600 we set in the ImageResponse
+// headers. The route still renders dynamically because the searchParams
+// (u, s) vary per request; we just don't want Next telling downstream
+// caches to never store the result.
+export const revalidate = 3600;
 
 // next/og's renderer doesn't run Tailwind, so we can't pass through the
 // scoreLabel.color class. Map each Tailwind text-color class we use in
