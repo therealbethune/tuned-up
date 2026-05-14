@@ -64,6 +64,16 @@ export async function GET(req: Request) {
     return new ImageResponse(<Card title="Tuned Up" />, { width: 1200, height: 630 });
   }
 
+  // Cache the rendered OG image at the edge for 1 hour, serve stale
+  // for an additional day while we revalidate in the background.
+  // Same (username, songId) pair always renders the same image until
+  // the rating changes, and the underlying rating doesn't change
+  // often. Massive win on social unfurls (Slack, iMessage, Twitter)
+  // since they all repeatedly fetch the same OG URL.
+  const cardHeaders = {
+    "cache-control": "public, s-maxage=3600, stale-while-revalidate=86400",
+  };
+
   return new ImageResponse(
     (
       <div
@@ -159,7 +169,7 @@ export async function GET(req: Request) {
         </div>
       </div>
     ),
-    { width: 1200, height: 630 },
+    { width: 1200, height: 630, headers: cardHeaders },
   );
 }
 

@@ -2,6 +2,18 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Keep prefetched dynamic routes in the client router cache for 30s
+  // (default is 0 — every navigation re-fetches dynamic data). Static
+  // segments stay 5 min. Net effect: tapping Feed → Me → Feed within
+  // 30s reuses the cached Feed render instead of re-rendering the
+  // server component, which was the heaviest part of the "switching
+  // tabs is slow" complaint.
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 300,
+    },
+  },
   // Allow Next/Image optimization for the third-party image hosts we pull
   // from. Every <Image> in the app loads from one of these hosts, so we
   // can rely on automatic resizing, format negotiation, and lazy-loading

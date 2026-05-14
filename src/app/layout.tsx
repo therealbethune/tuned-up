@@ -189,6 +189,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <html lang="en" className="dark" suppressHydrationWarning>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+          {/* Preconnect to image CDNs we hit on every page: YouTube
+              Music + Apple Music album art. The browser opens TLS +
+              DNS before our HTML fetches the first <img>, shaving
+              80–250ms off the first-image-paint on mobile networks.
+              dns-prefetch is the cheap fallback for browsers that
+              don't honor preconnect. */}
+          <link rel="preconnect" href="https://i.ytimg.com" crossOrigin="" />
+          <link rel="preconnect" href="https://lh3.googleusercontent.com" crossOrigin="" />
+          <link rel="preconnect" href="https://is1-ssl.mzstatic.com" crossOrigin="" />
+          <link rel="preconnect" href="https://is2-ssl.mzstatic.com" crossOrigin="" />
+          <link rel="preconnect" href="https://is3-ssl.mzstatic.com" crossOrigin="" />
+          <link rel="preconnect" href="https://is4-ssl.mzstatic.com" crossOrigin="" />
+          <link rel="preconnect" href="https://is5-ssl.mzstatic.com" crossOrigin="" />
+          <link rel="dns-prefetch" href="https://i.ytimg.com" />
+          <link rel="dns-prefetch" href="https://lh3.googleusercontent.com" />
+          <link rel="dns-prefetch" href="https://is1-ssl.mzstatic.com" />
           {/* iOS PWA splash screens. iOS picks the link whose media query
               matches the device exactly (or comes closest). */}
           <link rel="apple-touch-startup-image" href="/api/splash/1290/2796"
