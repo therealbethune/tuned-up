@@ -92,7 +92,15 @@ export function TodaysPickCard({ pick }: { pick: DailyPick }) {
           ) : (
             <RateButton song={songLike} initialScore={null} />
           )}
-          {!isAlbumId(pick.songId) && <AudioPreviewButton songId={pick.songId} />}
+          {!isAlbumId(pick.songId) && (
+            <AudioPreviewButton
+              songId={pick.songId}
+              title={pick.title}
+              artist={pick.artist}
+              album={pick.album}
+              thumbnail={pick.thumbnail}
+            />
+          )}
         </div>
       </div>
     </section>

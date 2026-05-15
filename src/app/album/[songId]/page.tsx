@@ -215,7 +215,15 @@ export default async function AlbumPage({
               appleMusicUrl={song.appleMusicUrl}
               spotifyTrackId={song.spotifyTrackId}
             />
-            {!isAlbum && <AudioPreviewButton songId={song.id} />}
+            {!isAlbum && (
+              <AudioPreviewButton
+                songId={song.id}
+                title={song.title}
+                artist={song.artist}
+                album={song.album}
+                thumbnail={song.thumbnail}
+              />
+            )}
           </div>
           {userId && (
             <>

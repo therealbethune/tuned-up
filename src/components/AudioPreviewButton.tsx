@@ -68,6 +68,12 @@ function getAudio(): HTMLAudioElement {
   const el = new Audio();
   el.preload = "none";
   el.addEventListener("ended", () => {
+    // CRITICAL: the silent-WAV activation buffer is only 1 sample long,
+    // so it "ends" almost immediately after we kick off the cold path.
+    // If we let that ended event clear playingSongId, the swap-to-real-
+    // URL step that follows will refuse to play ("playingSongId !==
+    // songId"). Detect this case and ignore.
+    if (el.src === SILENT_WAV) return;
     if (playingSongId !== null) {
       playingSongId = null;
       notify();
@@ -75,6 +81,9 @@ function getAudio(): HTMLAudioElement {
   });
   el.addEventListener("error", () => {
     if (swapping) return;
+    // Same defense: errors from the silent WAV (e.g., bad data URI on
+    // some browser) shouldn't be treated as "the user's track failed."
+    if (el.src === SILENT_WAV) return;
     if (playingSongId !== null) {
       playingSongId = null;
       notify();
@@ -135,6 +144,20 @@ function fetchPreviewMeta(songId: string): Promise<PreviewMeta> {
     });
   inFlight.set(songId, p);
   return p;
+}
+
+// Combine two PreviewMeta records, preferring values from `overlay`
+// when they're defined. Used to layer parent-supplied metadata on top
+// of the API response (the parent has fresher info from its own DB
+// query, e.g. the locally-stored artist string).
+function mergeMeta(base: PreviewMeta, overlay: PreviewMeta): PreviewMeta {
+  return {
+    url: overlay.url ?? base.url,
+    title: overlay.title ?? base.title,
+    artist: overlay.artist ?? base.artist,
+    album: overlay.album ?? base.album,
+    thumbnail: overlay.thumbnail ?? base.thumbnail,
+  };
 }
 
 // Populate the iOS Now Playing entry / Control Center widget. Without
@@ -269,7 +292,26 @@ function getServerSnapshot(): string | null {
 
 // ──── Component ────────────────────────────────────────────────────
 
-export function AudioPreviewButton({ songId }: { songId: string }) {
+type Props = {
+  songId: string;
+  // Optional metadata. When passed, used to populate navigator.mediaSession
+  // immediately on tap — so iOS Now Playing / Control Center shows the
+  // correct song without waiting for an API round-trip. All six call sites
+  // already have these fields from the parent's DB query, so passing them
+  // is essentially free.
+  title?: string;
+  artist?: string;
+  album?: string | null;
+  thumbnail?: string | null;
+};
+
+export function AudioPreviewButton({
+  songId,
+  title,
+  artist,
+  album,
+  thumbnail,
+}: Props) {
   const currentlyPlaying = useSyncExternalStore(
     subscribe,
     getSnapshot,
@@ -314,10 +356,17 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
       pauseCurrent();
       return;
     }
+    // Build a PreviewMeta from the parent props. Used as the FIRST source
+    // of truth for MediaSession — if we also get fresher data back from
+    // the /api/preview-url response, that updates on top. The immediate
+    // tap response already shows the right song on iOS Now Playing.
+    const propsMeta: PreviewMeta = { url: null, title, artist, album, thumbnail };
     const cached = urlCache.get(songId);
     if (cached && cached.url) {
       // HOT PATH — URL cached. Sync play, iOS gesture preserved.
-      playUrlSync(songId, cached);
+      // Merge parent props on top of cache so MediaSession always has
+      // the freshest title/artist (parent's DB row beats API response).
+      playUrlSync(songId, mergeMeta(cached, propsMeta));
       return;
     }
     if (cached && cached.url === null) {
@@ -325,10 +374,13 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
       return;
     }
     // COLD PATH — URL not cached. Activate audio element synchronously
-    // (silent WAV), set playing state, then fetch + swap.
+    // (silent WAV), populate MediaSession from parent props NOW so the
+    // user sees the right track in Control Center while the URL is
+    // fetched, then fetch + swap to the real audio URL.
     activateSync();
     playingSongId = songId;
     notify();
+    if (title || artist) setMediaSession(propsMeta);
     setPhase("loading");
     fetchPreviewMeta(songId).then((meta) => {
       setPhase("idle");
@@ -340,9 +392,9 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
         setPhase("unavailable");
         return;
       }
-      swapToMeta(songId, meta);
+      swapToMeta(songId, mergeMeta(meta, propsMeta));
     });
-  }, [isPlaying, phase, songId]);
+  }, [isPlaying, phase, songId, title, artist, album, thumbnail]);
 
   if (phase === "unavailable") return null;
 

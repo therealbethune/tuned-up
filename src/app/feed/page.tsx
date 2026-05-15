@@ -665,7 +665,13 @@ export default async function FeedPage({
                 <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-3">
                     {!isAlbumId(it.songId) && (
-                      <AudioPreviewButton songId={it.songId} />
+                      <AudioPreviewButton
+                        songId={it.songId}
+                        title={it.title}
+                        artist={it.artist}
+                        album={it.album}
+                        thumbnail={it.thumbnail}
+                      />
                     )}
                     <LikeButton
                       ratingUserId={it.ratingUserId}

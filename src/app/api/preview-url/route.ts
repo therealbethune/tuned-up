@@ -61,10 +61,21 @@ export async function GET(req: Request) {
     });
   }
 
-  const term = `${s.title} ${s.artist}`.trim();
+  // For artist strings like "Jack Johnson, Eddie Vedder & Kawika Kahiapo"
+  // iTunes' single-line search often fails to match the precise track —
+  // it returns whatever song happens to share the title. To avoid playing
+  // the wrong track, search with title+artist AND validate that one of
+  // the candidate results actually mentions the queried primary artist.
+  //
+  // We fetch up to 5 candidates and pick the first whose artistName
+  // shares a substring with the parent-supplied artist (case-insensitive).
+  // Fallback: if nothing matches, return null instead of guessing — UI
+  // hides the play button rather than silently playing a different song.
+  const primaryArtist = s.artist.split(/[,&/]| feat\.?| ft\.?| with /i)[0]?.trim() || s.artist;
+  const term = `${s.title} ${primaryArtist}`.trim();
   try {
     const res = await fetch(
-      `https://itunes.apple.com/search?media=music&entity=song&limit=1&term=${encodeURIComponent(term)}`,
+      `https://itunes.apple.com/search?media=music&entity=song&limit=5&term=${encodeURIComponent(term)}`,
       {
         headers: { "user-agent": "TunedUp/1.0 (https://tuned-up.com)" },
         signal: AbortSignal.timeout(5000),
@@ -82,8 +93,21 @@ export async function GET(req: Request) {
         thumbnail: s.thumbnail,
       });
     }
-    const data: { results?: Array<{ previewUrl?: string }> } = await res.json();
-    const previewUrl = data.results?.[0]?.previewUrl ?? null;
+    const data: {
+      results?: Array<{ previewUrl?: string; artistName?: string; trackName?: string }>;
+    } = await res.json();
+    const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const primaryArtistLower = norm(primaryArtist);
+    const candidates = data.results ?? [];
+    const matched =
+      candidates.find((r) => {
+        const a = norm(r.artistName ?? "");
+        // Either the iTunes artist contains our primary artist or vice
+        // versa (handles "Jack Johnson" vs "Jack Johnson, Eddie Vedder &
+        // Kawika Kahiapo" — both directions accepted).
+        return a && (a.includes(primaryArtistLower) || primaryArtistLower.includes(a));
+      }) ?? null;
+    const previewUrl = matched?.previewUrl ?? null;
     return NextResponse.json(
       {
         previewUrl,

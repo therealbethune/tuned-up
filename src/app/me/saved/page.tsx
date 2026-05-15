@@ -140,7 +140,13 @@ export default async function SavedSongsPage() {
                 <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     {!isAlbumId(r.songId) && (
-                      <AudioPreviewButton songId={r.songId} />
+                      <AudioPreviewButton
+                        songId={r.songId}
+                        title={r.title}
+                        artist={r.artist}
+                        album={r.album}
+                        thumbnail={r.thumbnail}
+                      />
                     )}
                     <SaveLaterButton songId={r.songId} initialSaved />
                   </div>

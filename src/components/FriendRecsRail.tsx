@@ -73,7 +73,13 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
                 </Link>
                 {!isAlbum && (
                   <div className="absolute bottom-2 right-2 z-10">
-                    <AudioPreviewButton songId={r.songId} />
+                    <AudioPreviewButton
+                      songId={r.songId}
+                      title={r.title}
+                      artist={r.artist}
+                      album={r.album}
+                      thumbnail={r.thumbnail}
+                    />
                   </div>
                 )}
               </div>
