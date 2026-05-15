@@ -1,158 +1,368 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { PlayIcon } from "./icons";
 
-// Module-level audio coordinator: only one preview plays at a time.
-// When a new one starts, any currently-playing instance pauses itself
-// via this shared event bus.
+// ──── iOS Safari background ────────────────────────────────────────
+// Safari blocks `audio.play()` outside a user-gesture stack. The
+// gesture is consumed by the FIRST `await` in the click handler — so
+// any code that does `await fetch(...)` then `await audio.play()` is
+// permanently broken on iOS first-tap. That's the bug we've been
+// fighting in five previous rewrites.
 //
-// History note: we previously tried more elaborate coordinators —
-// DOM-attached audio element, useSyncExternalStore, aggressive
-// source teardown, synchronous-play prefetch — to chase iOS edge
-// cases. Each rewrite broke the common case worse than the edge
-// case it fixed. The simple shared-audio + event-bus pattern below
-// is what actually works in production. If you're tempted to
-// "improve" this, read the git log first — there are several
-// monuments to that instinct.
-const PREVIEW_EVENT = "tu:preview-active";
+// The rule that actually works:
+//   1. audio.play() MUST be called synchronously inside the click
+//      event handler (no awaits before it).
+//   2. Once an <audio> element has been activated by a sync play()
+//      call inside a gesture, FUTURE play() calls on that same
+//      element work even after async work.
+//
+// Strategy here:
+//   • EAGER PREFETCH the URL on mount via requestIdleCallback and on
+//     touchstart/mouseenter. By the time the user clicks, the URL is
+//     almost always already in `urlCache` and we hit the HOT PATH —
+//     a single synchronous `audio.src = url; audio.play()`.
+//   • COLD FALLBACK: if click happens before prefetch finishes, we
+//     play a 1-sample silent WAV synchronously to ACTIVATE the audio
+//     element (iOS treats this as a user-gesture play), then fetch
+//     the real URL and swap src + play. The second play() works
+//     because the element is now permanently user-activated.
+//
+// History: the previous version `await fetch(...)`-then-`await play()`
+// failed on every iOS first-tap. Before that, an even more elaborate
+// rewrite tried `useSyncExternalStore` + DOM-attached audio + preload
+// "metadata" and broke even more cases. This file's goal is to be
+// SIMPLE and CORRECT, not clever.
 
-// Single shared <audio> element so iOS doesn't trip over multiple
-// audio contexts. iOS Safari blocks autoplay; the first user gesture
-// unlocks it.
-let sharedAudio: HTMLAudioElement | null = null;
-// Each "play session" gets a unique id. We can't identify the owning
-// button by HTMLAudioElement reference because every button shares the
-// same element — so we tag ownership with a number that's unique per
-// click.
-let nextOwnerId = 1;
-let activeOwnerId: number | null = null;
+// ──── Module-level state (singleton audio coordinator) ─────────────
 
-function getSharedAudio(): HTMLAudioElement {
-  if (typeof window === "undefined") {
-    throw new Error("preview audio is browser-only");
-  }
-  if (!sharedAudio) {
-    sharedAudio = new Audio();
-    sharedAudio.preload = "none";
-  }
-  return sharedAudio;
+let audioEl: HTMLAudioElement | null = null;
+let playingSongId: string | null = null;
+// Suppresses synthetic pause/error events that fire during our own
+// src swap — otherwise the UI flickers idle between source A and B.
+let swapping = false;
+
+type PreviewMeta = {
+  url: string | null;
+  title?: string;
+  artist?: string;
+  album?: string | null;
+  thumbnail?: string | null;
+};
+const urlCache = new Map<string, PreviewMeta>();
+const inFlight = new Map<string, Promise<PreviewMeta>>();
+const subs = new Set<() => void>();
+
+// 45-byte silent WAV (1 sample, 8kHz, 8-bit mono). Used to activate
+// the audio element synchronously inside a click handler on iOS when
+// we don't yet have the real preview URL. Playing this is essentially
+// instantaneous and inaudible.
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA";
+
+function notify() {
+  for (const fn of subs) fn();
 }
 
-// 30-second song preview button. Lazy-fetches the iTunes previewUrl on
-// first tap, plays via the module-shared audio element. Touch target
-// 36×36 (within the row of action buttons) but enlarged to 44×44 via
-// padding to satisfy WCAG.
-export function AudioPreviewButton({ songId }: { songId: string }) {
-  const [state, setState] = useState<"idle" | "loading" | "playing" | "unavailable">("idle");
-  const previewUrlRef = useRef<string | null>(null);
-  const ownerIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    // If another preview button starts playing, ours should stop. We
-    // compare session ids rather than audio-element identity because
-    // every button shares the same <audio>.
-    function onActive(e: Event) {
-      const detail = (e as CustomEvent<{ ownerId: number }>).detail;
-      if (ownerIdRef.current !== null && detail.ownerId !== ownerIdRef.current) {
-        ownerIdRef.current = null;
-        setState("idle");
-      }
+function getAudio(): HTMLAudioElement {
+  if (audioEl) return audioEl;
+  const el = new Audio();
+  el.preload = "none";
+  el.addEventListener("ended", () => {
+    if (playingSongId !== null) {
+      playingSongId = null;
+      notify();
     }
-    window.addEventListener(PREVIEW_EVENT, onActive);
-    return () => window.removeEventListener(PREVIEW_EVENT, onActive);
-  }, []);
+  });
+  el.addEventListener("error", () => {
+    if (swapping) return;
+    if (playingSongId !== null) {
+      playingSongId = null;
+      notify();
+    }
+  });
+  audioEl = el;
+  return el;
+}
 
-  // Stop our playback when the component unmounts so previews don't
-  // outlive the rating card scrolling out of view. Only pause if we're
-  // still the active owner — otherwise we'd cut off another button
-  // that took over the shared audio after us.
-  useEffect(() => {
-    return () => {
-      if (ownerIdRef.current !== null && ownerIdRef.current === activeOwnerId) {
-        activeOwnerId = null;
-        if (sharedAudio && !sharedAudio.paused) sharedAudio.pause();
+// Fetch preview URL + metadata, with cache + in-flight dedup. Metadata
+// (title, artist, album, thumbnail) is used to populate the iOS Now
+// Playing entry via navigator.mediaSession.
+function fetchPreviewMeta(songId: string): Promise<PreviewMeta> {
+  const cached = urlCache.get(songId);
+  if (cached) return Promise.resolve(cached);
+  const existing = inFlight.get(songId);
+  if (existing) return existing;
+  const p = fetch(`/api/preview-url?songId=${encodeURIComponent(songId)}`, {
+    signal: AbortSignal.timeout(8000),
+  })
+    .then((r) =>
+      r.ok
+        ? r.json()
+        : ({ previewUrl: null } as {
+            previewUrl?: string | null;
+            title?: string;
+            artist?: string;
+            album?: string | null;
+            thumbnail?: string | null;
+          }),
+    )
+    .then(
+      (j: {
+        previewUrl?: string | null;
+        title?: string;
+        artist?: string;
+        album?: string | null;
+        thumbnail?: string | null;
+      }) => {
+        const meta: PreviewMeta = {
+          url: j.previewUrl ?? null,
+          title: j.title,
+          artist: j.artist,
+          album: j.album ?? null,
+          thumbnail: j.thumbnail ?? null,
+        };
+        urlCache.set(songId, meta);
+        return meta;
+      },
+    )
+    .catch(() => {
+      const empty: PreviewMeta = { url: null };
+      urlCache.set(songId, empty);
+      return empty;
+    })
+    .finally(() => {
+      inFlight.delete(songId);
+    });
+  inFlight.set(songId, p);
+  return p;
+}
+
+// Populate the iOS Now Playing entry / Control Center widget. Without
+// this, iOS shows a generic "Web Page Audio" entry that users confuse
+// with the audio not playing at all.
+function setMediaSession(meta: PreviewMeta) {
+  if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+  const ms = navigator.mediaSession;
+  try {
+    const MM = (window as unknown as { MediaMetadata?: typeof MediaMetadata }).MediaMetadata;
+    if (!MM) return;
+    ms.metadata = new MM({
+      title: meta.title ?? "Preview",
+      artist: meta.artist ?? "",
+      album: meta.album ?? "",
+      artwork: meta.thumbnail
+        ? [
+            { src: meta.thumbnail, sizes: "300x300", type: "image/jpeg" },
+            { src: meta.thumbnail, sizes: "512x512", type: "image/jpeg" },
+          ]
+        : [],
+    });
+    ms.setActionHandler?.("pause", () => {
+      pauseCurrent();
+    });
+    ms.setActionHandler?.("play", () => {
+      if (audioEl) {
+        const p = audioEl.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
       }
-    };
-  }, []);
+    });
+  } catch {
+    // MediaSession isn't critical — fall through silently.
+  }
+}
 
-  async function toggle() {
-    if (state === "loading" || state === "unavailable") return;
-    const audio = getSharedAudio();
-    if (state === "playing") {
-      audio.pause();
-      if (activeOwnerId === ownerIdRef.current) activeOwnerId = null;
-      ownerIdRef.current = null;
-      setState("idle");
+// HOT PATH — must be called synchronously from a click handler.
+// Sets src + calls play() inside the gesture. iOS happy.
+function playUrlSync(songId: string, meta: PreviewMeta) {
+  if (!meta.url) return;
+  const audio = getAudio();
+  swapping = true;
+  if (audio.src !== meta.url) {
+    audio.pause();
+    audio.src = meta.url;
+    audio.load();
+  } else if (audio.ended) {
+    audio.currentTime = 0;
+  }
+  playingSongId = songId;
+  notify();
+  setMediaSession(meta);
+  const p = audio.play();
+  if (p && typeof p.catch === "function") {
+    p.catch(() => {
+      if (playingSongId === songId) {
+        playingSongId = null;
+        notify();
+      }
+    });
+  }
+  // Give synthetic pause/error events from the src swap a tick to settle.
+  setTimeout(() => {
+    swapping = false;
+  }, 50);
+}
+
+// COLD PATH activation — must be called synchronously from a click handler.
+// Plays a silent WAV to activate the audio element on iOS. Returns
+// immediately; the silent buffer is inaudible.
+function activateSync() {
+  const audio = getAudio();
+  swapping = true;
+  audio.pause();
+  audio.src = SILENT_WAV;
+  audio.load();
+  const p = audio.play();
+  if (p && typeof p.catch === "function") p.catch(() => {});
+  setTimeout(() => {
+    swapping = false;
+  }, 50);
+}
+
+// After the cold-path fetch completes, swap to the real URL and play.
+// At this point the audio element is already user-activated (by the
+// silent WAV play() that ran inside the click handler), so this
+// play() call works on iOS even though we're outside the gesture.
+function swapToMeta(songId: string, meta: PreviewMeta) {
+  if (!meta.url) return;
+  if (playingSongId !== songId) return; // user tapped a different song
+  const audio = getAudio();
+  swapping = true;
+  audio.pause();
+  audio.src = meta.url;
+  audio.load();
+  if (audio.ended) audio.currentTime = 0;
+  setMediaSession(meta);
+  const p = audio.play();
+  if (p && typeof p.catch === "function") {
+    p.catch(() => {
+      if (playingSongId === songId) {
+        playingSongId = null;
+        notify();
+      }
+    });
+  }
+  setTimeout(() => {
+    swapping = false;
+  }, 50);
+}
+
+function pauseCurrent() {
+  if (audioEl) audioEl.pause();
+  if (playingSongId !== null) {
+    playingSongId = null;
+    notify();
+  }
+}
+
+function subscribe(fn: () => void) {
+  subs.add(fn);
+  return () => {
+    subs.delete(fn);
+  };
+}
+function getSnapshot() {
+  return playingSongId;
+}
+function getServerSnapshot(): string | null {
+  return null;
+}
+
+// ──── Component ────────────────────────────────────────────────────
+
+export function AudioPreviewButton({ songId }: { songId: string }) {
+  const currentlyPlaying = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
+  const isPlaying = currentlyPlaying === songId;
+  // Initialize state from the module-level cache so we don't need a
+  // synchronous setState inside useEffect for the "already known to be
+  // unavailable" case (which trips react-hooks/set-state-in-effect).
+  const [phase, setPhase] = useState<"idle" | "loading" | "unavailable">(() => {
+    const cached = urlCache.get(songId);
+    return cached && cached.url === null ? "unavailable" : "idle";
+  });
+
+  // Prefetch URL on mount (low priority). If already cached we skip;
+  // if known unavailable we already initialized phase above.
+  useEffect(() => {
+    if (urlCache.has(songId)) return;
+    const win = window as typeof window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+    };
+    const fire = () => {
+      fetchPreviewMeta(songId).then((meta) => {
+        if (meta.url === null) setPhase("unavailable");
+      });
+    };
+    if (typeof win.requestIdleCallback === "function") {
+      win.requestIdleCallback(fire, { timeout: 2000 });
+    } else {
+      setTimeout(fire, 200);
+    }
+  }, [songId]);
+
+  // Last-chance warm on hover/touch — fires distinct gesture from click.
+  const warm = useCallback(() => {
+    if (!urlCache.has(songId)) void fetchPreviewMeta(songId);
+  }, [songId]);
+
+  const onClick = useCallback(() => {
+    if (phase === "unavailable") return;
+    if (isPlaying) {
+      pauseCurrent();
       return;
     }
-    setState("loading");
-    try {
-      let url = previewUrlRef.current;
-      if (!url) {
-        const res = await fetch(
-          `/api/preview-url?songId=${encodeURIComponent(songId)}`,
-        );
-        const j = await res.json();
-        url = j.previewUrl ?? null;
-        previewUrlRef.current = url;
-      }
-      if (!url) {
-        setState("unavailable");
+    const cached = urlCache.get(songId);
+    if (cached && cached.url) {
+      // HOT PATH — URL cached. Sync play, iOS gesture preserved.
+      playUrlSync(songId, cached);
+      return;
+    }
+    if (cached && cached.url === null) {
+      setPhase("unavailable");
+      return;
+    }
+    // COLD PATH — URL not cached. Activate audio element synchronously
+    // (silent WAV), set playing state, then fetch + swap.
+    activateSync();
+    playingSongId = songId;
+    notify();
+    setPhase("loading");
+    fetchPreviewMeta(songId).then((meta) => {
+      setPhase("idle");
+      if (!meta.url) {
+        if (playingSongId === songId) {
+          playingSongId = null;
+          notify();
+        }
+        setPhase("unavailable");
         return;
       }
-      // If the shared audio is currently a different track, switch
-      // source. Always pause + load before reassigning src — on iOS
-      // Safari, swapping audio.src mid-playback can leave the old
-      // track audible while the new one buffers (which manifests as
-      // "I tapped song B but I'm still hearing song A").
-      if (audio.src !== url) {
-        audio.pause();
-        audio.src = url;
-        audio.load();
-      } else if (audio.ended) {
-        // Same track that previously played to completion — rewind so
-        // the next play() starts from the beginning instead of no-op.
-        audio.currentTime = 0;
-      }
-      const myId = nextOwnerId++;
-      ownerIdRef.current = myId;
-      activeOwnerId = myId;
-      // Notify other buttons that we're taking over.
-      window.dispatchEvent(
-        new CustomEvent(PREVIEW_EVENT, { detail: { ownerId: myId } }),
-      );
-      // Re-attach an "ended" handler each click — easier than tracking it.
-      audio.onended = () => {
-        if (activeOwnerId === myId) activeOwnerId = null;
-        if (ownerIdRef.current === myId) {
-          ownerIdRef.current = null;
-          setState("idle");
-        }
-      };
-      await audio.play();
-      setState("playing");
-    } catch {
-      setState("idle");
-    }
-  }
+      swapToMeta(songId, meta);
+    });
+  }, [isPlaying, phase, songId]);
 
-  if (state === "unavailable") return null;
+  if (phase === "unavailable") return null;
 
   return (
     <button
-      onClick={toggle}
-      disabled={state === "loading"}
-      aria-label={state === "playing" ? "Pause preview" : "Play 30-second preview"}
-      title={state === "playing" ? "Pause" : "30-second preview"}
+      onClick={onClick}
+      onTouchStart={warm}
+      onMouseEnter={warm}
+      disabled={phase === "loading"}
+      aria-label={isPlaying ? "Pause preview" : "Play 30-second preview"}
+      title={isPlaying ? "Pause" : "30-second preview"}
       className={`inline-flex items-center justify-center h-11 w-11 rounded-full transition-colors active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ${
-        state === "playing"
+        isPlaying
           ? "bg-emerald-500 text-black"
           : "bg-neutral-800/80 text-neutral-300 hover:bg-neutral-700"
       } disabled:opacity-60`}
     >
-      {state === "loading" ? (
+      {phase === "loading" ? (
         <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-neutral-500 border-t-white animate-spin" />
-      ) : state === "playing" ? (
+      ) : isPlaying ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <rect x="6" y="5" width="4" height="14" rx="1" />
           <rect x="14" y="5" width="4" height="14" rx="1" />

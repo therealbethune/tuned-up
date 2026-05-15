@@ -6,11 +6,18 @@ import { db, songs } from "@/db";
 export const runtime = "nodejs";
 
 // GET /api/preview-url?songId=<id>
-// Returns { previewUrl: string | null }
+// Returns { previewUrl: string | null, title?: string, artist?: string,
+//           album?: string | null, thumbnail?: string | null }
 //
 // Tries the iTunes Search API (no auth needed; same lookup we use for
 // Apple Music URLs). iTunes responses include a `previewUrl` (~30s
 // audio). Falls back to null if no match — UI then hides the play button.
+//
+// Also returns the song's stored title/artist/album/thumbnail so the
+// client can populate `navigator.mediaSession.metadata` — that's what
+// makes iOS Control Center / lock-screen "Now Playing" show the song
+// (otherwise iOS shows a generic "Web Page Audio" entry, which users
+// confuse with the audio not playing at all).
 //
 // Caching:
 //  - The iTunes lookup itself is cached at the Next.js data-cache layer
@@ -32,13 +39,27 @@ export async function GET(req: Request) {
   }
 
   const [s] = await db
-    .select({ title: songs.title, artist: songs.artist, kind: songs.kind })
+    .select({
+      title: songs.title,
+      artist: songs.artist,
+      album: songs.album,
+      thumbnail: songs.thumbnail,
+      kind: songs.kind,
+    })
     .from(songs)
     .where(eq(songs.id, songId))
     .limit(1);
   if (!s) return NextResponse.json({ previewUrl: null });
 
-  if (s.kind === "album") return NextResponse.json({ previewUrl: null });
+  if (s.kind === "album") {
+    return NextResponse.json({
+      previewUrl: null,
+      title: s.title,
+      artist: s.artist,
+      album: s.album,
+      thumbnail: s.thumbnail,
+    });
+  }
 
   const term = `${s.title} ${s.artist}`.trim();
   try {
@@ -52,11 +73,25 @@ export async function GET(req: Request) {
         next: { revalidate: 86400 },
       },
     );
-    if (!res.ok) return NextResponse.json({ previewUrl: null });
+    if (!res.ok) {
+      return NextResponse.json({
+        previewUrl: null,
+        title: s.title,
+        artist: s.artist,
+        album: s.album,
+        thumbnail: s.thumbnail,
+      });
+    }
     const data: { results?: Array<{ previewUrl?: string }> } = await res.json();
     const previewUrl = data.results?.[0]?.previewUrl ?? null;
     return NextResponse.json(
-      { previewUrl },
+      {
+        previewUrl,
+        title: s.title,
+        artist: s.artist,
+        album: s.album,
+        thumbnail: s.thumbnail,
+      },
       {
         headers: {
           // Browser cache 1h. CDN cache 1d with 1d stale-while-revalidate
@@ -69,6 +104,12 @@ export async function GET(req: Request) {
       },
     );
   } catch {
-    return NextResponse.json({ previewUrl: null });
+    return NextResponse.json({
+      previewUrl: null,
+      title: s.title,
+      artist: s.artist,
+      album: s.album,
+      thumbnail: s.thumbnail,
+    });
   }
 }
