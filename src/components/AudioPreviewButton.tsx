@@ -15,6 +15,15 @@ let playingSongId: string | null = null;
 // the middle of swapping sources — we don't want the UI to briefly
 // flash "nothing playing" between teardown and the new play().
 let transitioning = false;
+// iOS Safari requires audio.play() to be invoked synchronously inside
+// the user-gesture stack — `await fetch(...)` blows that window. We
+// "unlock" the element on the very first user click by calling play()
+// on a silent payload, which Safari then treats as a sanctioned media
+// element for the rest of the session. Subsequent src swaps + plays
+// work without gesture-context fights.
+let unlocked = false;
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
 const previewUrlCache = new Map<string, string | null>();
 const subscribers = new Set<() => void>();
 
@@ -112,6 +121,40 @@ function pause() {
   if (audioEl) audioEl.pause();
 }
 
+// Call this synchronously inside the click handler — BEFORE any
+// await. It plays a 1-frame silent WAV so iOS Safari registers the
+// audio element as user-activated. Returns a promise we don't have
+// to await for the gesture to count.
+function primeIfNeeded() {
+  if (unlocked) return;
+  const audio = getAudio();
+  // Stash the current src/state so the unlock doesn't disrupt
+  // an in-progress preview if any.
+  const wasPaused = audio.paused;
+  const prevSrc = audio.src;
+  if (wasPaused) {
+    audio.src = SILENT_WAV;
+    audio.load();
+    // Fire and forget. Promise rejection means audio is blocked
+    // (autoplay policy) — we'll try again on the next gesture.
+    audio.play().then(
+      () => {
+        unlocked = true;
+        audio.pause();
+        if (prevSrc) {
+          audio.src = prevSrc;
+          audio.load();
+        } else {
+          audio.removeAttribute("src");
+        }
+      },
+      () => {
+        // Still failed — leave unlocked=false so we'll try again.
+      },
+    );
+  }
+}
+
 function subscribe(fn: () => void) {
   subscribers.add(fn);
   return () => {
@@ -147,6 +190,11 @@ export function AudioPreviewButton({ songId }: { songId: string }) {
       pause();
       return;
     }
+    // Synchronously prime the audio element BEFORE any await so iOS
+    // Safari treats subsequent play() calls as user-activated. Without
+    // this, fetchPreviewUrl's await loses the gesture context and the
+    // real audio.play() rejects with NotAllowedError on first tap.
+    primeIfNeeded();
     setPhase("loading");
     const url = await fetchPreviewUrl(songId);
     if (!url) {

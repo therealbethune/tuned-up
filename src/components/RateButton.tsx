@@ -366,19 +366,24 @@ export function RateButton({
             </div>
           </div>
 
-          {/* Optional review — supports @-mentions */}
+          {/* Optional review — supports @-mentions. The textarea opens
+              a typeahead picker on `@` (no character needed after) so
+              users see the friend list immediately. */}
           <div>
             <MentionInput
               as="textarea"
               value={review}
               onChange={setReview}
-              placeholder="Why this score? Use @ to tag friends. (optional)"
+              placeholder="Why this score? Type @ to tag a friend."
               rows={3}
               maxLength={500}
               className="w-full rounded-md bg-neutral-900 border border-neutral-800 p-3 text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 resize-none"
             />
-            <div className="text-right text-xs text-neutral-500 mt-1">
-              {review.length}/500
+            <div className="flex items-center justify-between text-xs text-neutral-500 mt-1">
+              <span className="inline-flex items-center gap-1">
+                <span className="font-semibold text-neutral-400">@</span> tags a friend
+              </span>
+              <span className="tabular-nums">{review.length}/500</span>
             </div>
           </div>
 

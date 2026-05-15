@@ -97,29 +97,39 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
   }
 
   useEffect(() => {
-    if (mentionAt == null || mentionPartial.length < 1) {
+    // Show the picker the moment the user types `@` — no partial
+    // required. When mentionPartial is empty we hit the suggestions
+    // endpoint (which returns the viewer's likely-to-tag people: who
+    // they follow, who has mutuals, etc.) instead of search (which
+    // requires q.length >= 1). As the user types, we switch to the
+    // search endpoint with the partial.
+    if (mentionAt == null) {
       setCandidates([]);
       return;
     }
     const id = ++reqId.current;
-    // AbortController so a fast typist's stale request is actually
-    // cancelled at the network layer, not just dropped by the reqId
-    // guard after the bytes already came back. Cleaner and lets the
-    // browser cancel inflight bytes when the user erases the partial.
     const ac = new AbortController();
+    const url =
+      mentionPartial.length > 0
+        ? `/api/users/search?q=${encodeURIComponent(mentionPartial)}`
+        : `/api/users/suggestions?limit=5`;
+    // No debounce on the bare @ (gets to a snappy picker reveal);
+    // 100ms debounce as the user types so we don't fire on every keystroke.
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `/api/users/search?q=${encodeURIComponent(mentionPartial)}`,
-          { signal: ac.signal },
-        );
+        const res = await fetch(url, { signal: ac.signal });
         const data = await res.json();
         if (id !== reqId.current) return;
-        setCandidates((data.results ?? []).slice(0, 5));
-      } catch {
+        // Two response shapes: { results } from /api/users/search and
+        // { suggestions } from /api/users/suggestions. Normalize both
+        // down to the Candidate shape the listbox renders.
+        const list = (data.results ?? data.suggestions ?? []) as Candidate[];
+        setCandidates(list.slice(0, 5));
+      } catch (e) {
+        if ((e as { name?: string })?.name === "AbortError") return;
         if (id === reqId.current) setCandidates([]);
       }
-    }, 100);
+    }, mentionPartial.length === 0 ? 0 : 100);
     return () => {
       clearTimeout(t);
       ac.abort();
@@ -297,7 +307,12 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
           id={listboxId}
           role="listbox"
           aria-label="Mention suggestions"
-          className="absolute left-0 right-0 bottom-full mb-1 z-30 max-h-56 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-lg text-sm"
+          // Floats below the input on mobile (textarea is at the top
+          // of the rate-modal sheet, so a dropdown ABOVE the textarea
+          // would get clipped by the modal header). Sits above on
+          // desktop where there's room either way. The keyboard pushes
+          // everything up anyway so below-the-input is always visible.
+          className="absolute left-0 right-0 top-full mt-1 z-30 max-h-56 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl text-sm sheet-scroll"
         >
           {candidates.map((c, i) => (
             <li key={c.id} role="presentation">
