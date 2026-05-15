@@ -158,6 +158,9 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
   function handleKeyDown(
     e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) {
+    // Only catch the typeahead-nav keys when there's actually a row
+    // to navigate. Otherwise the typer's arrows/Enter pass through
+    // to the textarea like normal text input.
     if (mentionAt != null && candidates.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -266,7 +269,13 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mentionsInValue.join("|")]);
 
-  const showTypeahead = mentionAt != null && candidates.length > 0;
+  // ALWAYS render the picker shell while @ is active — even when there
+  // are zero candidates — so the user gets immediate visual feedback
+  // that the helper is online. The empty-state row tells them what to
+  // try next instead of leaving them staring at no UI at all.
+  const showTypeahead = mentionAt != null;
+  // The cursor still uses keyboard-nav only when there are real rows.
+  const navigable = candidates.length > 0;
   const listboxId = "mention-listbox";
 
   // ARIA combobox pattern: the input announces itself as a combobox
@@ -309,41 +318,64 @@ export const MentionInput = forwardRef<MentionInputHandle, Props>(function Menti
           aria-label="Mention suggestions"
           // Floats below the input on mobile (textarea is at the top
           // of the rate-modal sheet, so a dropdown ABOVE the textarea
-          // would get clipped by the modal header). Sits above on
-          // desktop where there's room either way. The keyboard pushes
-          // everything up anyway so below-the-input is always visible.
-          className="absolute left-0 right-0 top-full mt-1 z-30 max-h-56 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl text-sm sheet-scroll"
+          // would get clipped by the modal header). The keyboard pushes
+          // everything up so below-the-input is always visible.
+          className="absolute left-0 right-0 top-full mt-1 z-30 max-h-60 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl text-sm sheet-scroll"
         >
-          {candidates.map((c, i) => (
-            <li key={c.id} role="presentation">
-              <button
-                type="button"
-                id={`mention-opt-${i}`}
-                role="option"
-                aria-selected={i === activeIdx}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  pick(c);
-                }}
-                onMouseEnter={() => setActiveIdx(i)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left ${
-                  i === activeIdx ? "bg-neutral-800" : "hover:bg-neutral-800/60"
-                }`}
-              >
-                <Avatar
-                  imageUrl={c.imageUrl}
-                  name={c.displayName || c.username}
-                  seed={c.id}
-                  size={24}
-                  ring={false}
-                />
-                <span className="font-medium truncate">
-                  {c.displayName || c.username}
-                </span>
-                <span className="text-neutral-500 truncate">@{c.username}</span>
-              </button>
+          {/* Header that names what you're tagging. Stays visible
+              across both populated + empty states so the picker
+              never feels like "did anything happen?" */}
+          <li
+            role="presentation"
+            className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-neutral-500 sticky top-0 bg-neutral-900/95 backdrop-blur"
+          >
+            {mentionPartial.length > 0
+              ? `Tag @${mentionPartial}…`
+              : "Tag a friend"}
+          </li>
+          {navigable ? (
+            candidates.map((c, i) => (
+              <li key={c.id} role="presentation">
+                <button
+                  type="button"
+                  id={`mention-opt-${i}`}
+                  role="option"
+                  aria-selected={i === activeIdx}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pick(c);
+                  }}
+                  onTouchStart={() => setActiveIdx(i)}
+                  onMouseEnter={() => setActiveIdx(i)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left ${
+                    i === activeIdx ? "bg-neutral-800" : "hover:bg-neutral-800/60"
+                  }`}
+                >
+                  <Avatar
+                    imageUrl={c.imageUrl}
+                    name={c.displayName || c.username}
+                    seed={c.id}
+                    size={28}
+                    ring={false}
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-medium truncate">
+                      {c.displayName || c.username}
+                    </span>
+                    <span className="block text-xs text-neutral-500 truncate">
+                      @{c.username}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))
+          ) : (
+            <li role="presentation" className="px-3 py-3 text-xs text-neutral-400">
+              {mentionPartial.length > 0
+                ? `No one matches "${mentionPartial}". Try a username (@name) — no spaces, no caps.`
+                : "Start typing a name or @username."}
             </li>
-          ))}
+          )}
         </ul>
       )}
 

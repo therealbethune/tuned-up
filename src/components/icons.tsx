@@ -79,6 +79,33 @@ export function AppleMusicIcon({ size = 14, className, ...rest }: IconProps) {
   );
 }
 
+// SoundCloud — abstract waveform mark. Their official logo is a
+// trademark we shouldn't reproduce exactly; this is a generic
+// "stacked vertical bars" rendition that reads as "audio waveform"
+// without aping the licensed asset. Tinted with their brand orange
+// via currentColor at the caller.
+export function SoundCloudIcon({ size = 14, className, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      className={className}
+      {...rest}
+    >
+      <rect x="2"  y="10" width="2" height="6"  rx="1" />
+      <rect x="5"  y="8"  width="2" height="10" rx="1" />
+      <rect x="8"  y="6"  width="2" height="14" rx="1" />
+      <rect x="11" y="4"  width="2" height="16" rx="1" />
+      <rect x="14" y="6"  width="2" height="14" rx="1" />
+      <rect x="17" y="9"  width="2" height="8"  rx="1" />
+      <rect x="20" y="11" width="2" height="4"  rx="1" />
+    </svg>
+  );
+}
+
 // --- Generic UI icons ----------------------------------------------------
 
 // Triangular play glyph. Single source of truth — replaces inline

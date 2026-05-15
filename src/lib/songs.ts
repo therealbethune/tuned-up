@@ -35,11 +35,17 @@ export function isAlbumId(songId: string): boolean {
 export function streamingSearchLinks(params: { title: string; artist: string }): {
   spotify: string;
   appleMusic: string;
+  soundcloud: string;
 } {
   const q = `${params.title} ${params.artist}`.trim();
   return {
     spotify: `https://open.spotify.com/search/${encodeURIComponent(q)}`,
     appleMusic: `https://music.apple.com/us/search?term=${encodeURIComponent(q)}`,
+    // SoundCloud's public search URL — opens their site with results
+    // pre-filtered to the title+artist query. No API key required; if
+    // we later want direct track URLs we'd need to register a client
+    // id with SoundCloud's API (currently waitlisted to new apps).
+    soundcloud: `https://soundcloud.com/search/sounds?q=${encodeURIComponent(q)}`,
   };
 }
 

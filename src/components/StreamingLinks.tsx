@@ -1,5 +1,5 @@
 import { ytUrlForSongId, spotifyDirectUrlForSongId, streamingSearchLinks } from "@/lib/songs";
-import { SpotifyIcon, YtMusicIcon, AppleMusicIcon } from "@/components/icons";
+import { SpotifyIcon, YtMusicIcon, AppleMusicIcon, SoundCloudIcon } from "@/components/icons";
 
 export function StreamingLinks({
   songId,
@@ -23,7 +23,8 @@ export function StreamingLinks({
   const spotifyResolved = spotifyTrackId
     ? `https://open.spotify.com/track/${spotifyTrackId}`
     : null;
-  const { spotify: spotifySearch, appleMusic: appleMusicSearch } = streamingSearchLinks({ title, artist });
+  const { spotify: spotifySearch, appleMusic: appleMusicSearch, soundcloud } =
+    streamingSearchLinks({ title, artist });
   const spotify = spotifyDirect ?? spotifyResolved ?? spotifySearch;
   const appleMusic = appleMusicUrl ?? appleMusicSearch;
 
@@ -70,6 +71,16 @@ export function StreamingLinks({
         className={`${linkClass} text-pink-500 hover:bg-pink-500/10`}
       >
         <AppleMusicIcon />
+      </a>
+      <a
+        href={soundcloud}
+        target="_blank"
+        rel="noreferrer"
+        title="Search on SoundCloud"
+        aria-label="Search on SoundCloud"
+        className={`${linkClass} text-orange-500 hover:bg-orange-500/10`}
+      >
+        <SoundCloudIcon />
       </a>
     </div>
   );
