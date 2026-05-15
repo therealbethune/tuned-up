@@ -37,9 +37,12 @@ import { PlayIcon } from "./icons";
 
 let audioEl: HTMLAudioElement | null = null;
 let playingSongId: string | null = null;
-// Suppresses synthetic pause/error events that fire during our own
-// src swap — otherwise the UI flickers idle between source A and B.
-let swapping = false;
+// Counts in-flight source swaps. While > 0 we ignore audio-element
+// events (pause/error) that would otherwise look like "the current
+// preview stopped" — because they're really side effects of our own
+// teardown. Counter instead of a boolean so overlapping rapid swaps
+// can't accidentally re-enable event handling mid-swap.
+let swapDepth = 0;
 
 type PreviewMeta = {
   url: string | null;
@@ -68,6 +71,7 @@ function getAudio(): HTMLAudioElement {
   const el = new Audio();
   el.preload = "none";
   el.addEventListener("ended", () => {
+    if (swapDepth > 0) return;
     // CRITICAL: the silent-WAV activation buffer is only 1 sample long,
     // so it "ends" almost immediately after we kick off the cold path.
     // If we let that ended event clear playingSongId, the swap-to-real-
@@ -80,7 +84,7 @@ function getAudio(): HTMLAudioElement {
     }
   });
   el.addEventListener("error", () => {
-    if (swapping) return;
+    if (swapDepth > 0) return;
     // Same defense: errors from the silent WAV (e.g., bad data URI on
     // some browser) shouldn't be treated as "the user's track failed."
     if (el.src === SILENT_WAV) return;
@@ -89,8 +93,49 @@ function getAudio(): HTMLAudioElement {
       notify();
     }
   });
+  // Sync UI when iOS pauses our audio for an external reason — phone
+  // call, another app taking the audio session, Control Center pause.
+  // Guarded by swapDepth so our own pause-during-teardown doesn't
+  // flicker the UI.
+  el.addEventListener("pause", () => {
+    if (swapDepth > 0) return;
+    if (el.src === SILENT_WAV) return;
+    // "ended" already handles the natural end-of-track. We only care
+    // here about external pauses while the track is still mid-play.
+    if (el.ended) return;
+    if (playingSongId !== null) {
+      playingSongId = null;
+      notify();
+    }
+  });
   audioEl = el;
   return el;
+}
+
+// Hard-reset the audio element before assigning a new source. On iOS
+// Safari, a plain `audio.pause(); audio.src = newUrl; audio.load()`
+// is not enough — the previous source's decoded buffer can keep
+// playing through the output pipeline for several seconds while the
+// new one loads. Removing the src attribute and calling load() forces
+// the element into NETWORK_EMPTY / HAVE_NOTHING, which deterministically
+// flushes that buffer.
+function hardSwapSrc(audio: HTMLAudioElement, newUrl: string) {
+  swapDepth++;
+  try {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    audio.src = newUrl;
+    audio.load();
+  } finally {
+    // The synchronous body above generates the pause/emptied/error
+    // events we need to suppress. Release on the next microtask so any
+    // event that's already queued behind the current task also sees
+    // swapDepth > 0.
+    queueMicrotask(() => {
+      swapDepth--;
+    });
+  }
 }
 
 // Fetch preview URL + metadata, with cache + in-flight dedup. Metadata
@@ -199,11 +244,8 @@ function setMediaSession(meta: PreviewMeta) {
 function playUrlSync(songId: string, meta: PreviewMeta) {
   if (!meta.url) return;
   const audio = getAudio();
-  swapping = true;
   if (audio.src !== meta.url) {
-    audio.pause();
-    audio.src = meta.url;
-    audio.load();
+    hardSwapSrc(audio, meta.url);
   } else if (audio.ended) {
     audio.currentTime = 0;
   }
@@ -219,10 +261,6 @@ function playUrlSync(songId: string, meta: PreviewMeta) {
       }
     });
   }
-  // Give synthetic pause/error events from the src swap a tick to settle.
-  setTimeout(() => {
-    swapping = false;
-  }, 50);
 }
 
 // COLD PATH activation — must be called synchronously from a click handler.
@@ -230,15 +268,9 @@ function playUrlSync(songId: string, meta: PreviewMeta) {
 // immediately; the silent buffer is inaudible.
 function activateSync() {
   const audio = getAudio();
-  swapping = true;
-  audio.pause();
-  audio.src = SILENT_WAV;
-  audio.load();
+  hardSwapSrc(audio, SILENT_WAV);
   const p = audio.play();
   if (p && typeof p.catch === "function") p.catch(() => {});
-  setTimeout(() => {
-    swapping = false;
-  }, 50);
 }
 
 // After the cold-path fetch completes, swap to the real URL and play.
@@ -249,11 +281,7 @@ function swapToMeta(songId: string, meta: PreviewMeta) {
   if (!meta.url) return;
   if (playingSongId !== songId) return; // user tapped a different song
   const audio = getAudio();
-  swapping = true;
-  audio.pause();
-  audio.src = meta.url;
-  audio.load();
-  if (audio.ended) audio.currentTime = 0;
+  hardSwapSrc(audio, meta.url);
   setMediaSession(meta);
   const p = audio.play();
   if (p && typeof p.catch === "function") {
@@ -264,9 +292,6 @@ function swapToMeta(songId: string, meta: PreviewMeta) {
       }
     });
   }
-  setTimeout(() => {
-    swapping = false;
-  }, 50);
 }
 
 function pauseCurrent() {
