@@ -230,8 +230,9 @@ async function topReviewers(viewerId: string | null): Promise<TopReviewer[]> {
 }
 
 // Reusable square-art card for songs/albums on /discover. Used by
-// both Trending and Top Rated grids. Audio preview button overlays
-// the artwork bottom-right (for songs only).
+// both Trending and Top Rated grids. Photo-forward: artwork dominates,
+// metadata sits underneath in a tight type rhythm, score chip floats
+// on the art so the eye lands on the verdict first.
 function DiscoverCard({ r }: { r: DiscoverRow }) {
   const isAlbum = isAlbumId(r.songId);
   const songLike = {
@@ -243,39 +244,44 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
     thumbnail: r.thumbnail,
     durationSeconds: r.durationSeconds,
   };
+  const tier = scoreLabel(r.avgScore);
   return (
-    <div className="rounded-xl border border-neutral-800 bg-gradient-to-b from-neutral-900 to-neutral-950 overflow-hidden hover:border-neutral-700 transition-colors flex flex-col">
+    <div className="card-elevated card-hover overflow-hidden flex flex-col group">
       <div className="relative">
-        <Link href={`/album/${encodeBase64Url(r.songId)}`} className="block">
+        <Link
+          href={`/album/${encodeBase64Url(r.songId)}`}
+          className="block aspect-square-art relative"
+          aria-label={`${r.title} by ${r.artist}`}
+        >
           {r.thumbnail ? (
             <Image
               src={r.thumbnail}
               alt=""
-              width={240}
-              height={240}
+              width={320}
+              height={320}
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="w-full aspect-square object-cover"
+              className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
             />
           ) : (
-            <div className="w-full aspect-square bg-neutral-800" />
+            <div className="w-full h-full bg-neutral-800" />
           )}
-          {/* Score chip color-codes by tier so a glance through the
-              discover grid is also a glance at the quality spread —
-              previously every score was emerald regardless of value,
-              which collapsed an 80 and a 40 visually. */}
+          {/* Bottom scrim so the score chip + album badge always have
+              contrast no matter how bright the artwork is. */}
+          <div className="absolute inset-0 gradient-scrim opacity-80 pointer-events-none" />
+          {/* Score chip — bigger, tier-colored, sits on the artwork. */}
           <span
-            className={`absolute top-2 right-2 rounded-md bg-black/80 backdrop-blur-sm px-2 py-0.5 text-sm font-bold tabular-nums shadow-md ${scoreLabel(r.avgScore).color}`}
+            className={`absolute top-2.5 right-2.5 rounded-lg px-2 py-1 text-base font-extrabold tabular-nums leading-none bg-black/70 backdrop-blur-md shadow-lg ${tier.color}`}
           >
             {r.avgScore}
           </span>
           {isAlbum && (
-            <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/30 text-sky-100 border border-sky-400/40">
+            <span className="absolute top-2.5 left-2.5 label-eyebrow px-1.5 py-0.5 rounded-md bg-sky-500/25 text-sky-100 border border-sky-400/40 backdrop-blur-sm">
               Album
             </span>
           )}
         </Link>
         {!isAlbum && (
-          <div className="absolute bottom-2 right-2 z-10">
+          <div className="absolute bottom-2.5 right-2.5 z-10">
             <AudioPreviewButton
               songId={r.songId}
               title={r.title}
@@ -288,10 +294,10 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
         )}
       </div>
       <div className="p-3 flex flex-col gap-2 flex-1">
-        <div className="min-h-[40px]">
+        <div className="min-h-[38px]">
           <Link
             href={`/album/${encodeBase64Url(r.songId)}`}
-            className="font-semibold text-[13px] leading-tight line-clamp-1 hover:underline"
+            className="font-semibold text-[14px] leading-tight line-clamp-1 hover:underline"
             title={r.title}
           >
             {r.title}
@@ -303,10 +309,12 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
             {r.artist}
           </div>
         </div>
-        <div className="text-[10px] text-neutral-400 tabular-nums">
-          {r.ratingCount} {r.ratingCount === 1 ? "rating" : "ratings"}
-          <span className={`ml-1.5 font-medium ${scoreLabel(r.avgScore).color}`}>
-            {scoreLabel(r.avgScore).label}
+        <div className="flex items-center justify-between gap-2">
+          <span className={`text-[11px] font-semibold ${tier.color}`}>
+            {tier.label}
+          </span>
+          <span className="text-[10px] text-neutral-500 tabular-nums">
+            {r.ratingCount}&nbsp;{r.ratingCount === 1 ? "rating" : "ratings"}
           </span>
         </div>
         <RateButton song={songLike} />
@@ -369,26 +377,53 @@ function HeroSpotlight({
     thumbnail,
     durationSeconds,
   };
+  const tier = scoreLabel(avgScore);
   return (
-    <section className="relative rounded-2xl overflow-hidden border border-emerald-500/40 bg-[radial-gradient(circle_at_top_left,theme(colors.emerald.500/0.25),theme(colors.neutral.950)_65%)] shadow-[0_0_60px_-20px_theme(colors.emerald.500/0.35)]">
-      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-6">
+    <section className="card-hero relative">
+      {/* Layer 1: blurred art behind, acts as a colored bed for the
+          actual image card. The huge blur softens the album art into
+          a halo so the foreground composition has a glow without
+          needing a server-side color extraction. */}
+      {thumbnail && (
+        <div
+          className="absolute inset-0 pointer-events-none opacity-60"
+          style={{
+            backgroundImage: `url(${thumbnail})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: "blur(48px) saturate(140%)",
+            transform: "scale(1.15)",
+          }}
+          aria-hidden
+        />
+      )}
+      {/* Layer 2: dark vignette over the blur so the foreground text
+          stays readable regardless of art brightness. */}
+      <div className="absolute inset-0 bg-black/55 pointer-events-none" aria-hidden />
+      <div className="absolute inset-0 gradient-spotlight pointer-events-none" aria-hidden />
+
+      <div className="relative flex flex-col sm:flex-row gap-5 sm:gap-7 p-5 sm:p-7">
         <div className="relative shrink-0 mx-auto sm:mx-0">
-          <Link href={`/album/${encodeBase64Url(songId)}`} className="block">
+          <Link
+            href={`/album/${encodeBase64Url(songId)}`}
+            className="block"
+            aria-label={`${title} by ${artist}`}
+          >
             {thumbnail ? (
               <Image
                 src={thumbnail}
                 alt=""
-                width={200}
-                height={200}
+                width={240}
+                height={240}
                 priority
-                className="rounded-lg w-40 h-40 sm:w-48 sm:h-48 object-cover ring-2 ring-neutral-800 shadow-xl"
+                className="rounded-xl w-44 h-44 sm:w-52 sm:h-52 object-cover ring-1 ring-white/10 shadow-2xl"
               />
             ) : (
-              <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-lg bg-neutral-800 ring-2 ring-neutral-800" />
+              <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-xl bg-neutral-800" />
             )}
           </Link>
           {!isAlbum && (
-            <div className="absolute bottom-2 right-2">
+            <div className="absolute bottom-2.5 right-2.5">
               <AudioPreviewButton
                 songId={songId}
                 title={title}
@@ -399,36 +434,40 @@ function HeroSpotlight({
             </div>
           )}
         </div>
-        <div className="flex-1 min-w-0 flex flex-col gap-2 justify-center">
-          <span className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold">
+
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-3">
+          {/* Sunset gradient pill for the "hot" signal — replaces the
+              emerald eyebrow so the hero pops vs the rest of the page. */}
+          <span className="pill-hot self-start sm:self-start mx-auto sm:mx-0">
+            <span aria-hidden>★</span>
             {badge}
           </span>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+
+          <h2 className="display text-white">
             <Link
               href={`/album/${encodeBase64Url(songId)}`}
-              className="hover:underline"
+              className="hover:underline decoration-white/30 underline-offset-4"
             >
               {title}
             </Link>
           </h2>
-          <p className="text-neutral-400">{artist}</p>
-          <div className="flex items-baseline gap-3 pt-1 flex-wrap">
-            {/* Top-of-discover hero — color-coded by tier (was hardcoded
-                emerald) so the showcase number reflects whether the
-                "what's hot" pick is actually highly rated or just
-                heavily-rated. Soft glow for theatrical hierarchy. */}
+          <p className="text-lg text-neutral-300 -mt-1">{artist}</p>
+
+          <div className="flex items-center gap-4 mt-1 flex-wrap">
             <span
-              className={`text-5xl font-bold tabular-nums leading-none ${scoreLabel(avgScore).color}`}
-              style={{ textShadow: "0 0 28px rgba(16, 185, 129, 0.22)" }}
+              className={`score-chip text-6xl sm:text-7xl tier-glow-emerald ${tier.color}`}
+              style={{ textShadow: `0 0 36px rgb(var(--tu-emerald-shadow) / 0.35)` }}
             >
               {avgScore}
             </span>
-            <span className={`text-sm font-semibold ${scoreLabel(avgScore).color}`}>
-              {scoreLabel(avgScore).label}
-            </span>
-            <span className="text-xs text-neutral-400 ml-auto">
-              {ratingCount} {ratingCount === 1 ? "rating" : "ratings"}
-            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className={`text-sm font-bold uppercase tracking-wider ${tier.color}`}>
+                {tier.label}
+              </span>
+              <span className="text-xs text-neutral-400 tabular-nums">
+                {ratingCount}&nbsp;{ratingCount === 1 ? "rating" : "ratings"}
+              </span>
+            </div>
           </div>
           <div className="pt-2">
             <RateButton song={songLike} />
@@ -598,10 +637,12 @@ export default async function DiscoverPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">Discover</h1>
-        <p className="text-neutral-400 text-sm">
+    <div className="space-y-10">
+      {/* Page header — larger display type, paired eyebrow for rhythm. */}
+      <div className="space-y-1.5">
+        <span className="label-eyebrow text-emerald-300">For you · Today</span>
+        <h1 className="headline-xl">Discover</h1>
+        <p className="text-neutral-400 text-[15px] max-w-prose">
           What everyone&apos;s rating, who&apos;s rating it, and what your network loved.
         </p>
       </div>
@@ -626,20 +667,40 @@ export default async function DiscoverPage() {
           preview + avatar stack pattern for free. */}
       <FriendRecsRail recs={friendRecs} />
 
+      {/* Trending — horizontal rail (Instagram-story feel) so the swipe
+          affordance suggests "there's more here" without consuming
+          three rows of vertical space. */}
       <section className="space-y-3">
         <div className="flex items-end justify-between">
           <div>
-            <h2 className="text-base font-semibold tracking-tight">Trending this week</h2>
-            <p className="text-xs text-neutral-400 mt-0.5">Most rated over the last 7 days</p>
+            <span className="section-eyebrow">This week</span>
+            <h2 className="section-title">Trending now</h2>
           </div>
         </div>
-        <DiscoverGrid rows={trending} />
+        {trending.length === 0 ? (
+          <EmptyState
+            emoji="📊"
+            title="Not enough ratings yet"
+            body="Be the first to rate this week."
+          />
+        ) : (
+          <div className="rail scrollbar-hide cv-auto">
+            {trending.map((r) => (
+              <div key={r.songId} className="w-44 sm:w-52">
+                <DiscoverCard r={r} />
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
+      {/* Top rated — full grid, this is the "browse-y" section. Cards
+          land here at their full size + metadata. */}
       <section className="space-y-3">
         <div className="flex items-end justify-between">
           <div>
-            <h2 className="text-base font-semibold tracking-tight">Top rated</h2>
+            <span className="section-eyebrow">All-time</span>
+            <h2 className="section-title">Top rated</h2>
             <p className="text-xs text-neutral-400 mt-0.5">Highest average · 2+ ratings</p>
           </div>
         </div>
@@ -651,6 +712,19 @@ export default async function DiscoverPage() {
       )}
 
       {userId && <TopReviewersSection reviewers={reviewers} />}
+    </div>
+  );
+}
+
+// Generic empty-state for in-page sections. Used when a particular
+// Discover rail has nothing to show yet — better than rendering
+// nothing (which looked like a layout bug).
+function EmptyState({ emoji, title, body }: { emoji: string; title: string; body: string }) {
+  return (
+    <div className="card-flat px-5 py-7 text-center space-y-2">
+      <div className="text-3xl">{emoji}</div>
+      <p className="font-medium">{title}</p>
+      <p className="text-xs text-neutral-400">{body}</p>
     </div>
   );
 }
