@@ -60,17 +60,31 @@ export function WelcomeFlow({
     }
     setSearching(true);
     const id = ++reqId.current;
+    // AbortController so a rapid-typed query doesn't leave a long
+    // string of stale YTM scrapes in flight on the server (the reqId
+    // guard already prevents stale state, but the requests themselves
+    // were still racing through to YTM and counting against any
+    // upstream rate limits).
+    const ac = new AbortController();
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`, {
+          signal: ac.signal,
+        });
         const data = await res.json();
         if (id !== reqId.current) return;
         setResults(data.results ?? []);
+      } catch (e) {
+        if ((e as { name?: string })?.name === "AbortError") return;
+        if (id === reqId.current) setResults([]);
       } finally {
         if (id === reqId.current) setSearching(false);
       }
     }, 250);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [q]);
 
   // Track when a rating is saved by listening for window events from RateButton.

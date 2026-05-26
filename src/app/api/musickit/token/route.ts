@@ -4,6 +4,7 @@ import {
   appleMusicConfigured,
   getAppleMusicDeveloperToken,
 } from "@/lib/apple-music-token";
+import { reportError } from "@/lib/report-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,9 +35,10 @@ export async function GET() {
       { headers: { "cache-control": "private, no-store" } },
     );
   } catch (e) {
-    return NextResponse.json(
-      { error: "sign_failed", message: (e as Error).message },
-      { status: 500 },
-    );
+    // The JWT sign step can throw on a malformed PRIVATE_KEY env var or
+    // a crypto-runtime mismatch. Log internally — don't leak the raw
+    // message which can contain PEM-parser internals or key fingerprints.
+    reportError(e, "musickit token sign");
+    return NextResponse.json({ error: "sign_failed" }, { status: 500 });
   }
 }
