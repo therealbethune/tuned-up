@@ -1,9 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, desc, eq, gte, inArray, sql, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql, notInArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, recommendations, users, songs, activities, blocks } from "@/db";
-import { getBlockEdges } from "@/lib/block-edges";
+import { db, recommendations, users, songs, activities } from "@/db";
+import { getBlockEdges, isBlockedBetween } from "@/lib/block-edges";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
@@ -102,17 +102,7 @@ export async function POST(req: Request) {
     // Block guard — neither side can send a recommendation across a
     // block edge. Same reasoning as follow: refusing the write stops
     // the abuse path of using "rec" as a notification bomb.
-    const [blockEdge] = await db
-      .select({ blockerId: blocks.blockerId })
-      .from(blocks)
-      .where(
-        or(
-          and(eq(blocks.blockerId, userId), eq(blocks.blockedId, target.id)),
-          and(eq(blocks.blockerId, target.id), eq(blocks.blockedId, userId)),
-        ),
-      )
-      .limit(1);
-    if (blockEdge) {
+    if (await isBlockedBetween(userId, target.id)) {
       return NextResponse.json({ error: "blocked" }, { status: 403 });
     }
 

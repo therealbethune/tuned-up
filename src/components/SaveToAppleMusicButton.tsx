@@ -8,6 +8,12 @@ import {
 } from "@/lib/musickit-client";
 
 const ERROR_AUTO_RESET_MS = 2500;
+// "Saved ✓" stays for a bit so the user gets clear feedback, then
+// returns to "Save to Apple Music" so the button stops feeling
+// permanently disabled. Previously the saved state was sticky for the
+// whole page session — a user navigating back to this song later
+// couldn't tell if their previous tap actually landed.
+const SAVED_AUTO_RESET_MS = 5000;
 
 // Adds a song to the viewer's Apple Music library. Lazy-loads MusicKit JS
 // on first click; user authorizes Apple Music in a popup; we look up the
@@ -23,12 +29,12 @@ export function SaveToAppleMusicButton({ songId }: { songId: string }) {
     };
   }, []);
 
-  function scheduleReset() {
+  function scheduleReset(ms = ERROR_AUTO_RESET_MS) {
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
     resetTimerRef.current = setTimeout(() => {
       setState("idle");
       resetTimerRef.current = null;
-    }, ERROR_AUTO_RESET_MS);
+    }, ms);
   }
 
   async function save() {
@@ -86,6 +92,9 @@ export function SaveToAppleMusicButton({ songId }: { songId: string }) {
           },
         );
         setState("saved");
+        // Auto-reset so the button returns to its "Save" state after the
+        // confirmation moment — see SAVED_AUTO_RESET_MS comment above.
+        scheduleReset(SAVED_AUTO_RESET_MS);
       } catch (e) {
         const msg = (e as Error).message || "Save failed";
         setState("error");

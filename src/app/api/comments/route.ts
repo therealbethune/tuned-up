@@ -1,9 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, asc, eq, gte, inArray, sql, or, notInArray } from "drizzle-orm";
-import { getBlockEdges } from "@/lib/block-edges";
+import { and, asc, eq, gte, inArray, sql, notInArray } from "drizzle-orm";
+import { getBlockEdges, isBlockedBetween } from "@/lib/block-edges";
 import { randomUUID } from "node:crypto";
-import { db, comments, users, ratings, activities, songs, blocks } from "@/db";
+import { db, comments, users, ratings, activities, songs } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
@@ -130,24 +130,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  // Block guard: refuse a comment from someone who's on either side of
-  // a block edge with the rating owner. Apple Guideline 1.2 wants the
+  // Block guard: refuse a comment from someone on either side of a
+  // block edge with the rating owner. Apple Guideline 1.2 wants the
   // moderation barrier to be real — silently dropping the comment isn't
   // enough; the write itself must fail.
-  if (ratingUserId !== userId) {
-    const [blockEdge] = await db
-      .select({ blockerId: blocks.blockerId })
-      .from(blocks)
-      .where(
-        or(
-          and(eq(blocks.blockerId, userId), eq(blocks.blockedId, ratingUserId)),
-          and(eq(blocks.blockerId, ratingUserId), eq(blocks.blockedId, userId)),
-        ),
-      )
-      .limit(1);
-    if (blockEdge) {
-      return NextResponse.json({ error: "blocked" }, { status: 403 });
-    }
+  if (await isBlockedBetween(userId, ratingUserId)) {
+    return NextResponse.json({ error: "blocked" }, { status: 403 });
   }
 
   // If this is a reply, validate the parent and flatten any reply-to-reply

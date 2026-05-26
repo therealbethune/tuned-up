@@ -1,11 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq, gte, sql, or } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db, follows, users, activities } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { randomUUID } from "node:crypto";
 import { sendPushToUser } from "@/lib/push";
-import { blocks } from "@/db";
+import { isBlockedBetween } from "@/lib/block-edges";
 import { enforce, LIMITS, windowStartDate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -84,20 +84,8 @@ export async function POST(req: Request) {
   // Block guard: a blocked user attempting to follow their target
   // would otherwise quietly drop a fresh follow row + notification.
   // Refuse the action on either side of the block edge.
-  if (action !== "unfollow") {
-    const [edge] = await db
-      .select({ blockerId: blocks.blockerId })
-      .from(blocks)
-      .where(
-        or(
-          and(eq(blocks.blockerId, userId), eq(blocks.blockedId, target.id)),
-          and(eq(blocks.blockerId, target.id), eq(blocks.blockedId, userId)),
-        ),
-      )
-      .limit(1);
-    if (edge) {
-      return NextResponse.json({ error: "blocked" }, { status: 403 });
-    }
+  if (action !== "unfollow" && (await isBlockedBetween(userId, target.id))) {
+    return NextResponse.json({ error: "blocked" }, { status: 403 });
   }
 
   // Rate-limit follow creates only — accept/reject/unfollow can't be

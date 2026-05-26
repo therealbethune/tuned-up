@@ -1,9 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, desc, eq, gte, count, sql, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, gte, count, sql, notInArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, likes, ratings, activities, users, songs, blocks } from "@/db";
-import { getBlockEdges } from "@/lib/block-edges";
+import { db, likes, ratings, activities, users, songs } from "@/db";
+import { getBlockEdges, isBlockedBetween } from "@/lib/block-edges";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { sendPushToUser } from "@/lib/push";
 import { encodeBase64Url } from "@/lib/encoding";
@@ -155,20 +155,8 @@ export async function POST(req: Request) {
     // Block guard: refuse the new like entirely if there's a block
     // edge in either direction. Existing likes can still be unliked
     // (above branch) since that's only a removal.
-    if (ratingUserId !== userId) {
-      const [blockEdge] = await db
-        .select({ blockerId: blocks.blockerId })
-        .from(blocks)
-        .where(
-          or(
-            and(eq(blocks.blockerId, userId), eq(blocks.blockedId, ratingUserId)),
-            and(eq(blocks.blockerId, ratingUserId), eq(blocks.blockedId, userId)),
-          ),
-        )
-        .limit(1);
-      if (blockEdge) {
-        return NextResponse.json({ error: "blocked" }, { status: 403 });
-      }
+    if (await isBlockedBetween(userId, ratingUserId)) {
+      return NextResponse.json({ error: "blocked" }, { status: 403 });
     }
 
     // Use the unique constraint as the single source of truth: if a parallel

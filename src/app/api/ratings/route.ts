@@ -301,28 +301,21 @@ export async function POST(req: Request) {
             }
             const convergent = matches.filter((m) => knownIds.has(m.userId));
             if (convergent.length > 0) {
-              // Fire one activity row for the OTHER side (delivered as
-              // their notification) and one for the new rater (visible
-              // in their own /activity later). Use type "taste_match"
-              // so we can style it distinctly in the activity UI.
-              const rows = convergent.flatMap((m) => [
-                {
-                  id: randomUUID(),
-                  userId: m.userId,
-                  actorId: userId,
-                  type: "taste_match",
-                  songId: song.id,
-                  ratingUserId: userId,
-                },
-                {
-                  id: randomUUID(),
-                  userId,
-                  actorId: m.userId,
-                  type: "taste_match",
-                  songId: song.id,
-                  ratingUserId: m.userId,
-                },
-              ]);
+              // Fire one activity row PER convergent friend, addressed to
+              // THAT friend so they see "X also loved this" in their bell.
+              // We used to also create a mirror row for the rater themselves,
+              // but at 5+ simultaneous convergences that cluttered the new
+              // rater's Activity tab with N rows for one rating event —
+              // and they already get the success toast at the rate modal,
+              // which is sufficient feedback for their own side.
+              const rows = convergent.map((m) => ({
+                id: randomUUID(),
+                userId: m.userId,
+                actorId: userId,
+                type: "taste_match",
+                songId: song.id,
+                ratingUserId: userId,
+              }));
               await db.insert(activities).values(rows);
 
               // Push the other side so they notice the convergence in
