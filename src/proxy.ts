@@ -33,6 +33,9 @@ const isProtectedRoute = createRouteMatcher([
   "/api/suggestions(.*)",
   "/api/applemusic(.*)",
   "/api/musickit(.*)",
+  "/api/search(.*)",
+  "/api/songs(.*)",
+  "/api/spotify(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

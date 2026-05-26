@@ -307,11 +307,11 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, id: recId });
   } catch (e) {
+    // Log internally — don't echo raw error messages, which on this
+    // route can include Drizzle constraint violations / Postgres
+    // internals from the FK/unique paths above.
     reportError(e, "recommendations POST unexpected");
-    return NextResponse.json(
-      { error: (e as Error).message || "Internal error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }
 
