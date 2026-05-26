@@ -1,8 +1,296 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM v1 — instagram-style, dark-first, dual-accent.
+   ═══════════════════════════════════════════════════════════════════════
+   Naming convention:
+     --tu-{token}     →  brand tokens (color, gradient, motion)
+     --surface-{n}    →  depth scale (1 = base bg, 4 = highest elevation)
+     --border-{name}  →  hairline weights
+     --radius-{name}  →  border-radius tokens
+     --motion-{name}  →  motion-duration tokens
+     --type-{name}    →  typography ramp
+
+   Use these via CSS variables (var(--tu-coral-400)) OR through the
+   utility classes defined further down (.surface-2, .gradient-sunset,
+   .display, etc.).
+   ═══════════════════════════════════════════════════════════════════════ */
+
 :root {
   color-scheme: light dark;
+
+  /* PRIMARY — emerald stays the brand anchor. */
+  --tu-emerald-50:  #d1fae5;
+  --tu-emerald-100: #a7f3d0;
+  --tu-emerald-200: #6ee7b7;
+  --tu-emerald-300: #34d399;
+  --tu-emerald-400: #10b981;   /* canonical brand */
+  --tu-emerald-500: #059669;
+  --tu-emerald-600: #047857;
+  --tu-emerald-shadow: 16 185 129;     /* rgb tuple for shadow recipes */
+
+  /* SECONDARY ACCENT — coral→amber sunset. Used for "hot", "trending",
+     "live" signals + the hero-card scrim gradient. Reads as warm energy
+     against the emerald + neutral chrome. */
+  --tu-coral-300:   #fda4af;
+  --tu-coral-400:   #fb7185;           /* canonical */
+  --tu-coral-500:   #f43f5e;
+  --tu-amber-300:   #fcd34d;
+  --tu-amber-400:   #fbbf24;
+  --tu-amber-500:   #f59e0b;
+  --tu-coral-shadow: 251 113 133;
+
+  /* TERTIARY — violet for personal-signal moments (taste matches, your
+     own milestones). Subtle on dark surfaces. */
+  --tu-violet-400:  #a78bfa;
+  --tu-violet-500:  #8b5cf6;
+
+  /* GRADIENTS — declared once so the same recipe shows up everywhere. */
+  --tu-grad-sunset:    linear-gradient(135deg, #f59e0b 0%, #f43f5e 50%, #8b5cf6 100%);
+  --tu-grad-emerald:   linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --tu-grad-glass:     linear-gradient(180deg, rgb(255 255 255 / 0.04) 0%, rgb(255 255 255 / 0) 100%);
+  --tu-grad-scrim:     linear-gradient(180deg, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0.7) 100%);
+  /* Radial spotlight — used behind hero album art. */
+  --tu-grad-spotlight: radial-gradient(circle at 30% 0%, rgb(16 185 129 / 0.22) 0%, transparent 55%);
+
+  /* SURFACE DEPTH SCALE — higher = more elevation. Dark is the design
+     target; light-mode counterparts inside html:not(.dark) below. */
+  --surface-1: #0a0a0a;                /* page bg */
+  --surface-2: #141414;                /* card flat */
+  --surface-3: #1d1d1d;                /* card elevated */
+  --surface-4: #262626;                /* card raised / hover */
+  --surface-glass: rgb(20 20 20 / 0.72);
+
+  /* BORDERS — hairlines, in three weights. */
+  --border-hairline:  rgb(38 38 38 / 0.85);
+  --border-soft:      rgb(64 64 64 / 0.6);
+  --border-emphasis:  rgb(115 115 115 / 0.5);
+
+  /* RADII — modern-feeling, not "round = friendly". */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-hero: 24px;                 /* image-forward heroes */
+  --radius-pill: 9999px;
+
+  /* MOTION — three speed tiers + a spring easing the app already used. */
+  --motion-fast:   120ms;
+  --motion-md:     220ms;
+  --motion-slow:   420ms;
+  --motion-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* TYPOGRAPHY RAMP — fluid for the largest sizes via clamp(). */
+  --type-display:   clamp(2.25rem, 7vw, 3.5rem);   /* hero headlines */
+  --type-h1:        clamp(1.5rem, 4vw, 1.875rem);  /* page titles */
+  --type-h2:        1.25rem;                       /* section heads */
+  --type-h3:        1rem;                          /* sub-section */
+  --type-body:      0.875rem;                      /* default */
+  --type-label:     0.6875rem;                     /* uppercase eyebrow */
+  --type-mono-num:  1.5rem;                        /* score chips */
 }
+
+/* Light-mode surface overrides — invert the depth scale so cards still
+   read as elevated against the page bg. */
+html:not(.dark) {
+  --surface-1: #fafafa;
+  --surface-2: #ffffff;
+  --surface-3: #ffffff;
+  --surface-4: #f3f4f6;
+  --surface-glass: rgb(255 255 255 / 0.85);
+  --border-hairline:  rgb(229 231 235 / 1);
+  --border-soft:      rgb(212 212 216 / 0.85);
+  --border-emphasis:  rgb(156 163 175 / 0.7);
+  --tu-grad-spotlight: radial-gradient(circle at 30% 0%, rgb(16 185 129 / 0.10) 0%, transparent 55%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DESIGN-SYSTEM UTILITY CLASSES
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Surface tiers — apply via class instead of remembering which neutral-
+   gray maps to which elevation. */
+.surface-1 { background-color: var(--surface-1); }
+.surface-2 { background-color: var(--surface-2); }
+.surface-3 { background-color: var(--surface-3); }
+.surface-4 { background-color: var(--surface-4); }
+
+/* Glass surface — for sticky headers, nav backdrops, modal scrims.
+   Combine with `border` for the typical "frosted card" treatment. */
+.surface-glass {
+  background-color: var(--surface-glass);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Gradient utility classes. Match the var() recipes above. */
+.gradient-sunset    { background-image: var(--tu-grad-sunset); }
+.gradient-emerald   { background-image: var(--tu-grad-emerald); }
+.gradient-spotlight { background-image: var(--tu-grad-spotlight); }
+.gradient-scrim     { background-image: var(--tu-grad-scrim); }
+
+/* Text-gradient variants — useful for hero headlines + price-like emphasis. */
+.text-gradient-sunset {
+  background-image: var(--tu-grad-sunset);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.text-gradient-emerald {
+  background-image: var(--tu-grad-emerald);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Typography ramp utilities. */
+.display {
+  font-size: var(--type-display);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+.headline-xl {
+  font-size: var(--type-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.headline-lg {
+  font-size: var(--type-h2);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+.headline-md {
+  font-size: var(--type-h3);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+}
+.label-eyebrow {
+  font-size: var(--type-label);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(163 163 163);
+}
+html:not(.dark) .label-eyebrow { color: #525252; }
+
+/* Card surface variants — `flat` is the default, `elevated` adds a
+   subtle ring + soft glow, `hero` is for image-forward spotlight cards
+   with a bigger radius. */
+.card-flat {
+  background-color: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+.card-elevated {
+  background-color: var(--surface-3);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.04) inset,
+    0 8px 24px -12px rgb(0 0 0 / 0.5);
+}
+html:not(.dark) .card-elevated {
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.6) inset,
+    0 4px 14px -6px rgb(0 0 0 / 0.08);
+}
+.card-hero {
+  background-color: var(--surface-3);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-hero);
+  overflow: hidden;
+  position: relative;
+}
+.card-hover {
+  transition:
+    transform var(--motion-md) var(--motion-spring),
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+.card-hover:hover {
+  border-color: var(--border-emphasis);
+  background-color: var(--surface-4);
+}
+
+/* Score chip — pill-shaped, big tabular number. Component-side
+   color comes from the tier-glow-* utilities defined further down. */
+.score-chip {
+  font-size: var(--type-mono-num);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* Hot/Trending pill — used for "live" signals (trending now, fresh
+   activity, etc.). Sunset gradient on a black inset. */
+.pill-hot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background-image: var(--tu-grad-sunset);
+  color: #1a0a00;
+  box-shadow: 0 4px 14px -4px rgb(var(--tu-coral-shadow) / 0.5);
+}
+
+/* Section heading rhythm — paired eyebrow + title, used by all the
+   Discover/Feed rails so vertical rhythm stays consistent. */
+.section-eyebrow {
+  font-size: var(--type-label);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tu-emerald-300);
+}
+.section-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+
+/* Horizontal rails — used by the Discover trending/top-rated sections
+   and the friend-recs grid. Scrollbar hidden via .scrollbar-hide
+   class; this just sets the rhythm + snap points. */
+.rail {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  /* Bleed into the page gutter so the first card sits flush with the
+     page left edge — emphasizes the swipe affordance on mobile. */
+  margin-left: calc(-1 * var(--rail-gutter, 0px));
+  padding-left: var(--rail-gutter, 0px);
+  margin-right: calc(-1 * var(--rail-gutter, 0px));
+  padding-right: var(--rail-gutter, 0px);
+}
+.rail > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+:root { --rail-gutter: 16px; }
+@media (min-width: 640px) { :root { --rail-gutter: 0px; } }
+
+/* Aspect-ratio enforcement for image-forward cards. */
+.aspect-square-art { aspect-ratio: 1 / 1; }
+.aspect-hero-art  { aspect-ratio: 4 / 5; }     /* portrait-leaning hero */
+
+/* :root { color-scheme } already declared above — keep the file
+   visually grouped here for backwards compat with old references. */
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
