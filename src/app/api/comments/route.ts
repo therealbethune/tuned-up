@@ -461,6 +461,44 @@ export async function DELETE(req: Request) {
     .set({ parentCommentId: null })
     .where(eq(comments.parentCommentId, commentId));
   await db.delete(comments).where(eq(comments.id, commentId));
+
+  // Activity cleanup: if the commenter has no remaining comments on this
+  // rating, drop the "X commented on your rating" activity row so the
+  // recipient's notification bell doesn't keep linking to a deleted
+  // comment. We can't pinpoint the activity row by commentId (the
+  // activities schema doesn't carry one), so we use the
+  // "no comments left from this actor on this target" check as the
+  // signal that the notification is safe to remove. Best-effort.
+  if (c.commenterId !== c.ratingUserId) {
+    try {
+      const remaining = await db
+        .select({ id: comments.id })
+        .from(comments)
+        .where(
+          and(
+            eq(comments.ratingUserId, c.ratingUserId),
+            eq(comments.songId, c.songId),
+            eq(comments.commenterId, c.commenterId),
+          ),
+        )
+        .limit(1);
+      if (remaining.length === 0) {
+        await db
+          .delete(activities)
+          .where(
+            and(
+              eq(activities.userId, c.ratingUserId),
+              eq(activities.actorId, c.commenterId),
+              eq(activities.type, "comment"),
+              eq(activities.songId, c.songId),
+            ),
+          );
+      }
+    } catch (e) {
+      reportError(e, "comments DELETE activity cleanup");
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
 
