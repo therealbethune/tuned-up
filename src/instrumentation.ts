@@ -25,6 +25,75 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "edge") {
     await import("../sentry.edge.config");
   }
+
+  // Startup environment sanity checks. Run on the Node runtime only
+  // (Edge fires this hook on every cold start, which is too noisy).
+  // These exist because we burned a debugging session each time one
+  // of these misconfigs reached production — surfacing them once at
+  // cold start in Netlify's function logs makes them obvious instead
+  // of mysterious ("why is /me broken?").
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    runStartupChecks();
+  }
+}
+
+function runStartupChecks() {
+  const inProd = process.env.NODE_ENV === "production";
+  const warn = (msg: string) =>
+    // Use console.error so it shows up in Netlify's function-error log
+    // (Site → Functions → Logs filtered to Errors), not just the
+    // chatty info stream.
+    console.error("⚠️  [Tuned Up startup]", msg);
+
+  // 1) Clerk: pk_test_/sk_test_ in a production deploy means the dev
+  // Clerk instance is serving auth. Dev instance Clerk user IDs do
+  // NOT match the IDs already stored in the DB (those came from the
+  // prod Clerk instance), so the user-row lookup on /me silently
+  // fails and the page shows "Profile temporarily unavailable."
+  // Caught us once — never again.
+  if (inProd) {
+    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+    const sk = process.env.CLERK_SECRET_KEY ?? "";
+    if (pk.startsWith("pk_test_") || sk.startsWith("sk_test_")) {
+      warn(
+        "Clerk is using TEST keys in a production deploy. User IDs from " +
+          "the dev Clerk instance do not match the prod IDs already in the DB, " +
+          "so /me will silently 'Profile temporarily unavailable' for users. " +
+          "Switch NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY to " +
+          "pk_live_… / sk_live_… on Netlify and redeploy.",
+      );
+    }
+    if (!pk || !sk) {
+      warn("Clerk publishable/secret key missing in production env.");
+    }
+  }
+
+  // 2) Database URL — we tolerate either NETLIFY_DATABASE_URL or
+  // DATABASE_URL, but if neither is set the very first DB query just
+  // throws "DB connection URL missing" deep in the request path. A
+  // startup-time warning makes that obvious before any user hits a
+  // 500.
+  const dbUrl =
+    process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL || "";
+  if (inProd && !dbUrl) {
+    warn(
+      "No database URL configured. Set NETLIFY_DATABASE_URL or DATABASE_URL on Netlify.",
+    );
+  }
+
+  // 3) VAPID keys — push notifications silently no-op when these are
+  // missing. Not catastrophic, but worth knowing if you wonder why
+  // a release feature shipped without pushes firing.
+  if (inProd) {
+    const vp = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vs = process.env.VAPID_PRIVATE_KEY;
+    if (!vp || !vs) {
+      warn(
+        "VAPID keys missing — push notifications will silently no-op. " +
+          "Set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to enable.",
+      );
+    }
+  }
 }
 
 type RequestErrorContext = {

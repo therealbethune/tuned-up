@@ -13,7 +13,6 @@ import { AudioPreviewButton } from "@/components/AudioPreviewButton";
 import { SaveToAppleMusicButton } from "@/components/SaveToAppleMusicButton";
 import { SaveLaterButton } from "@/components/SaveLaterButton";
 import { Avatar } from "@/components/Avatar";
-import { safeQuery } from "@/lib/safe-query";
 
 export const dynamic = "force-dynamic";
 
