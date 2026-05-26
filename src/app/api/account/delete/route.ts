@@ -2,6 +2,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, users, activities } from "@/db";
+import { reportError } from "@/lib/report-error";
 
 export const runtime = "nodejs";
 
@@ -27,10 +28,11 @@ export async function POST() {
     const client = await clerkClient();
     await client.users.deleteUser(userId);
   } catch (e) {
-    return NextResponse.json(
-      { error: "clerk delete failed", message: (e as Error).message },
-      { status: 502 },
-    );
+    // Log internally — don't return the raw Clerk error message which
+    // can leak request IDs, internal endpoint paths, or other config
+    // details a hostile client could use to probe.
+    reportError(e, "account delete clerk");
+    return NextResponse.json({ error: "clerk_delete_failed" }, { status: 502 });
   }
 
   // 2) Local DB cleanup. Now that Clerk is gone the user is permanently
@@ -56,10 +58,11 @@ export async function POST() {
   try {
     await db.delete(users).where(eq(users.id, userId));
   } catch (e) {
-    return NextResponse.json(
-      { ok: true, dbError: (e as Error).message },
-      { status: 200 },
-    );
+    // Clerk already deleted — user is signed out either way, so return
+    // 200. Surface the DB issue via reportError + Sentry rather than
+    // echoing the raw message back, which could leak Postgres internals.
+    reportError(e, "account delete db");
+    return NextResponse.json({ ok: true, dbCleanupPending: true });
   }
 
   return NextResponse.json({ ok: true });
