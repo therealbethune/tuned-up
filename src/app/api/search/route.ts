@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { search, type ItemKind } from "@/lib/ytmusic";
+import { reportError } from "@/lib/report-error";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,13 @@ export async function GET(req: Request) {
     const results = await search(q, kind);
     return NextResponse.json({ results });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 502 });
+    // Log the upstream YTM error to Sentry + Netlify so we can diagnose
+    // shape changes, but don't leak the internal message to the client
+    // (could contain stack frames or scraper internals).
+    reportError(e, "search ytmusic");
+    return NextResponse.json(
+      { error: "Search is having a hiccup. Try again in a moment." },
+      { status: 502 },
+    );
   }
 }

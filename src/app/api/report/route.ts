@@ -58,12 +58,17 @@ export async function POST(req: Request) {
   const reason = typeof b.reason === "string" ? b.reason : "";
   const details =
     typeof b.details === "string" ? b.details.slice(0, 500) : null;
-  const targetUserId =
-    typeof b.targetUserId === "string" ? b.targetUserId : null;
-  const targetSongId =
-    typeof b.targetSongId === "string" ? b.targetSongId : null;
-  const targetCommentId =
-    typeof b.targetCommentId === "string" ? b.targetCommentId : null;
+  // Length-bound the target id fields. Without these a hostile client
+  // could push megabytes of garbage through to the DB-side `text`
+  // columns + the index lookups below. 64 chars matches Clerk's user_id
+  // format, 256 matches the songs.id cap used elsewhere.
+  const isShortId = (v: unknown): v is string =>
+    typeof v === "string" && v.length > 0 && v.length <= 64;
+  const isSongId = (v: unknown): v is string =>
+    typeof v === "string" && v.length > 0 && v.length <= 256;
+  const targetUserId = isShortId(b.targetUserId) ? b.targetUserId : null;
+  const targetSongId = isSongId(b.targetSongId) ? b.targetSongId : null;
+  const targetCommentId = isShortId(b.targetCommentId) ? b.targetCommentId : null;
 
   if (!["rating", "comment", "user"].includes(targetType)) {
     return NextResponse.json({ error: "bad_target_type" }, { status: 400 });
