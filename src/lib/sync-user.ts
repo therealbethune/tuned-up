@@ -67,6 +67,15 @@ async function _syncCurrentUser(): Promise<SyncedUser | null> {
   const realImageUrl = u.hasImage ? (u.imageUrl ?? null) : null;
 
   // Step 1: try the upsert. This is the happy path 99.9% of the time.
+  // We update displayName + imageUrl on conflict so Clerk profile edits
+  // propagate to our local row without a re-sign-in cycle. username is
+  // intentionally NOT in the conflict set: Clerk does enforce uniqueness
+  // per instance, but our derived fallbacks (email prefix, `user_<6>`)
+  // do not, and a forced UPDATE here could collide with our unique index
+  // on users.username — leading to the upsert throwing, falling through
+  // to the SELECT-only path, and the user seeing nothing change. A
+  // proper username rename is rare enough to belong in a manual admin
+  // step or a dedicated endpoint with conflict handling.
   try {
     const [row] = await db
       .insert(users)
@@ -79,6 +88,7 @@ async function _syncCurrentUser(): Promise<SyncedUser | null> {
       .onConflictDoUpdate({
         target: users.id,
         set: {
+          displayName,
           imageUrl: realImageUrl,
         },
       })
