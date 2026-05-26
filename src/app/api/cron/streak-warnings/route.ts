@@ -174,6 +174,33 @@ export async function POST(req: Request) {
       ratedYesterdayBy.has(c.id),
   );
 
+  // Stale-streak refresh: candidates whose cached streak says they're
+  // streaking but who didn't rate yesterday (so the streak is actually
+  // broken). refreshUserStreak only runs when the user posts a new
+  // rating, so without this sweep the cached value can stay >0 forever
+  // — the "🔥 5 day streak" badge persists in everyone's feeds even
+  // though they've been gone for a week. Capped at 50 per run to
+  // stay inside the cron's time budget.
+  const toResetStreak = candidates
+    .filter((c) => c.cachedStreak > 0 && !ratedYesterdayBy.has(c.id))
+    .slice(0, 50);
+  let streaksReset = 0;
+  if (toResetStreak.length > 0) {
+    await Promise.allSettled(
+      toResetStreak.map(async (c) => {
+        try {
+          await db
+            .update(users)
+            .set({ currentStreak: 0 })
+            .where(eq(users.id, c.id));
+          streaksReset++;
+        } catch (e) {
+          errors.push(`${c.id}: streak reset failed — ${(e as Error).message}`);
+        }
+      }),
+    );
+  }
+
   await Promise.allSettled(
     toWarn.map(async (c) => {
       const isUrgent = c.stage === "urgent";
@@ -208,6 +235,7 @@ export async function POST(req: Request) {
     ok: true,
     evaluated,
     warned,
+    streaksReset,
     errors,
     at: now.toISOString(),
   });
