@@ -20,13 +20,11 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
     <section className="space-y-3">
       <div className="flex items-end justify-between">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">Friends loved</h2>
-          <p className="text-xs text-neutral-500 mt-0.5">
-            Highly rated by people you follow
-          </p>
+          <span className="section-eyebrow">From your network</span>
+          <h2 className="section-title">Friends loved</h2>
         </div>
       </div>
-      <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-3 snap-x snap-mandatory scroll-pl-4">
+      <div className="rail scrollbar-hide cv-auto">
         {recs.map((r) => {
           const isAlbum = isAlbumId(r.songId);
           const songLike = {
@@ -41,7 +39,7 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
           return (
             <div
               key={r.songId}
-              className="shrink-0 w-44 rounded-xl border border-neutral-800 bg-gradient-to-b from-neutral-900 to-neutral-950 snap-start flex flex-col overflow-hidden hover:border-neutral-700 transition-colors"
+              className="card-elevated card-hover w-44 sm:w-52 flex flex-col overflow-hidden group"
             >
               {/* Artwork area. The Link wraps only the image + score
                   chip so the AudioPreviewButton (positioned absolutely)
@@ -53,20 +51,20 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
                     <Image
                       src={r.thumbnail}
                       alt=""
-                      width={176}
-                      height={176}
-                      sizes="176px"
-                      className="w-full aspect-square object-cover"
+                      width={208}
+                      height={208}
+                      sizes="208px"
+                      className="w-full aspect-square object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
                     />
                   ) : (
                     <div className="w-full aspect-square bg-neutral-800" />
                   )}
+                  <div className="absolute inset-0 gradient-scrim opacity-80 pointer-events-none" />
                   {/* Tier-color the friend-avg chip so the rail's
-                      quality spread reads at a glance — was always
-                      emerald-400 regardless of value. Matches the
+                      quality spread reads at a glance — matches the
                       /discover grid chip pattern. */}
                   <span
-                    className={`absolute top-2 right-2 rounded-md bg-black/80 backdrop-blur-sm px-2 py-0.5 text-sm font-bold tabular-nums shadow-md ${scoreLabel(r.friendAvg).color}`}
+                    className={`absolute top-2.5 right-2.5 rounded-lg px-2 py-1 text-base font-extrabold tabular-nums leading-none bg-black/70 backdrop-blur-md shadow-lg ${scoreLabel(r.friendAvg).color}`}
                   >
                     {r.friendAvg}
                   </span>
