@@ -94,7 +94,7 @@ export function MobileTabBar({ unread }: { unread: number }) {
 
   return (
     <nav
-      className={`sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-neutral-800 bg-neutral-950/95 backdrop-blur transition-transform duration-150 ${
+      className={`sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-neutral-800/80 surface-glass transition-transform duration-150 ${
         kbOpen ? "translate-y-full pointer-events-none" : "translate-y-0"
       }`}
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}

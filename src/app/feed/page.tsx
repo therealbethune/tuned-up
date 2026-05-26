@@ -417,11 +417,11 @@ export default async function FeedPage({
           competes for width with Surprise Me + Rate-a-song. On sm
           (≥640px) the row collapses back to a single line. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-2xl font-bold">Feed</h1>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h1 className="headline-xl">Feed</h1>
           {(todayCount > 0 || currentStreak > 0) && (
             <span
-              className="text-[11px] inline-flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900/60 px-2.5 py-1 text-neutral-300"
+              className="text-[11px] inline-flex items-center gap-2 rounded-full border border-neutral-800 surface-2 px-2.5 py-1 text-neutral-300"
               title="Your rating activity today and current streak"
             >
               {todayCount > 0 && (
@@ -483,15 +483,15 @@ export default async function FeedPage({
               <li
                 id={anchorId}
                 data-target-highlight=""
-                className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-3 sm:p-4 scroll-mt-[calc(env(safe-area-inset-top)+5rem)] hover:border-neutral-700 hover:bg-neutral-900/80 transition-colors cv-auto"
+                className="card-elevated card-hover p-4 sm:p-5 scroll-mt-[calc(env(safe-area-inset-top)+5rem)] cv-auto"
               >
-                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <div className="flex items-center gap-2.5 mb-3.5 flex-wrap">
                   <Avatar
                     imageUrl={it.imageUrl}
                     name={it.displayName || it.username}
                     seed={it.ratingUserId}
-                    size={28}
-                    ring={false}
+                    size={32}
+                    ring={(it.currentStreak ?? 0) >= 3}
                   />
                   <Link href={`/u/${it.username}`} className="text-sm font-medium hover:underline">
                     {it.displayName || it.username}
@@ -521,7 +521,7 @@ export default async function FeedPage({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3.5">
                   {url ? (
                     <a
                       href={url}
@@ -534,61 +534,53 @@ export default async function FeedPage({
                         <Image
                           src={it.thumbnail}
                           alt=""
-                          width={56}
-                          height={56}
+                          width={72}
+                          height={72}
                           // First card is the LCP candidate; everything
                           // below the fold stays lazy.
                           {...(idx === 0 ? { priority: true } : { loading: "lazy" })}
-                          className="rounded h-14 w-14 object-cover"
+                          className="rounded-lg h-[72px] w-[72px] sm:h-20 sm:w-20 object-cover ring-1 ring-white/5"
                         />
                       ) : (
-                        <div className="h-14 w-14 rounded shimmer" />
+                        <div className="h-[72px] w-[72px] sm:h-20 sm:w-20 rounded-lg shimmer" />
                       )}
-                      {/* Play affordance. On mobile: a small badge in
-                          the corner shows the thumbnail is tappable
-                          (no hover state exists). On desktop: a full
-                          dark overlay reveals on hover. */}
-                      <span className="sm:hidden absolute bottom-1 right-1 h-5 w-5 rounded-full bg-black/70 backdrop-blur-sm inline-flex items-center justify-center text-white">
-                        <PlayIcon size={10} />
+                      {/* Play affordance. Bottom-fade scrim + glyph so
+                          the image always reads as tappable. */}
+                      <span className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full bg-black/75 backdrop-blur-sm inline-flex items-center justify-center text-white shadow-md">
+                        <PlayIcon size={11} />
                       </span>
-                      <div className="hidden sm:flex absolute inset-0 rounded bg-black/0 group-hover:bg-black/40 items-center justify-center transition-colors text-white">
-                        <PlayIcon
-                          size={20}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      </div>
+                      <div className="hidden sm:flex absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/30 items-center justify-center transition-colors pointer-events-none" />
                     </a>
                   ) : it.thumbnail ? (
-                    <Image src={it.thumbnail} alt="" width={56} height={56} loading="lazy" className="rounded h-14 w-14 object-cover shrink-0" />
+                    <Image src={it.thumbnail} alt="" width={72} height={72} loading="lazy" className="rounded-lg h-[72px] w-[72px] sm:h-20 sm:w-20 object-cover shrink-0 ring-1 ring-white/5" />
                   ) : (
-                    <div className="h-14 w-14 rounded shimmer shrink-0" />
+                    <div className="h-[72px] w-[72px] sm:h-20 sm:w-20 rounded-lg shimmer shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       {url ? (
-                        <a href={url} target="_blank" rel="noreferrer" className="font-medium truncate hover:underline">
+                        <a href={url} target="_blank" rel="noreferrer" className="font-semibold truncate hover:underline text-[15px] sm:text-base leading-tight">
                           {it.title}
                         </a>
                       ) : (
-                        <div className="font-medium truncate">{it.title}</div>
+                        <div className="font-semibold truncate text-[15px] sm:text-base leading-tight">{it.title}</div>
                       )}
                       {isAlbumId(it.songId) && (
-                        <span className="shrink-0 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                        <span className="shrink-0 label-eyebrow px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
                           Album
                         </span>
                       )}
                     </div>
-                    <div className="text-sm text-neutral-400 truncate">{it.artist}{it.album ? ` · ${it.album}` : ""}</div>
+                    <div className="text-[13px] text-neutral-400 truncate mt-0.5">{it.artist}{it.album ? ` · ${it.album}` : ""}</div>
                   </div>
                   <div className="text-right shrink-0 leading-tight">
-                    {/* Score is the punchline of the card — give it
-                        hero weight and color (the tier color, not just
-                        plain white) so it reads as the card's verdict
-                        at a glance. */}
-                    <div className={`text-4xl sm:text-4xl font-bold tabular-nums ${scoreLabel(it.score).color} ${scoreTierGlow(it.score)}`}>
+                    {/* Score is the punchline of the card — hero
+                        weight + tier color + soft glow so it reads as
+                        the verdict at a glance. */}
+                    <div className={`score-chip text-[44px] sm:text-5xl ${scoreLabel(it.score).color} ${scoreTierGlow(it.score)}`}>
                       {it.score}
                     </div>
-                    <div className="text-[10px] uppercase tracking-wider text-neutral-400 mt-0.5">
+                    <div className={`label-eyebrow mt-1 ${scoreLabel(it.score).color}`}>
                       {scoreLabel(it.score).label}
                     </div>
                   </div>

@@ -240,7 +240,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         >
           <header
-            className="border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-neutral-950/60 sticky top-0 z-10"
+            className="border-b border-neutral-800/70 surface-glass sticky top-0 z-10"
             style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
             <nav className="mx-auto max-w-3xl flex items-center justify-between px-3 py-3 gap-2">
