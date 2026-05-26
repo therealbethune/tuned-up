@@ -440,7 +440,13 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
         </div>
       )}
 
-      {taste && (
+      {/* Privacy gate: TasteCompare shows the target's actual per-song
+          scores. If the viewer can't see the target's ratings (private
+          account they don't follow, or either side has blocked), they
+          must NOT see them via this panel either. The computeTasteDetails
+          query runs in parallel above for latency reasons, but its
+          output is gated here at render time. */}
+      {taste && canSeeRatings && (
         <TasteComparePanel
           agreement={taste.agreement}
           shared={taste.shared}
