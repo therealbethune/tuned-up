@@ -221,6 +221,7 @@ export default async function AlbumPage({
                 artist={song.artist}
                 album={song.album}
                 thumbnail={song.thumbnail}
+                previewUrl={song.previewChecked ? song.previewUrl : undefined}
               />
             )}
           </div>

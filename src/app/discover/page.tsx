@@ -27,6 +27,8 @@ type DiscoverRow = {
   appleMusicUrl: string | null;
   spotifyTrackId: string | null;
   durationSeconds: number | null;
+  previewUrl: string | null;
+  previewChecked: boolean;
   ratingCount: number;
   avgScore: number;
 };
@@ -52,6 +54,8 @@ const trendingThisWeek = unstable_cache(
             appleMusicUrl: songs.appleMusicUrl,
             spotifyTrackId: songs.spotifyTrackId,
             durationSeconds: songs.durationSeconds,
+            previewUrl: songs.previewUrl,
+            previewChecked: songs.previewChecked,
             ratingCount: sql<number>`count(${ratings.songId})::int`,
             avgScore: sql<number>`round(avg(${ratings.score}))::int`,
           })
@@ -83,6 +87,8 @@ const topRated = unstable_cache(
             appleMusicUrl: songs.appleMusicUrl,
             spotifyTrackId: songs.spotifyTrackId,
             durationSeconds: songs.durationSeconds,
+            previewUrl: songs.previewUrl,
+            previewChecked: songs.previewChecked,
             ratingCount: sql<number>`count(${ratings.songId})::int`,
             avgScore: sql<number>`round(avg(${ratings.score}))::int`,
           })
@@ -276,6 +282,7 @@ function DiscoverCard({ r }: { r: DiscoverRow }) {
               artist={r.artist}
               album={r.album}
               thumbnail={r.thumbnail}
+              previewUrl={r.previewChecked ? r.previewUrl : undefined}
             />
           </div>
         )}
@@ -335,6 +342,8 @@ function HeroSpotlight({
   artist,
   thumbnail,
   durationSeconds,
+  previewUrl,
+  previewChecked,
   ratingCount,
   avgScore,
   badge,
@@ -344,6 +353,8 @@ function HeroSpotlight({
   artist: string;
   thumbnail: string | null;
   durationSeconds: number | null;
+  previewUrl: string | null;
+  previewChecked: boolean;
   ratingCount: number;
   avgScore: number;
   badge: string;
@@ -383,6 +394,7 @@ function HeroSpotlight({
                 title={title}
                 artist={artist}
                 thumbnail={thumbnail}
+                previewUrl={previewChecked ? previewUrl : undefined}
               />
             </div>
           )}
@@ -570,6 +582,12 @@ export default async function DiscoverPage() {
       appleMusicUrl: t.appleMusicUrl,
       spotifyTrackId: t.spotifyTrackId,
       durationSeconds: t.durationSeconds,
+      // Friend-rec rows don't carry preview metadata through the recs
+      // helper (yet). The hero will fall through to AudioPreviewButton's
+      // legacy fetch path — uncommon enough that it's not worth widening
+      // recommendedFromFriends just to plumb two more columns.
+      previewUrl: null,
+      previewChecked: false,
       ratingCount: t.friendCount,
       avgScore: t.friendAvg,
       badge:
@@ -599,6 +617,8 @@ export default async function DiscoverPage() {
           artist={hero.artist}
           thumbnail={hero.thumbnail}
           durationSeconds={hero.durationSeconds}
+          previewUrl={hero.previewUrl}
+          previewChecked={hero.previewChecked}
           ratingCount={hero.ratingCount}
           avgScore={hero.avgScore}
           badge={hero.badge}

@@ -33,6 +33,8 @@ export default async function SavedSongsPage() {
           appleMusicUrl: songs.appleMusicUrl,
           spotifyTrackId: songs.spotifyTrackId,
           durationSeconds: songs.durationSeconds,
+          previewUrl: songs.previewUrl,
+          previewChecked: songs.previewChecked,
           kind: songs.kind,
           savedAt: savedSongs.createdAt,
         })
@@ -50,6 +52,8 @@ export default async function SavedSongsPage() {
       appleMusicUrl: string | null;
       spotifyTrackId: string | null;
       durationSeconds: number | null;
+      previewUrl: string | null;
+      previewChecked: boolean;
       kind: string;
       savedAt: Date;
     }>,
@@ -146,6 +150,7 @@ export default async function SavedSongsPage() {
                         artist={r.artist}
                         album={r.album}
                         thumbnail={r.thumbnail}
+                        previewUrl={r.previewChecked ? r.previewUrl : undefined}
                       />
                     )}
                     <SaveLaterButton songId={r.songId} initialSaved />

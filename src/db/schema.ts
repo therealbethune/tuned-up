@@ -57,6 +57,17 @@ export const songs = pgTable("songs", {
   // Lower-case, hyphen-separated as Spotify returns ("indie-rock",
   // "pop", "k-pop"). null when uncached or untagged.
   genre: text("genre"),
+  // 30-second iTunes preview URL. Populated lazily by /api/preview-url
+  // on first request and then served directly via row queries — so the
+  // audio button's click handler doesn't have to fetch at tap time,
+  // which is what was breaking iOS Safari's gesture activation.
+  // null = either no iTunes match found OR we haven't looked it up yet.
+  previewUrl: text("preview_url"),
+  // Sentinel set to `true` once we've attempted an iTunes lookup, so we
+  // can distinguish "never tried" (previewUrl null + previewChecked
+  // null/false) from "looked up, iTunes had nothing" (previewUrl null
+  // + previewChecked true). Lets the retry-this-song button be smart.
+  previewChecked: boolean("preview_checked").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -211,6 +211,12 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS "songs_genre_idx" ON "songs" USING btree ("genre")`,
   `ALTER TABLE "ratings" ADD COLUMN IF NOT EXISTS "mood" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cover_theme" text`,
+  // Persistent iTunes preview URL cache on songs. Populated by
+  // /api/preview-url on first lookup, then served directly via row
+  // queries — kills the click-time network round-trip that was
+  // breaking iOS Safari's gesture activation on cold first taps.
+  `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "preview_url" text`,
+  `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "preview_checked" boolean NOT NULL DEFAULT false`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

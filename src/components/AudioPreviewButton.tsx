@@ -319,15 +319,27 @@ function getServerSnapshot(): string | null {
 
 type Props = {
   songId: string;
-  // Optional metadata. When passed, used to populate navigator.mediaSession
-  // immediately on tap — so iOS Now Playing / Control Center shows the
-  // correct song without waiting for an API round-trip. All six call sites
-  // already have these fields from the parent's DB query, so passing them
-  // is essentially free.
+  // Optional metadata. When provided we use it for MediaSession (iOS
+  // Now Playing / Control Center) immediately on tap — no round-trip.
   title?: string;
   artist?: string;
   album?: string | null;
   thumbnail?: string | null;
+  // OPTIONAL but heavily preferred: the resolved iTunes preview URL.
+  // When the parent passes this from its own DB query (the canonical
+  // path now — every feed/discover/album/saved query joins it in), the
+  // button's click handler runs SYNCHRONOUSLY — no fetch, no silent
+  // WAV gymnastics, just `audio.src = url; audio.play()`. That's the
+  // pattern iOS Safari grants gesture activation for reliably. We only
+  // fall back to the fetch path when this prop is undefined (legacy
+  // call sites or songs not yet looked up).
+  //
+  // Tri-state:
+  //   - undefined  → parent didn't pass it. Use legacy fetch path.
+  //   - null       → parent looked up and confirmed no preview exists.
+  //                  Hide the button.
+  //   - string     → ready to play. Synchronous path.
+  previewUrl?: string | null;
 };
 
 export function AudioPreviewButton({
@@ -336,6 +348,7 @@ export function AudioPreviewButton({
   artist,
   album,
   thumbnail,
+  previewUrl,
 }: Props) {
   const currentlyPlaying = useSyncExternalStore(
     subscribe,
@@ -343,17 +356,35 @@ export function AudioPreviewButton({
     getServerSnapshot,
   );
   const isPlaying = currentlyPlaying === songId;
-  // Initialize state from the module-level cache so we don't need a
-  // synchronous setState inside useEffect for the "already known to be
-  // unavailable" case (which trips react-hooks/set-state-in-effect).
+  // Initialize state from the module-level cache OR the prop. If the
+  // parent told us there's no preview (previewUrl === null), we're
+  // unavailable immediately.
   const [phase, setPhase] = useState<"idle" | "loading" | "unavailable">(() => {
+    if (previewUrl === null) return "unavailable";
     const cached = urlCache.get(songId);
     return cached && cached.url === null ? "unavailable" : "idle";
   });
 
-  // Prefetch URL on mount (low priority). If already cached we skip;
-  // if known unavailable we already initialized phase above.
+  // Seed the module cache from the prop so all buttons for this songId
+  // share the same URL — and so the post-click play() goes straight
+  // through the HOT PATH on first tap.
   useEffect(() => {
+    if (previewUrl !== undefined && !urlCache.has(songId)) {
+      urlCache.set(songId, {
+        url: previewUrl,
+        title,
+        artist,
+        album,
+        thumbnail,
+      });
+    }
+  }, [songId, previewUrl, title, artist, album, thumbnail]);
+
+  // Prefetch URL on mount ONLY when the parent didn't provide one.
+  // Most call sites now pass previewUrl, so this is a fallback for
+  // older code paths.
+  useEffect(() => {
+    if (previewUrl !== undefined) return; // parent gave us the answer
     if (urlCache.has(songId)) return;
     const win = window as typeof window & {
       requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
@@ -368,12 +399,14 @@ export function AudioPreviewButton({
     } else {
       setTimeout(fire, 200);
     }
-  }, [songId]);
+  }, [songId, previewUrl]);
 
-  // Last-chance warm on hover/touch — fires distinct gesture from click.
+  // Last-chance warm on hover/touch — only relevant when parent didn't
+  // pass the URL. Skip when previewUrl is already known.
   const warm = useCallback(() => {
+    if (previewUrl !== undefined) return;
     if (!urlCache.has(songId)) void fetchPreviewMeta(songId);
-  }, [songId]);
+  }, [songId, previewUrl]);
 
   const onClick = useCallback(() => {
     if (phase === "unavailable") return;
@@ -381,16 +414,25 @@ export function AudioPreviewButton({
       pauseCurrent();
       return;
     }
-    // Build a PreviewMeta from the parent props. Used as the FIRST source
-    // of truth for MediaSession — if we also get fresher data back from
-    // the /api/preview-url response, that updates on top. The immediate
-    // tap response already shows the right song on iOS Now Playing.
-    const propsMeta: PreviewMeta = { url: null, title, artist, album, thumbnail };
+    const propsMeta: PreviewMeta = {
+      url: previewUrl ?? null,
+      title,
+      artist,
+      album,
+      thumbnail,
+    };
+
+    // PRIMARY PATH — parent gave us the URL. Sync play, iOS gesture
+    // preserved 100% of the time. No silent WAV gymnastics needed.
+    if (typeof previewUrl === "string") {
+      playUrlSync(songId, propsMeta);
+      return;
+    }
+
+    // Legacy fall-throughs for call sites that haven't been updated to
+    // pass previewUrl yet.
     const cached = urlCache.get(songId);
     if (cached && cached.url) {
-      // HOT PATH — URL cached. Sync play, iOS gesture preserved.
-      // Merge parent props on top of cache so MediaSession always has
-      // the freshest title/artist (parent's DB row beats API response).
       playUrlSync(songId, mergeMeta(cached, propsMeta));
       return;
     }
@@ -398,10 +440,8 @@ export function AudioPreviewButton({
       setPhase("unavailable");
       return;
     }
-    // COLD PATH — URL not cached. Activate audio element synchronously
-    // (silent WAV), populate MediaSession from parent props NOW so the
-    // user sees the right track in Control Center while the URL is
-    // fetched, then fetch + swap to the real audio URL.
+    // COLD PATH — neither the prop nor the cache has a URL yet.
+    // Activate audio element synchronously (silent WAV), fetch + swap.
     activateSync();
     playingSongId = songId;
     notify();
@@ -419,7 +459,7 @@ export function AudioPreviewButton({
       }
       swapToMeta(songId, mergeMeta(meta, propsMeta));
     });
-  }, [isPlaying, phase, songId, title, artist, album, thumbnail]);
+  }, [isPlaying, phase, songId, title, artist, album, thumbnail, previewUrl]);
 
   if (phase === "unavailable") return null;
 

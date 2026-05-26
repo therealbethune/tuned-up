@@ -128,6 +128,8 @@ export default async function FeedPage({
     thumbnail: string | null;
     appleMusicUrl: string | null;
     spotifyTrackId: string | null;
+    previewUrl: string | null;
+    previewChecked: boolean;
     username: string;
     displayName: string | null;
     imageUrl: string | null;
@@ -150,6 +152,11 @@ export default async function FeedPage({
               thumbnail: songs.thumbnail,
               appleMusicUrl: songs.appleMusicUrl,
               spotifyTrackId: songs.spotifyTrackId,
+              // iTunes preview URL: included in the feed query so the
+              // AudioPreviewButton can play synchronously inside the click
+              // handler (no fetch round-trip = iOS gesture preserved).
+              previewUrl: songs.previewUrl,
+              previewChecked: songs.previewChecked,
               username: users.username,
               displayName: users.displayName,
               imageUrl: users.imageUrl,
@@ -207,6 +214,8 @@ export default async function FeedPage({
             thumbnail: songs.thumbnail,
             appleMusicUrl: songs.appleMusicUrl,
             spotifyTrackId: songs.spotifyTrackId,
+            previewUrl: songs.previewUrl,
+            previewChecked: songs.previewChecked,
             username: users.username,
             displayName: users.displayName,
             imageUrl: users.imageUrl,
@@ -671,6 +680,10 @@ export default async function FeedPage({
                         artist={it.artist}
                         album={it.album}
                         thumbnail={it.thumbnail}
+                        // Tri-state: when previewChecked is true we know
+                        // the URL (or that there isn't one), so we pass
+                        // it. Otherwise undefined → fetch path on demand.
+                        previewUrl={it.previewChecked ? it.previewUrl : undefined}
                       />
                     )}
                     <LikeButton
