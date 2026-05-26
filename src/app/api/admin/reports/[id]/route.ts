@@ -57,8 +57,44 @@ export async function POST(
   if (removeContent) {
     try {
       if (report.targetType === "comment" && report.targetCommentId) {
-        // Drop the offending comment + any activity rows that point at it.
+        // Load the comment first so we can sweep the matching activity
+        // row (only if this was the actor's last remaining comment on
+        // that target). Mirrors the cleanup in /api/comments DELETE.
+        const [c] = await db
+          .select()
+          .from(comments)
+          .where(eq(comments.id, report.targetCommentId))
+          .limit(1);
         await db.delete(comments).where(eq(comments.id, report.targetCommentId));
+        if (c && c.commenterId !== c.ratingUserId) {
+          try {
+            const remaining = await db
+              .select({ id: comments.id })
+              .from(comments)
+              .where(
+                and(
+                  eq(comments.ratingUserId, c.ratingUserId),
+                  eq(comments.songId, c.songId),
+                  eq(comments.commenterId, c.commenterId),
+                ),
+              )
+              .limit(1);
+            if (remaining.length === 0) {
+              await db
+                .delete(activities)
+                .where(
+                  and(
+                    eq(activities.userId, c.ratingUserId),
+                    eq(activities.actorId, c.commenterId),
+                    eq(activities.type, "comment"),
+                    eq(activities.songId, c.songId),
+                  ),
+                );
+            }
+          } catch {
+            /* non-critical activity sweep */
+          }
+        }
       } else if (report.targetType === "rating" && report.targetUserId && report.targetSongId) {
         // Deleting the rating cascades to its likes + comments via the
         // existing FK. Also clean the activity rows that point at it
