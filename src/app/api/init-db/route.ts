@@ -217,6 +217,19 @@ const STATEMENTS = [
   // breaking iOS Safari's gesture activation on cold first taps.
   `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "preview_url" text`,
   `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "preview_checked" boolean NOT NULL DEFAULT false`,
+  // Partial unique indexes that make duplicate activity notifications
+  // impossible for the dedup-safe types. The runtime route handlers
+  // pair these with `.onConflictDoNothing()` so simultaneous double-
+  // taps + re-imports of historical activity rows fold into a single
+  // row instead of multiplying. Required IF NOT EXISTS so the
+  // idempotent re-run pattern works.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "activities_dedup_no_song"
+    ON "activities" ("user_id", "actor_id", "type")
+    WHERE "type" IN ('follow', 'follow_request')`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "activities_dedup_with_song"
+    ON "activities" ("user_id", "actor_id", "type", "song_id")
+    WHERE "type" IN ('like', 'recommendation', 'streak_milestone', 'rating_match', 'rec_rated')
+      AND "song_id" IS NOT NULL`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

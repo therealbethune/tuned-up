@@ -191,14 +191,17 @@ export async function POST(req: Request) {
                 eq(activities.songId, songId),
               ),
             );
-          await db.insert(activities).values({
-            id: randomUUID(),
-            userId: ratingUserId,
-            actorId: userId,
-            type: "like",
-            songId,
-            ratingUserId,
-          });
+          await db
+            .insert(activities)
+            .values({
+              id: randomUUID(),
+              userId: ratingUserId,
+              actorId: userId,
+              type: "like",
+              songId,
+              ratingUserId,
+            })
+            .onConflictDoNothing();
         })(),
         db
           .select({ displayName: users.displayName, username: users.username })

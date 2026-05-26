@@ -139,18 +139,23 @@ export async function maybeAnnounceStreakMilestone(
       );
 
     if (followers.length > 0) {
-      await db.insert(activities).values(
-        followers.map((f) => ({
-          id: randomUUID(),
-          userId: f.followerId,
-          actorId: userId,
-          type: "streak_milestone",
-          // Encode the milestone + percentile in songId field (re-using
-          // existing column) as `streak:<days>:<topPct>` so renderers can
-          // pull it without a schema change.
-          songId: `streak:${newMilestone}:${topPct}`,
-        })),
-      );
+      await db
+        .insert(activities)
+        .values(
+          followers.map((f) => ({
+            id: randomUUID(),
+            userId: f.followerId,
+            actorId: userId,
+            type: "streak_milestone",
+            // Encode the milestone + percentile in songId field (re-using
+            // existing column) as `streak:<days>:<topPct>` so renderers
+            // can pull it without a schema change.
+            songId: `streak:${newMilestone}:${topPct}`,
+          })),
+        )
+        // Partial unique index activities_dedup_with_song covers this —
+        // re-announces from the backfill cron would otherwise collide.
+        .onConflictDoNothing();
     }
   } catch {
     /* ignore */

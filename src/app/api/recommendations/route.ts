@@ -204,13 +204,16 @@ export async function POST(req: Request) {
             eq(activities.songId, song.id),
           ),
         );
-      await db.insert(activities).values({
-        id: randomUUID(),
-        userId: target.id,
-        actorId: userId,
-        type: "recommendation",
-        songId: song.id,
-      });
+      await db
+        .insert(activities)
+        .values({
+          id: randomUUID(),
+          userId: target.id,
+          actorId: userId,
+          type: "recommendation",
+          songId: song.id,
+        })
+        .onConflictDoNothing();
     } catch (e) {
       reportError(e, "recommendations POST activity insert");
     }

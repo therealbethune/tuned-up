@@ -54,12 +54,15 @@ export async function POST(req: Request) {
             eq(activities.type, "follow_request"),
           ),
         );
-      await db.insert(activities).values({
-        id: randomUUID(),
-        userId: userId,
-        actorId: target.id,
-        type: "follow",
-      });
+      await db
+        .insert(activities)
+        .values({
+          id: randomUUID(),
+          userId: userId,
+          actorId: target.id,
+          type: "follow",
+        })
+        .onConflictDoNothing();
     } else {
       await db
         .delete(follows)
@@ -137,12 +140,15 @@ export async function POST(req: Request) {
               eq(activities.type, activityType),
             ),
           );
-        await db.insert(activities).values({
-          id: randomUUID(),
-          userId: target.id,
-          actorId: userId,
-          type: activityType,
-        });
+        await db
+          .insert(activities)
+          .values({
+            id: randomUUID(),
+            userId: target.id,
+            actorId: userId,
+            type: activityType,
+          })
+          .onConflictDoNothing();
       })(),
       db
         .select({ displayName: users.displayName, username: users.username })

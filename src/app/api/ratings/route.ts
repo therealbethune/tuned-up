@@ -265,8 +265,10 @@ export async function POST(req: Request) {
         ratingUserId: userId,
       }));
       // Best-effort; don't fail the rating if activity insert fails.
+      // onConflictDoNothing covers the simultaneous-double-rate race
+      // against the activities_dedup_with_song partial unique index.
       try {
-        await db.insert(activities).values(toInsert);
+        await db.insert(activities).values(toInsert).onConflictDoNothing();
       } catch {
         /* ignore */
       }
@@ -410,15 +412,18 @@ export async function POST(req: Request) {
           // Activity insert + push fan out — push doesn't need the
           // activity row to have landed first.
           await Promise.allSettled([
-            db.insert(activities).values({
-              id: randomUUID(),
-              userId: r.fromUserId,
-              actorId: userId,
-              type: "rec_rated",
-              songId: song.id,
-              // The rating that was just made — owned by the rater (actor).
-              ratingUserId: userId,
-            }),
+            db
+              .insert(activities)
+              .values({
+                id: randomUUID(),
+                userId: r.fromUserId,
+                actorId: userId,
+                type: "rec_rated",
+                songId: song.id,
+                // The rating that was just made — owned by the rater (actor).
+                ratingUserId: userId,
+              })
+              .onConflictDoNothing(),
             sendPushToUser(r.fromUserId, {
               title: `🎯 ${myName} rated your rec`,
               body: `${song.title} — ${finalScore}/100`,

@@ -44,12 +44,15 @@ export async function POST(req: Request) {
                 eq(activities.type, "follow_request"),
               ),
             );
-          await db.insert(activities).values({
-            id: randomUUID(),
-            userId,
-            actorId: f.followerId,
-            type: "follow",
-          });
+          await db
+            .insert(activities)
+            .values({
+              id: randomUUID(),
+              userId,
+              actorId: f.followerId,
+              type: "follow",
+            })
+            .onConflictDoNothing();
         }
       }
     } catch (e) {
