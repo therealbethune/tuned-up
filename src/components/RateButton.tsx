@@ -64,6 +64,8 @@ export function RateButton({
 
   // Animate in. We mount with open=true and translate-y-full, then flip to
   // translate-y-0 on the next frame to trigger the CSS transition.
+  // Prop-driven CSS-transition pattern; lint rule misclassifies it.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       const id = requestAnimationFrame(() => setShow(true));
@@ -102,6 +104,7 @@ export function RateButton({
       cancelled = true;
     };
   }, [open, song.id, initialScore, initialReview]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useScrollLock(open);
 

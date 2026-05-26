@@ -50,6 +50,9 @@ export function ReportButton({
 
   useScrollLock(open);
 
+  // Prop-driven modal animation. Same intentional pattern as RateButton /
+  // ConfirmDialog / LikersSheet — lint rule misclassifies it.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       const id = requestAnimationFrame(() => setShow(true));
@@ -68,6 +71,7 @@ export function ReportButton({
     // so it re-runs once per show/hide.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, busy]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function close() {
     if (busy) return;

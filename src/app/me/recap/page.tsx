@@ -22,6 +22,9 @@ export default async function WeeklyRecapPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
+  // Async server component executes once per request; the "must be
+  // idempotent" rule applies to client components that may re-render.
+  // eslint-disable-next-line react-hooks/purity
   const sevenDaysAgo = new Date(Date.now() - WEEK_MS);
 
   type WeekRow = {

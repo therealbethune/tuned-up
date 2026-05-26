@@ -52,6 +52,11 @@ export function WelcomeFlow({
   const [searching, setSearching] = useState(false);
   const reqId = useRef(0);
 
+  // Debounced search. Same intentional setState-inside-effect pattern
+  // used in /people and /search — clear results / set searching state
+  // on input change, fire the request from setTimeout. No cascading-
+  // render risk because the dep array is just `[q]`.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) {
@@ -86,6 +91,7 @@ export function WelcomeFlow({
       ac.abort();
     };
   }, [q]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Track when a rating is saved by listening for window events from RateButton.
   // RateButton calls router.refresh() after save — which is fine; we also

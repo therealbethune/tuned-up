@@ -40,6 +40,8 @@ export function RecommendButton({ song }: { song: SongResult }) {
 
   // Debounced user search with AbortController so unmount + rapid retypes
   // don't dump stale data into state or warn about setState-on-unmounted.
+  // Same intentional setState-in-effect pattern as /people and /search.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open || picked) return;
     const term = q.trim();
@@ -70,6 +72,7 @@ export function RecommendButton({ song }: { song: SongResult }) {
       ctrl.abort();
     };
   }, [q, open, picked]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function reset() {
     setQ("");

@@ -29,6 +29,8 @@ export function ShareButton({
       : `/r/${encodeURIComponent(username)}/${encodeBase64Url(songId)}`;
   const ogUrl = `/api/og/rating?u=${encodeURIComponent(username)}&s=${encodeURIComponent(songId)}`;
 
+  // Prop-driven modal animation. Lint rule misclassifies it.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       const id = requestAnimationFrame(() => setShow(true));
@@ -37,6 +39,7 @@ export function ShareButton({
       setShow(false);
     }
   }, [open]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function close() {
     setShow(false);

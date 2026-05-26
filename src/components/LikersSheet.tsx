@@ -41,6 +41,8 @@ export function LikersSheet({
   // Slide-in animation: mount first, then translate after next frame.
   // Also: capture the previously-focused element on open, move focus to
   // the Close button (default a11y target), and restore focus on close.
+  // Standard prop-driven-animation pattern; lint rule misclassifies it.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       previouslyFocusedRef.current =
@@ -68,6 +70,9 @@ export function LikersSheet({
   }, [open, onClose]);
 
   // Fetch on first open. Re-fetch each open since likes can change.
+  // The setLoading/setError synchronously at the top of the effect are
+  // the intentional "show spinner immediately" UX, not a cascading
+  // render. Dep array is `[open, ratingUserId, songId]`.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -93,6 +98,7 @@ export function LikersSheet({
       cancelled = true;
     };
   }, [open, ratingUserId, songId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!open) return null;
 

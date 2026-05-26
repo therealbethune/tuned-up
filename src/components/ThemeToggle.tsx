@@ -7,10 +7,15 @@ export function ThemeToggle() {
   const [mode, setMode] = useState<Mode>("dark");
   const [mounted, setMounted] = useState(false);
 
+  // Read theme state from the DOM after mount — document is the source
+  // of truth (set by the inline anti-flash script in <head>). We can't
+  // do this in useState's initializer without an SSR/CSR mismatch.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setMounted(true);
     setMode(document.documentElement.classList.contains("dark") ? "dark" : "light");
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggle() {
     const next: Mode = mode === "dark" ? "light" : "dark";

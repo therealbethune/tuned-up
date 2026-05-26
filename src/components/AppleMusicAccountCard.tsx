@@ -27,7 +27,12 @@ export function AppleMusicAccountCard() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
+  // localStorage isn't available during SSR, so we can't read the
+  // "authorized" flag from useState's initializer without a hydration
+  // mismatch. The setState-on-mount pattern is the correct hydration-
+  // safe approach here; the lint rule misclassifies it.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isAppleMusicAuthorized()) setConnected(true);
   }, []);
 

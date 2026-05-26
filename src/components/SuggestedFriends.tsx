@@ -23,7 +23,9 @@ export function SuggestedFriends({ initial }: { initial?: Suggestion[] }) {
   // Lazy-load if no initial data was passed. Failures are silent —
   // the UI just shows the empty state. Without a catch a non-2xx
   // response (or a network error) would surface as an unhandled
-  // promise rejection in dev tools.
+  // promise rejection in dev tools. setLoading-then-fetch is the
+  // standard data-fetching effect; lint rule misclassifies it.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (initial != null) return;
     let cancelled = false;
@@ -47,6 +49,7 @@ export function SuggestedFriends({ initial }: { initial?: Suggestion[] }) {
       cancelled = true;
     };
   }, [initial]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Removes a card and triggers a slight reflow animation.
   function removeOne(id: string) {

@@ -43,6 +43,13 @@ export function PushBanner() {
   const [busy, setBusy] = useState(false);
   const [iosHint, setIosHint] = useState(false);
 
+  // Mount-time browser-feature + localStorage probe to decide whether
+  // to show the banner. The lint rule prefers state to be derived, but
+  // these APIs (localStorage, Notification.permission, navigator) are
+  // only available client-side, so initial-state derivation would
+  // hydration-mismatch. Stays gated to a single mount run via the
+  // empty deps array.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!VAPID_PUBLIC_KEY) return;
@@ -63,6 +70,7 @@ export function PushBanner() {
     if (Notification.permission !== "default") return;
     setShouldShow(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function enable() {
     setBusy(true);

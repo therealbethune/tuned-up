@@ -34,6 +34,11 @@ export default async function StatsView({
   const freezes = target.streakFreezeTokens ?? 0;
 
   // 90 days back from now (UTC midnight) — drives the heatmap window.
+  // Date.now() is impure but this is an async server component — it
+  // executes once per request, never re-renders client-side. The lint
+  // rule's "must be idempotent" guidance is the client-component rule;
+  // it doesn't apply here.
+  // eslint-disable-next-line react-hooks/purity
   const ninetyDaysAgo = new Date(Date.now() - QUARTER_MS);
   const [aggResult, topSongs, topArtists, monthly, heatmapRows] = await Promise.all([
     db.execute(sql`

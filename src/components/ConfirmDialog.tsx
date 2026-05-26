@@ -50,7 +50,11 @@ export function ConfirmDialog({
 
   // Mount-then-animate + focus shuffle + Escape-to-close. The slide-up
   // matches the modal pattern the rest of the app uses (RateButton,
-  // LikersSheet) so this dialog doesn't pop in stiff.
+  // LikersSheet) so this dialog doesn't pop in stiff. The setState
+  // inside the effect (setShow on next frame, setShow(false) on close)
+  // is the standard pattern for driving a CSS-transition off a prop
+  // boundary — lint rule misclassifies it.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       previouslyFocusedRef.current =
@@ -73,6 +77,7 @@ export function ConfirmDialog({
       if (prev && document.contains(prev)) prev.focus();
     }
   }, [open, onClose, busy]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!open) return null;
 

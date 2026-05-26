@@ -24,6 +24,13 @@ export default function PeoplePage() {
   const [actingId, setActingId] = useState<string | null>(null);
   const reqId = useRef(0);
 
+  // Debounced search. We intentionally setState inside the effect:
+  // clear results / flip loading state when the input changes, then
+  // fire a delayed request from inside setTimeout. The dep array is
+  // just `[q]` so this only re-fires when the user types — no
+  // cascading-render risk. The lint rule misclassifies this; the
+  // suppression below covers the whole effect body.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const term = q.trim();
     if (term.length < 1) {
@@ -55,6 +62,7 @@ export default function PeoplePage() {
       ac.abort();
     };
   }, [q]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Inline follow — flips the row's status optimistically so the
   // button responds immediately even with a 200-300ms server roundtrip.

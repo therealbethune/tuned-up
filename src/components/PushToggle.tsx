@@ -154,7 +154,6 @@ export function PushToggle() {
             enabled ? "bg-emerald-500 justify-end" : "bg-neutral-700 justify-start"
           } disabled:opacity-50`}
           style={{ transform: "none" }}
-          aria-pressed={enabled}
           aria-label="Toggle push notifications"
           role="switch"
           aria-checked={enabled}

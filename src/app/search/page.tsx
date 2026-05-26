@@ -40,10 +40,16 @@ export default function SearchPage() {
   const [recents, setRecents] = useState<string[]>([]);
   const reqId = useRef(0);
 
+  // Read recents from localStorage on mount — has to happen after
+  // hydration since localStorage isn't available on the server. Pattern
+  // is intentional and re-runs zero times after first paint.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecents(loadRecents());
   }, []);
 
+  // Debounced search effect. See same explanation in /people/page.tsx.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) {
@@ -90,6 +96,7 @@ export default function SearchPage() {
       ac.abort();
     };
   }, [q, kind]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const top = results[0];
   const rest = results.slice(1);

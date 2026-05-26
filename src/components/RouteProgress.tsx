@@ -23,6 +23,9 @@ export function RouteProgress() {
   // Reset to "done" whenever the pathname actually changes — the new
   // page has hydrated. We fade out by sliding the bar past 100% and
   // hiding it; setProgress(0) on a delay resets state for next nav.
+  // setState-in-effect is the right pattern here: we react to a route
+  // change (an external signal) by advancing animation state.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (progress > 0) {
       setProgress(100);
@@ -31,6 +34,7 @@ export function RouteProgress() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Listen for navigation-initiating clicks anywhere in the document.
   // We match same-origin internal links and ignore: cmd-click,
