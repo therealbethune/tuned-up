@@ -99,6 +99,7 @@ export function TodaysPickCard({ pick }: { pick: DailyPick }) {
               artist={pick.artist}
               album={pick.album}
               thumbnail={pick.thumbnail}
+              previewUrl={pick.previewChecked ? pick.previewUrl : undefined}
             />
           )}
         </div>

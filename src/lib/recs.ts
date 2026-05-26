@@ -11,6 +11,10 @@ export type FriendRec = {
   appleMusicUrl: string | null;
   spotifyTrackId: string | null;
   durationSeconds: number | null;
+  // iTunes preview cache so FriendRecsRail can pass it straight to
+  // AudioPreviewButton — no fetch on click, iOS gesture preserved.
+  previewUrl: string | null;
+  previewChecked: boolean;
   friendCount: number;
   friendAvg: number;
   // Up to 3 friends who rated it, for an avatar stack. Sorted by score
@@ -47,6 +51,8 @@ async function _recommendedFromFriends(
     apple_music_url: string | null;
     spotify_track_id: string | null;
     duration_seconds: number | null;
+    preview_url: string | null;
+    preview_checked: boolean;
     friend_count: number;
     friend_avg: number;
     top_raters_json: string;
@@ -100,6 +106,7 @@ async function _recommendedFromFriends(
     SELECT
       s.id AS song_id, s.title, s.artist, s.album, s.thumbnail,
       s.apple_music_url, s.spotify_track_id, s.duration_seconds,
+      s.preview_url, s.preview_checked,
       fs.friend_count, fs.friend_avg,
       t.raters::text AS top_raters_json
     FROM friend_stats fs
@@ -135,6 +142,8 @@ async function _recommendedFromFriends(
       appleMusicUrl: r.apple_music_url,
       spotifyTrackId: r.spotify_track_id,
       durationSeconds: r.duration_seconds == null ? null : Number(r.duration_seconds),
+      previewUrl: r.preview_url,
+      previewChecked: r.preview_checked,
       friendCount: Number(r.friend_count),
       friendAvg: Number(r.friend_avg),
       topRaters,

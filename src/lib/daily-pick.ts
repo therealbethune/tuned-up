@@ -25,6 +25,8 @@ export type DailyPick = {
   album: string | null;
   thumbnail: string | null;
   durationSeconds: number | null;
+  previewUrl: string | null;
+  previewChecked: boolean;
   kind: "song" | "album";
   avgScore: number;
   ratingCount: number;
@@ -42,6 +44,8 @@ type PoolRow = {
   album: string | null;
   thumbnail: string | null;
   durationSeconds: number | null;
+  previewUrl: string | null;
+  previewChecked: boolean;
   kind: string;
   avg: number;
   n: number;
@@ -55,6 +59,8 @@ function toDailyPick(p: PoolRow, alreadyRated: boolean): DailyPick {
     album: p.album,
     thumbnail: p.thumbnail,
     durationSeconds: p.durationSeconds,
+    previewUrl: p.previewUrl,
+    previewChecked: p.previewChecked,
     kind: p.kind === "album" ? "album" : "song",
     avgScore: Number(p.avg) || 0,
     ratingCount: Number(p.n) || 0,
@@ -85,6 +91,8 @@ export async function getDailyPick(viewerId: string | null): Promise<DailyPick |
           album: songs.album,
           thumbnail: songs.thumbnail,
           durationSeconds: songs.durationSeconds,
+          previewUrl: songs.previewUrl,
+          previewChecked: songs.previewChecked,
           kind: songs.kind,
           avg: sql<number>`round(avg(${ratings.score}))::int`,
           n: sql<number>`count(${ratings.songId})::int`,
@@ -122,6 +130,8 @@ export async function getDailyPick(viewerId: string | null): Promise<DailyPick |
           album: songs.album,
           thumbnail: songs.thumbnail,
           durationSeconds: songs.durationSeconds,
+          previewUrl: songs.previewUrl,
+          previewChecked: songs.previewChecked,
           kind: songs.kind,
           avg: sql<number>`round(avg(${ratings.score}))::int`,
           n: sql<number>`count(${ratings.songId})::int`,

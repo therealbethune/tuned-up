@@ -79,6 +79,7 @@ export function FriendRecsRail({ recs }: { recs: FriendRec[] }) {
                       artist={r.artist}
                       album={r.album}
                       thumbnail={r.thumbnail}
+                      previewUrl={r.previewChecked ? r.previewUrl : undefined}
                     />
                   </div>
                 )}

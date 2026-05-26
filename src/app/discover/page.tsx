@@ -582,12 +582,8 @@ export default async function DiscoverPage() {
       appleMusicUrl: t.appleMusicUrl,
       spotifyTrackId: t.spotifyTrackId,
       durationSeconds: t.durationSeconds,
-      // Friend-rec rows don't carry preview metadata through the recs
-      // helper (yet). The hero will fall through to AudioPreviewButton's
-      // legacy fetch path — uncommon enough that it's not worth widening
-      // recommendedFromFriends just to plumb two more columns.
-      previewUrl: null,
-      previewChecked: false,
+      previewUrl: t.previewUrl,
+      previewChecked: t.previewChecked,
       ratingCount: t.friendCount,
       avgScore: t.friendAvg,
       badge:
