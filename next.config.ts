@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Disable the X-Powered-By: Next.js header — minor fingerprint
+  // surface reduction. Apple App Store scanners flag it; turning it
+  // off costs nothing.
+  poweredByHeader: false,
+
   // Keep prefetched dynamic routes in the client router cache for 30s
   // (default is 0 — every navigation re-fetches dynamic data). Static
   // segments stay 5 min. Net effect: tapping Feed → Me → Feed within
@@ -13,6 +18,49 @@ const nextConfig: NextConfig = {
       dynamic: 30,
       static: 300,
     },
+  },
+
+  // Security headers applied to every response — including the
+  // dynamic Next.js function responses that bypass netlify.toml
+  // [[headers]] blocks. Without this path, the netlify.toml headers
+  // only land on /_next/static/* assets, leaving the actual HTML +
+  // JSON responses (where the real attack surface is) unguarded.
+  //
+  // What's here vs. what's not:
+  //   ✓ HSTS w/ includeSubDomains + preload — forces HTTPS forever.
+  //   ✓ X-Frame-Options DENY — clickjacking; no embed use case.
+  //   ✓ X-Content-Type-Options nosniff — defense against MIME confusion.
+  //   ✓ Referrer-Policy strict-origin-when-cross-origin — same as Next's
+  //     default; explicit so it can't disappear on a framework change.
+  //   ✓ Permissions-Policy — turn off APIs we never use (camera, mic,
+  //     geo, payment, USB, etc.) so a future XSS can't tap them.
+  //   ✗ Content-Security-Policy — NOT set yet. CSP for Next + Clerk +
+  //     MusicKit + Sentry + iTunes artwork CDN needs nonce-based
+  //     scripts; rolling out without that breaks Clerk's hosted UIs.
+  //     Tracked in docs/APP_STORE_GUIDE.md.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value:
+              "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), midi=(), magnetometer=(), accelerometer=(), gyroscope=(), interest-cohort=()",
+          },
+        ],
+      },
+    ];
   },
   // Allow Next/Image optimization for the third-party image hosts we pull
   // from. Every <Image> in the app loads from one of these hosts, so we

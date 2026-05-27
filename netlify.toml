@@ -9,24 +9,15 @@
   node_bundler = "esbuild"
 
 # ─────────────────────────────────────────────────────────────
-# Security headers
+# Security headers — static assets only
 # ─────────────────────────────────────────────────────────────
-# Applied to every response from tuned-up.com. Headers stay in the
-# .toml (not _headers) so deploy-time validation catches typos.
-#
-# What's here vs. what's not:
-#   ✓ HSTS with includeSubDomains + preload — forces HTTPS forever.
-#   ✓ X-Frame-Options DENY — clickjacking. The site has no embed use case.
-#   ✓ X-Content-Type-Options nosniff — already sent by Next; redundant
-#     safe-belt in case a static asset slips through.
-#   ✓ Referrer-Policy strict-origin-when-cross-origin — same as Next's
-#     default; explicit so it doesn't disappear on a framework change.
-#   ✓ Permissions-Policy — turn off APIs we never use (geolocation,
-#     mic, camera, payment, etc.) so a future XSS can't grab them.
-#   ✗ Content-Security-Policy — NOT set yet. CSP for a Next.js app with
-#     Clerk + MusicKit JS + iTunes artwork CDN + Sentry needs careful
-#     nonce-based scripts; rolling out without that breaks Clerk's
-#     hosted UIs. Listed as a follow-up in docs/APP_STORE_GUIDE.md.
+# Netlify's [[headers]] blocks apply ONLY to static assets served
+# directly by the CDN. Dynamic Next.js routes (the actual HTML pages
+# + API endpoints — most of the attack surface) come out of
+# serverless functions and bypass these headers entirely. The same
+# security headers ARE set inside next.config.ts's headers() so
+# they land on every response. This block is belt-and-suspenders for
+# /_next/static/* and /public files.
 
 [[headers]]
   for = "/*"
@@ -35,12 +26,4 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    # Permissions-Policy — explicitly disable browser APIs the app
-    # doesn't use so a future XSS can't tap into them. Camera + mic +
-    # geo are the obvious ones; payment + USB + serial + bluetooth are
-    # the "you definitely don't need these" tier.
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), midi=(), magnetometer=(), accelerometer=(), gyroscope=(), interest-cohort=()"
-    # Remove the X-Powered-By: Next.js header (Next 16 sends it by
-    # default). Not a vulnerability, but reduces fingerprinting surface
-    # for opportunistic scanners.
-    X-Powered-By = ""
