@@ -5,7 +5,6 @@ import { randomUUID } from "node:crypto";
 import { db, songs, ratings, activities, recommendations, users, savedSongs, follows } from "@/db";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { resolveAppleMusicUrl } from "@/lib/apple-music";
-import { ensureSpotifyTrackIdCached } from "@/lib/spotify-server";
 import { sendPushToUser } from "@/lib/push";
 import { computeStreak } from "@/lib/streak";
 import {
@@ -126,12 +125,12 @@ export async function POST(req: Request) {
       .catch(() => {});
   }
 
-  // Best-effort: resolve & cache the Spotify track id for tracks (not albums)
-  // so the "Open in Spotify" link is direct, not a search. Fire-and-forget —
-  // failures shouldn't block the rating from saving.
-  if (kind === "song" && !song.id.startsWith("spotify:")) {
-    ensureSpotifyTrackIdCached(song.id, song.title, song.artist).catch(() => {});
-  }
+  // (Previously: background lookup against Spotify's catalog search to
+  // cache spotify_track_id on the songs row. Removed when we dropped
+  // the Spotify API dependency — songs.spotify_track_id is still read
+  // by <StreamingLinks/> when present, so existing rows continue to
+  // deep-link, but new songs from YouTube Music fall through to a
+  // Spotify search URL instead.)
 
   // Detect whether this is a NEW rating (vs an update of an existing one) by
   // checking for a prior row before the upsert.

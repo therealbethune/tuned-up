@@ -35,7 +35,6 @@ const isProtectedRoute = createRouteMatcher([
   "/api/musickit(.*)",
   "/api/search(.*)",
   "/api/songs(.*)",
-  "/api/spotify(.*)",
   "/api/listening(.*)",
 ]);
 

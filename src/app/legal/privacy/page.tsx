@@ -115,12 +115,6 @@ export default function PrivacyPage() {
           stack traces are sent without your email/IP attached.
         </li>
         <li>
-          <strong>Spotify Web API</strong> — anonymous title-artist lookups
-          (app-credentials only) so we can show an &ldquo;Open in Spotify&rdquo;
-          deep link on songs you rate. No account data is sent and Tuned Up
-          does not connect to or read from your personal Spotify account.
-        </li>
-        <li>
           <strong>Apple iTunes Search</strong> — anonymous title-artist lookups
           to find a streaming URL for songs you rate. No account data is sent.
         </li>
