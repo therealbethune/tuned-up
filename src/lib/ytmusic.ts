@@ -1,10 +1,21 @@
 // Minimal YouTube Music search via the public InnerTube API.
 // Mirrors what ytmusicapi (Python) does. Swap for Spotify later.
 
-// The InnerTube web client key is publicly published in music.youtube.com's
-// HTML, but we still keep it in an env var so source-code secret scanners
-// don't flag it. Set YT_MUSIC_KEY in your Netlify project env vars
-// (server-only — never exposed to the browser).
+// The InnerTube web client key is the EXACT same string Google ships
+// hard-coded in the HTML at https://music.youtube.com/ — open view-
+// source on that page and you'll find it as `INNERTUBE_API_KEY`. It's
+// not a secret; it just identifies the WEB_REMIX client to Google's
+// API. We keep it in YT_MUSIC_KEY anyway so:
+//   1. Source-code secret scanners don't flash red on the AIzaSy
+//      prefix every time someone audits the repo.
+//   2. If Google ever rotates the public key, we update one env var
+//      instead of redeploying.
+// (Historical note: the very first commit had this string hard-coded
+// in source, which GitHub Secret Scanning still alerts on against
+// that initial blob. The alert is a known false positive — mark it
+// as "Won't fix / public client key" in github.com/<repo>/security/
+// secret-scanning. Rotating would not help: the new key would also
+// be publicly published by Google.)
 const YT_MUSIC_KEY = process.env.YT_MUSIC_KEY ?? "";
 const ENDPOINT = `https://music.youtube.com/youtubei/v1/search?key=${YT_MUSIC_KEY}&prettyPrint=false`;
 const SONGS_PARAMS = "EgWKAQIIAWoOEAMQBBAJEA4QChAFEBA%3D";
