@@ -90,6 +90,24 @@ export default async function Home() {
               </Link>
             </Show>
           </div>
+          {/* Inline legal disclosure required by App Store Review
+              Guidelines' privacy section — the user has to see that
+              they're agreeing to Terms + Privacy BEFORE tapping the
+              sign-up CTA, not buried in Clerk's hosted modal. Kept
+              compact so it doesn't compete with the hero. */}
+          <Show when="signed-out">
+            <p className="text-xs text-neutral-500 max-w-md">
+              By tapping &ldquo;Get started&rdquo; you agree to our{" "}
+              <Link href="/legal/terms" className="underline hover:text-neutral-300">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/legal/privacy" className="underline hover:text-neutral-300">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          </Show>
         </div>
 
         {/* Real top-rated rail. Each card is a small clickable preview of

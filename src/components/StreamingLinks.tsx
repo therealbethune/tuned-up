@@ -35,15 +35,24 @@ export function StreamingLinks({
   const spotifyDirectLink = Boolean(spotifyDirect || spotifyResolved);
   const appleDirectLink = Boolean(appleMusicUrl);
 
+  // Apple's HIG requires 44pt minimum tap targets. Previously these
+  // chips were 28px (h-7 w-7) — well under the threshold and the kind
+  // of thing the App Store review team flags during testing on a real
+  // iPhone. Bumped to h-11 w-11 (44pt) with the icon centered inside.
+  //
+  // We also drop `target="_blank"` so iOS Universal Links can route
+  // music.apple.com / open.spotify.com / music.youtube.com URLs into
+  // their native apps when those apps are installed. In the browser
+  // these still open in a new tab (default behavior of these domains'
+  // own pages). In the Capacitor wrapper, iOS picks the native app.
   const linkClass =
-    "inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors";
+    "inline-flex items-center justify-center h-11 w-11 rounded-full transition-colors active:scale-95";
 
   return (
-    <div className={`flex items-center gap-1 ${className}`} aria-label="Open on streaming services">
+    <div className={`flex items-center gap-0.5 ${className}`} aria-label="Open on streaming services">
       {yt && (
         <a
           href={yt}
-          target="_blank"
           rel="noreferrer"
           title="Open in YouTube Music"
           aria-label="Open in YouTube Music"
@@ -54,7 +63,6 @@ export function StreamingLinks({
       )}
       <a
         href={spotify}
-        target="_blank"
         rel="noreferrer"
         title={spotifyDirectLink ? "Open in Spotify" : "Search on Spotify"}
         aria-label={spotifyDirectLink ? "Open in Spotify" : "Search on Spotify"}
@@ -64,7 +72,6 @@ export function StreamingLinks({
       </a>
       <a
         href={appleMusic}
-        target="_blank"
         rel="noreferrer"
         title={appleDirectLink ? "Open in Apple Music" : "Search on Apple Music"}
         aria-label={appleDirectLink ? "Open in Apple Music" : "Search on Apple Music"}
@@ -74,7 +81,6 @@ export function StreamingLinks({
       </a>
       <a
         href={soundcloud}
-        target="_blank"
         rel="noreferrer"
         title="Search on SoundCloud"
         aria-label="Search on SoundCloud"

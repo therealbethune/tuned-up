@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "How Tuned Up handles your data.",
 };
 
-const UPDATED = "May 12, 2026";
+const UPDATED = "May 27, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -43,10 +43,11 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>What you create in the app</strong>: ratings (1–100 with an
-          optional review), comments, likes, follows, recommendations you send
-          and receive, which suggestions you dismiss, and any reports or
-          blocks you submit (we keep these to act on moderation issues and
-          to enforce that blocked users stay hidden from your view).
+          optional review, mood tag, and cover-theme preference), comments,
+          likes, follows, recommendations you send and receive, songs you
+          save for later, friend suggestions you dismiss, and any reports
+          or blocks you submit (we keep these to act on moderation issues
+          and to enforce that blocked users stay hidden from your view).
         </li>
         <li>
           <strong>Timezone</strong>: a best-effort read of your browser&rsquo;s
@@ -61,10 +62,22 @@ export default function PrivacyPage() {
           token. We never read or send anything else through these channels.
         </li>
         <li>
-          <strong>Apple Music (only if you connect it)</strong>: a MusicKit
-          user token your browser holds locally, used so you can add songs to
-          your library from inside Tuned Up. We do not store this token on our
-          servers; revoking us from your Apple ID terminates it.
+          <strong>Apple Music (only if you connect it)</strong>: when you tap
+          &ldquo;Connect Apple Music&rdquo; in Settings, we store the MusicKit
+          user token your device hands us. We use it to fetch your recent
+          listening from Apple&rsquo;s API and to optionally add songs to your
+          library when you tap Save. The token is treated as sensitive
+          credential data, scoped to your account, and removed immediately
+          when you tap Disconnect or delete your account. Revoking us from
+          your Apple ID terminates it too.
+        </li>
+        <li>
+          <strong>Apple Music recent listens (only if you connect it)</strong>:
+          if you connect Apple Music, we cache up to your last 50 played
+          tracks — title, artist, album, artwork URL, Apple Music URL, and
+          our best estimate of when each was played. Friends see this on
+          your profile (subject to the visibility setting you choose:
+          followers, anyone, or only me). Disconnecting deletes all rows.
         </li>
         <li>
           <strong>Server logs</strong>: standard request logs from our hosting

@@ -15,6 +15,21 @@ const ERROR_AUTO_RESET_MS = 2500;
 // couldn't tell if their previous tap actually landed.
 const SAVED_AUTO_RESET_MS = 5000;
 
+// True when the page is running inside the Capacitor iOS wrapper.
+// MusicKit JS's terms restrict use inside native wrappers, and Apple
+// reviewers WILL flag a broken save flow as a Guideline 2.1 rejection.
+// Until a native MusicKit-iOS bridge is wired via a Capacitor plugin,
+// we hide the button entirely when running inside the wrapper.
+function isCapacitorNative(): boolean {
+  if (typeof window === "undefined") return false;
+  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  try {
+    return Boolean(cap?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
+}
+
 // Adds a song to the viewer's Apple Music library. Lazy-loads MusicKit JS
 // on first click; user authorizes Apple Music in a popup; we look up the
 // Apple Music catalog ID server-side then call addToLibrary.
@@ -22,12 +37,19 @@ export function SaveToAppleMusicButton({ songId }: { songId: string }) {
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track Capacitor-native state in a useState so it's correct after
+  // hydration without flashing the button on first paint.
+  const [hideForNative, setHideForNative] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isCapacitorNative()) setHideForNative(true);
     return () => {
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
     };
   }, []);
+
+  if (hideForNative) return null;
 
   function scheduleReset(ms = ERROR_AUTO_RESET_MS) {
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);

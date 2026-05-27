@@ -94,11 +94,18 @@ export function PushToggle() {
         // would linger in push_subscriptions and we'd keep trying to
         // send pushes to a dead endpoint (web-push would 410, which
         // we don't currently prune — see lib/push.ts).
-        await fetch("/api/push/subscribe", {
+        const res = await fetch("/api/push/subscribe", {
           method: "DELETE",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ endpoint }),
         });
+        if (!res.ok) {
+          // Server DELETE failed — don't proceed with local unsubscribe
+          // OR flip the UI state. The row remains in push_subscriptions;
+          // the user can retry. Surface the actual failure so they
+          // don't tap "Disable" and silently still get notifications.
+          throw new Error(`Couldn't disable on the server (HTTP ${res.status}).`);
+        }
         await sub.unsubscribe();
       }
       setStatus("off");

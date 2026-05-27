@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: "Rules for using Tuned Up.",
 };
 
-const UPDATED = "May 12, 2026";
+const UPDATED = "May 27, 2026";
 
 export default function TermsPage() {
   return (

@@ -173,7 +173,7 @@ export default async function AlbumPage({
             <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
               <Image
                 src={song.thumbnail}
-                alt=""
+                alt={`Cover art for ${song.title} by ${song.artist}`}
                 width={144}
                 height={144}
                 className="rounded-lg h-32 w-32 sm:h-36 sm:w-36 object-cover ring-2 ring-neutral-800"
@@ -182,7 +182,7 @@ export default async function AlbumPage({
           ) : (
             <Image
               src={song.thumbnail}
-              alt=""
+              alt={`Cover art for ${song.title} by ${song.artist}`}
               width={144}
               height={144}
               className="rounded-lg h-32 w-32 sm:h-36 sm:w-36 object-cover ring-2 ring-neutral-800 shrink-0"
