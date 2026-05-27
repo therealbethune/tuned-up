@@ -19,6 +19,7 @@ import { computeTasteDetails } from "@/lib/taste";
 import { streakPercentile } from "@/lib/streak-milestones";
 import { safeQuery } from "@/lib/safe-query";
 import { TasteComparePanel } from "@/components/TasteComparePanel";
+import { ProfileListeningSection } from "@/components/ProfileListeningSection";
 import { Avatar } from "@/components/Avatar";
 import { PaperPlaneIcon } from "@/components/icons";
 import { ReportButton } from "@/components/ReportButton";
@@ -446,6 +447,14 @@ export default async function UserProfile({ target, viewerId }: { target: User; 
           must NOT see them via this panel either. The computeTasteDetails
           query runs in parallel above for latency reasons, but its
           output is gated here at render time. */}
+      {/* Listening section: now-playing + recent listens from Apple Music.
+          The component handles its own privacy gating server-side via
+          /api/listening, so we can mount it unconditionally — it'll
+          render nothing if the target isn't connected or the viewer
+          isn't allowed to see. Owner sees an empty-state when there's
+          no synced data; others see nothing in that case. */}
+      <ProfileListeningSection username={target.username} isOwner={isOwner} />
+
       {taste && canSeeRatings && (
         <TasteComparePanel
           agreement={taste.agreement}

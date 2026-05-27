@@ -230,6 +230,34 @@ const STATEMENTS = [
     ON "activities" ("user_id", "actor_id", "type", "song_id")
     WHERE "type" IN ('like', 'recommendation', 'streak_milestone', 'rating_match', 'rec_rated')
       AND "song_id" IS NOT NULL`,
+  // Apple Music listening integration (wave BG). Per-user connection
+  // stores the MusicKit user token; listening_history caches recent
+  // plays so we don't hit Apple on every profile page load. provider
+  // column is forward-compat for SoundCloud / Spotify additions.
+  `CREATE TABLE IF NOT EXISTS "apple_music_connections" (
+    "user_id" text PRIMARY KEY REFERENCES "users"("id") ON DELETE CASCADE,
+    "music_user_token" text NOT NULL,
+    "storefront" text,
+    "visibility" text NOT NULL DEFAULT 'followers',
+    "connected_at" timestamp DEFAULT now() NOT NULL,
+    "last_synced_at" timestamp,
+    "last_sync_error" text
+  )`,
+  `CREATE TABLE IF NOT EXISTS "listening_history" (
+    "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+    "provider" text NOT NULL DEFAULT 'apple_music',
+    "track_id" text NOT NULL,
+    "played_at" timestamp NOT NULL,
+    "title" text NOT NULL,
+    "artist" text NOT NULL,
+    "album" text,
+    "thumbnail" text,
+    "apple_music_url" text,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    PRIMARY KEY ("user_id", "provider", "track_id", "played_at")
+  )`,
+  `CREATE INDEX IF NOT EXISTS "listening_history_user_idx"
+    ON "listening_history" ("user_id", "played_at" DESC)`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

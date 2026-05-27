@@ -13,7 +13,16 @@ export type MusicKitAPI = {
 
 export type MusicKitInstance = {
   isAuthorized: boolean;
+  // `authorize()` returns the Music User Token string. Once granted,
+  // MusicKit also stores it on the instance under `musicUserToken`
+  // for any caller that needs to ship it to the server later
+  // (e.g. our /api/applemusic/connect endpoint, which stores it for
+  // server-side recent-played syncs).
   authorize: () => Promise<string>;
+  musicUserToken?: string;
+  // ISO 3166-1 alpha-2 storefront id, set by MusicKit after auth.
+  // Used to build per-region Apple Music URLs (us / gb / jp / ...).
+  storefrontId?: string;
   api: {
     music: (
       path: string,

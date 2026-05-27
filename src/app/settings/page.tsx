@@ -2,10 +2,11 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { db, users, blocks } from "@/db";
+import { db, users, blocks, appleMusicConnections } from "@/db";
 import { safeQuery } from "@/lib/safe-query";
 import { SettingsForm } from "./SettingsForm";
 import { AppleMusicAccountCard } from "@/components/AppleMusicAccountCard";
+import { AppleMusicListeningCard } from "@/components/AppleMusicListeningCard";
 import { ProfilePictureSection } from "@/components/ProfilePictureSection";
 import { BlockedUsersList } from "@/components/BlockedUsersList";
 import { NotifySettings } from "@/components/NotifySettings";
@@ -17,7 +18,7 @@ export default async function SettingsPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  const [meRows, blockedRows] = await Promise.all([
+  const [meRows, blockedRows, appleConnRows] = await Promise.all([
     safeQuery(
       () => db.select().from(users).where(eq(users.id, userId)).limit(1),
       [] as (typeof users.$inferSelect)[],
@@ -39,6 +40,28 @@ export default async function SettingsPage() {
           .limit(200),
       [] as { id: string; username: string; displayName: string | null; imageUrl: string | null }[],
       "settings-blocked-list",
+    ),
+    // Apple Music listening connection — used to seed the
+    // <AppleMusicListeningCard /> with current status so the card
+    // doesn't have to do a roundtrip on mount to decide whether to
+    // render "Connect" vs "Connected" state.
+    safeQuery(
+      () =>
+        db
+          .select({
+            visibility: appleMusicConnections.visibility,
+            lastSyncedAt: appleMusicConnections.lastSyncedAt,
+            lastSyncError: appleMusicConnections.lastSyncError,
+          })
+          .from(appleMusicConnections)
+          .where(eq(appleMusicConnections.userId, userId))
+          .limit(1),
+      [] as {
+        visibility: string;
+        lastSyncedAt: Date | null;
+        lastSyncError: string | null;
+      }[],
+      "settings-apple-listening",
     ),
   ]);
   const me = meRows[0] ?? null;
@@ -81,6 +104,19 @@ export default async function SettingsPage() {
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-2">Connected accounts</h2>
         <AppleMusicAccountCard />
+        <AppleMusicListeningCard
+          initial={{
+            connected: appleConnRows.length > 0,
+            visibility:
+              (appleConnRows[0]?.visibility as
+                | "followers"
+                | "public"
+                | "private") ?? "followers",
+            lastSyncedAt:
+              appleConnRows[0]?.lastSyncedAt?.toISOString() ?? null,
+            lastSyncError: appleConnRows[0]?.lastSyncError ?? null,
+          }}
+        />
       </div>
 
       <CoverThemePicker initial={me.coverTheme ?? null} />

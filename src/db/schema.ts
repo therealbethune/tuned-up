@@ -195,6 +195,54 @@ export const savedSongs = pgTable("saved_songs", {
   index("saved_songs_user_idx").on(t.userId, t.createdAt),
 ]);
 
+// Per-user Apple Music link. Stored client-grant Music User Token
+// plus storefront ("us", "gb", ...) + visibility policy. We sync
+// recent-played periodically into listening_history below.
+//
+// Token security: the Music User Token is sensitive — it lets us read
+// the user's listening data + library. Treat the row like an OAuth
+// refresh-token row: only the user's own auth context (or the cron
+// sync running with the dev token) should touch it. The column is
+// plain text for now; future hardening could encrypt at rest with a
+// KMS key + audit log.
+//
+// visibility: "followers" (default — only accepted followers see it),
+//             "public"    (anyone can see),
+//             "private"   (only you see).
+export const appleMusicConnections = pgTable("apple_music_connections", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  musicUserToken: text("music_user_token").notNull(),
+  storefront: text("storefront"),
+  visibility: text("visibility").notNull().default("followers"),
+  connectedAt: timestamp("connected_at").defaultNow().notNull(),
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastSyncError: text("last_sync_error"),
+});
+
+// Cached recent-played history. Populated by the listening-sync helper
+// from /v1/me/recent/played/tracks. Capped at ~50 rows per user via a
+// sweep at sync time so this table doesn't grow unboundedly.
+//
+// `provider` is set up to be 'apple_music' for v1 but prepped so a
+// future SoundCloud / Spotify integration can drop rows here too
+// without schema churn — the (user_id, provider, track_id, played_at)
+// composite PK already handles cross-provider dedup.
+export const listeningHistory = pgTable("listening_history", {
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull().default("apple_music"),
+  trackId: text("track_id").notNull(),
+  playedAt: timestamp("played_at").notNull(),
+  title: text("title").notNull(),
+  artist: text("artist").notNull(),
+  album: text("album"),
+  thumbnail: text("thumbnail"),
+  appleMusicUrl: text("apple_music_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.provider, t.trackId, t.playedAt] }),
+  index("listening_history_user_idx").on(t.userId, t.playedAt),
+]);
+
 // Content reports. UGC moderation flow required by Apple App Store
 // Guideline 1.2 — users must be able to flag offensive content. The
 // targetType + nullable target* columns let one table cover every
