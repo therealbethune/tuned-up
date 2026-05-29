@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Netlify build output (gitignored). Minified function + static
+    // bundles; linting them produced ~29k meaningless problems that
+    // dwarfed the real source lint and slowed `lint`/preflight.
+    ".netlify/**",
   ]),
 ]);
 

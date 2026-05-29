@@ -21,15 +21,8 @@ export const dynamic = "force-dynamic";
 // the `:` in `yt:<videoId>` doesn't break URL routing.)
 
 import { cache } from "react";
-import { encodeBase64Url, decodeBase64Url } from "@/lib/encoding";
-function decodeSongId(s: string): string {
-  // Tolerant: either url-safe base64 or the literal id with %3A (colon).
-  try {
-    return decodeBase64Url(s);
-  } catch {
-    return decodeURIComponent(s);
-  }
-}
+import { encodeBase64Url, decodeSongIdParam } from "@/lib/encoding";
+import { ogRatingImageUrl } from "@/lib/site-url";
 
 // React.cache wrap: this page is rendered by Next twice per request —
 // once for generateMetadata (OG card), once for the page itself. Without
@@ -51,7 +44,7 @@ const loadRating = cache(async function loadRating(
   const user = userRows[0];
   if (!user) return null;
 
-  const songId = decodeSongId(encodedSongId);
+  const songId = decodeSongIdParam(encodedSongId);
   const ratingRows = await safeQuery(
     () =>
       db
@@ -123,7 +116,9 @@ export async function generateMetadata({
 
   const titleStr = `@${r.username} rated ${r.title} — ${r.score}/100`;
   const desc = r.review ?? `${r.artist} · ${r.score}/100 on Tuned Up`;
-  const ogImage = `/api/og/rating?u=${encodeURIComponent(r.username)}&s=${encodeURIComponent(r.songId)}`;
+  // Absolute, canonical (tuned-up.com) path-segment OG URL — see
+  // site-url.ts for why path segments + canonical host matter here.
+  const ogImage = ogRatingImageUrl(r.username, r.songId);
 
   return {
     title: titleStr,

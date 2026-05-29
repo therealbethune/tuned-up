@@ -11,16 +11,14 @@ import { RouteProgress } from "@/components/RouteProgress";
 import { TunedUpMark } from "@/components/icons";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { TimezoneSync } from "@/components/TimezoneSync";
+import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.URL && !process.env.URL.includes("--")
-    ? process.env.URL
-    : "https://tuned-up.com");
-
+// metadataBase must be the canonical domain, NOT Netlify's injected
+// process.env.URL (which resolves to tuned-up.netlify.app on prod
+// deploys and leaked that host into every OG/Twitter card URL).
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: "Tuned Up",
   description: "Rate songs 1–100 and follow your friends",
   applicationName: "Tuned Up",

@@ -258,6 +258,25 @@ const STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "listening_history_user_idx"
     ON "listening_history" ("user_id", "played_at" DESC)`,
+  // ─────────────────────────────────────────────────────────────
+  // Preview re-check marker — fixes wrong-song 30s previews.
+  // ─────────────────────────────────────────────────────────────
+  // The /api/preview-url matcher used to accept the first iTunes result
+  // whose ARTIST matched, ignoring the track TITLE — so it cached the
+  // wrong clip for any song whose artist had other tracks rank higher
+  // in search (e.g. "Bubble Toes" resolving to a different Jack Johnson
+  // song), and `preview_checked = true` pinned that wrong URL forever.
+  // The matcher now validates title too. `preview_algo_version` is a
+  // one-time reset marker (DB-only — intentionally not modeled in the
+  // Drizzle schema, which simply ignores the extra column): rows below
+  // the current version get their cached preview cleared so the next
+  // view re-looks-up with the corrected matcher. Bump the literal in
+  // both the comparison and the SET to force another sweep after a
+  // future matcher change.
+  `ALTER TABLE "songs" ADD COLUMN IF NOT EXISTS "preview_algo_version" integer NOT NULL DEFAULT 0`,
+  // Idempotent: once every non-album song reaches version 1 this UPDATE
+  // matches no rows, so re-running init-db is a safe no-op.
+  `UPDATE "songs" SET "preview_checked" = false, "preview_url" = NULL, "preview_algo_version" = 1 WHERE "preview_algo_version" < 1 AND "kind" <> 'album'`,
 ];
 
 // Auth: requires INIT_DB_TOKEN in the Authorization header (set as a Netlify env var).

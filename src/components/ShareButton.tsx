@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { encodeBase64Url } from "@/lib/encoding";
+import { ogRatingImagePath, shareRatingUrl } from "@/lib/site-url";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 import { toast } from "@/lib/toast";
 
@@ -23,11 +23,11 @@ export function ShareButton({
   const [copied, setCopied] = useState(false);
   useScrollLock(open);
 
-  const url =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/r/${encodeURIComponent(username)}/${encodeBase64Url(songId)}`
-      : `/r/${encodeURIComponent(username)}/${encodeBase64Url(songId)}`;
-  const ogUrl = `/api/og/rating?u=${encodeURIComponent(username)}&s=${encodeURIComponent(songId)}`;
+  // Always the canonical tuned-up.com link — never window.location.origin,
+  // which would hand out a tuned-up.netlify.app URL whenever the app is
+  // opened from the Netlify domain (e.g. an installed PWA).
+  const url = shareRatingUrl(username, songId);
+  const ogUrl = ogRatingImagePath(username, songId);
 
   // Prop-driven modal animation. Lint rule misclassifies it.
   /* eslint-disable react-hooks/set-state-in-effect */

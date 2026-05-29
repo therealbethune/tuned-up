@@ -2,14 +2,20 @@ import { ImageResponse } from "next/og";
 import { and, eq } from "drizzle-orm";
 import { db, ratings, songs, users } from "@/db";
 import { scoreLabel } from "@/lib/score-labels";
+import { decodeSongIdParam } from "@/lib/encoding";
 
 export const runtime = "nodejs";
-// Removed `export const dynamic = "force-dynamic"` — it was forcing
-// Next to emit `cache-control: max-age=0, must-revalidate` on the
-// response, overriding the s-maxage=3600 we set in the ImageResponse
-// headers. The route still renders dynamically because the searchParams
-// (u, s) vary per request; we just don't want Next telling downstream
-// caches to never store the result.
+// Identity lives in the PATH (/[u]/[s]), so Netlify's durable cache —
+// which this `revalidate` opts the route into — keys each (user, song)
+// pair separately. The same pair always renders the same card until the
+// rating changes, which is rare, so a 1-hour TTL + day-long
+// stale-while-revalidate is a big win on the repeated fetches social
+// unfurlers make.
+//
+// (History: this used to read ?u=&s= query params. The durable cache
+// keys on pathname only, so every rating collapsed onto one
+// `/api/og/rating` slot and unfurls served the *previous* song's image.
+// Path segments fixed it.)
 export const revalidate = 3600;
 
 // next/og's renderer doesn't run Tailwind, so we can't pass through the
@@ -30,12 +36,15 @@ function tierHex(score: number): string {
   return TIER_HEX[scoreLabel(score).color] ?? "#10b981";
 }
 
-// /api/og/rating?u=<username>&s=<encoded songId>
+// /api/og/rating/<username>/<base64url songId>
 // Renders a 1200x630 social card image for sharing.
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const username = url.searchParams.get("u") ?? "";
-  const songId = url.searchParams.get("s") ?? "";
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ u: string; s: string }> },
+) {
+  const { u, s } = await params;
+  const username = decodeURIComponent(u);
+  const songId = decodeSongIdParam(s);
 
   if (!username || !songId) {
     return new ImageResponse(<Card title="Tuned Up" />, { width: 1200, height: 630 });
@@ -70,12 +79,6 @@ export async function GET(req: Request) {
     return new ImageResponse(<Card title="Tuned Up" />, { width: 1200, height: 630 });
   }
 
-  // Cache the rendered OG image at the edge for 1 hour, serve stale
-  // for an additional day while we revalidate in the background.
-  // Same (username, songId) pair always renders the same image until
-  // the rating changes, and the underlying rating doesn't change
-  // often. Massive win on social unfurls (Slack, iMessage, Twitter)
-  // since they all repeatedly fetch the same OG URL.
   const cardHeaders = {
     "cache-control": "public, s-maxage=3600, stale-while-revalidate=86400",
   };
@@ -154,12 +157,9 @@ export async function GET(req: Request) {
                 marginTop: 32,
               }}
             >
-              {/* Score + label color-coded by tier (was hardcoded
-                  emerald + lime regardless of rating, so a 5-point
-                  "Skip" used to render in the same color as a 95
-                  "Classic" — making the OG card lie about the verdict
-                  in social previews). TIER_HEX above mirrors the
-                  Tailwind classes used inside scoreLabel(). */}
+              {/* Score + label color-coded by tier (mirrors the Tailwind
+                  classes in scoreLabel() via TIER_HEX) so the card reads
+                  as the verdict, not a generic highlight. */}
               <span style={{ fontSize: 140, fontWeight: 900, lineHeight: 1, color: tierHex(row.score) }}>
                 {row.score}
               </span>

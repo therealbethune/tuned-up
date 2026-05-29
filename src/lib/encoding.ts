@@ -25,3 +25,15 @@ export function decodeBase64Url(input: string): string {
   // Browser path
   return decodeURIComponent(escape(atob(padded)));
 }
+
+// Decode a songId taken from a URL segment. Tolerant of both how we
+// encode now (url-safe base64) and older / hand-built links that used a
+// percent-encoded literal id (the `:` shows up as %3A). Shared by the
+// share page and the OG image route so they decode identically.
+export function decodeSongIdParam(s: string): string {
+  try {
+    return decodeBase64Url(s);
+  } catch {
+    return decodeURIComponent(s);
+  }
+}

@@ -27,3 +27,21 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), midi=(), magnetometer=(), accelerometer=(), gyroscope=(), interest-cohort=()"
+
+# ─────────────────────────────────────────────────────────────
+# Canonical domain redirect
+# ─────────────────────────────────────────────────────────────
+# Send the bare production Netlify origin to the custom domain with a
+# 301. Only the exact `tuned-up.netlify.app` host matches — deploy-preview
+# and branch subdomains (e.g. deploy-preview-12--tuned-up.netlify.app)
+# have a different host and keep working. This is the belt to the
+# SITE_URL suspenders in code: it canonicalizes the address bar and any
+# installed PWA still pointed at the Netlify origin, so links copied from
+# there (and the iMessage/Slack unfurls they generate) read tuned-up.com.
+# force=true so it wins over the Next.js function that would otherwise
+# serve the page on the Netlify host.
+[[redirects]]
+  from = "https://tuned-up.netlify.app/*"
+  to = "https://tuned-up.com/:splat"
+  status = 301
+  force = true
